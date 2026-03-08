@@ -17,7 +17,6 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 ### 0.1.0
 - [x] DB orm (prisma?)
 - [x] Single command dev env build and start (client and server)
-- [ ] create dev branch
 - [ ] basic auth with email and password (created_at, email, password_hash)
 - [ ] private registration gated by unsecure clear-text password in app logs
 - [ ] add member (created_at, updated_at, name, pronouns, description)
