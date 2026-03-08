@@ -15,7 +15,7 @@ A free and open source alternative to Simply Plural (R.I.P.)
 This is my personal todo list. It is not a promise and may change at anytime without prior notice. There is no deadline or ETA
 
 ### 0.1.0
-- [ ] DB orm (prisma?)
+- [x] DB orm (prisma?)
 - [ ] Single command dev env build and start (api, client and DB)
 - [ ] create dev branch
 - [ ] basic auth with email and password (created_at, email, password_hash)
