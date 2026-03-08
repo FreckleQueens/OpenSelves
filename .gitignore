@@ -1,2 +1,4 @@
 /.idea
 /private launch items.md
+/node_modules
+/.yarn
