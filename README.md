@@ -28,6 +28,7 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0
+- [ ] linting (git hooks)
 - [ ] contribution CI (test and build on every commit and PRs)
 - [ ] localization
 - [ ] self-hosting (choose server url in client)
