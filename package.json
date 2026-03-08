@@ -1,7 +1,7 @@
 {
 	"name": "openselves",
 	"scripts": {
-		"dev": "concurrently --kill-others \"cd client && yarn dev\" \"cd server && yarn start:dev\""
+		"dev": "concurrently --kill-others \"cd client && yarn dev\" \"cd server && yarn dev\""
 	},
 	"packageManager": "yarn@4.13.0",
 	"devDependencies": {
