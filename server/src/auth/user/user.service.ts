@@ -11,28 +11,39 @@ import { PrismaService } from "../../prisma.service";
 
 @Injectable()
 export class UserService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(private readonly prismaService: PrismaService) {}
 
-	async user(where: UserWhereUniqueInput) {
-		return this.prisma.user.findUnique({ where });
-	}
-
-	async userWithPasswordHash(where: UserWhereUniqueInput) {
-		return this.prisma.user.findUnique({ where, omit: { passwordHash: false } });
+	async user(
+		where: UserWhereUniqueInput,
+		options: { withPasswordHash: boolean; withRelations?: Array<"refreshTokens"> } = {
+			withPasswordHash: false,
+		},
+	) {
+		const include = {};
+		if (options.withRelations) {
+			for (const relation of options.withRelations) {
+				include[relation] = true;
+			}
+		}
+		return this.prismaService.user.findUnique({
+			where,
+			include,
+			omit: { passwordHash: !options.withPasswordHash },
+		});
 	}
 
 	async createUser(data: UserCreateInput): Promise<User> {
-		return this.prisma.user.create({
+		return this.prismaService.user.create({
 			data,
 		});
 	}
 
 	async updateUser(where: UserWhereUniqueInput, data: UserUpdateInput): Promise<User> {
-		return this.prisma.user.update({ where, data });
+		return this.prismaService.user.update({ where, data });
 	}
 
 	async deleteUser(where: UserWhereUniqueInput) {
-		return this.prisma.user.delete({ where });
+		return this.prismaService.user.delete({ where });
 	}
 
 	public async hashPassword(password: string) {

@@ -26,7 +26,7 @@ export class UserController {
 
 	@Get("/:id")
 	public async getUserById(@Req() request: Request, @Param() params: FindOneParams) {
-		if (request.jwtPayload.user.id !== params.id) {
+		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
@@ -54,12 +54,12 @@ export class UserController {
 		@Param() params: FindOneParams,
 		@Body() updateUserDto: UpdateUserDto,
 	): Promise<User> {
-		if (request.jwtPayload.user.id !== params.id) {
+		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
 		const userWhere = { id: params.id };
-		const user = await this.userService.userWithPasswordHash(userWhere);
+		const user = await this.userService.user(userWhere, { withPasswordHash: true });
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
@@ -86,7 +86,7 @@ export class UserController {
 
 	@Delete("/:id")
 	public async deleteUser(@Req() request: Request, @Param() params: FindOneParams) {
-		if (request.jwtPayload.user.id !== params.id) {
+		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 

@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { App } from "supertest/types";
@@ -6,6 +7,7 @@ import { App } from "supertest/types";
 import { AppModule } from "../src/app.module";
 import { User } from "../src/generated/prisma/client";
 import { PrismaService } from "../src/prisma.service";
+import { waitFor } from "./utils";
 
 describe("AppController (e2e)", () => {
 	let app: INestApplication<App>;
@@ -13,9 +15,34 @@ describe("AppController (e2e)", () => {
 
 	let user: Omit<User, "passwordHash">;
 	let accessToken: string;
+	let refreshToken: string;
 	const userPassword = "12345678";
 
 	let user2: Omit<User, "passwordHash">;
+
+	async function makeExpiredAccessToken(originalTokenForPayload: string) {
+		const jwtService = app.get(JwtService);
+		const { iat, exp, ...payload } = jwtService.decode(originalTokenForPayload);
+		const expiredAccessToken = await jwtService.signAsync(payload, {
+			expiresIn: 1, // 1 second
+		});
+		await waitFor(2000);
+		return expiredAccessToken;
+	}
+
+	async function makeRefreshTokenExpired() {
+		const refreshTokenDuration = process.env["REFRESH_TOKEN_DURATION"];
+		if (!refreshTokenDuration) {
+			throw new Error("REFRESH_TOKEN_DURATION env variable not defined");
+		}
+
+		// time is (refresh token duration + 1 second) ago
+		const time = new Date(Date.now() - parseInt(refreshTokenDuration) * 1000 - 1000);
+		await app.get(PrismaService).session.update({
+			data: { createdAt: time, updatedAt: time },
+			where: { token: refreshToken },
+		});
+	}
 
 	beforeAll(async () => {
 		const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -44,12 +71,14 @@ describe("AppController (e2e)", () => {
 				.send({ email: "jane@example.com", password: userPassword })
 				.expect(201)
 		).body;
-		accessToken = (
+		const response = (
 			await request(server)
 				.post("/auth/login")
 				.send({ email: user.email, password: userPassword })
 				.expect(200)
-		).body.accessToken;
+		).body;
+		accessToken = response.accessToken;
+		refreshToken = response.refreshToken;
 
 		user2 = (
 			await request(server)
@@ -60,35 +89,212 @@ describe("AppController (e2e)", () => {
 	});
 
 	describe("/auth", () => {
-		test("/auth/login (POST)", async () => {
-			const response = await request(server)
-				.post("/auth/login")
-				.send({ email: user.email, password: userPassword })
-				.expect(200)
-				.expect("Content-Type", /json/);
-			expect(response.body.accessToken).toBeDefined();
-			expect(response.body.accessToken.length).toBeGreaterThan(0);
+		describe("/login", () => {
+			test("POST 200", async () => {
+				const response = await request(server)
+					.post("/auth/login")
+					.send({ email: user.email, password: userPassword })
+					.expect(200)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).toBeDefined();
+				expect(response.body.accessToken.length).toBeGreaterThan(0);
+				expect(response.body.refreshToken).toBeDefined();
+				expect(response.body.refreshToken.length).toBeGreaterThan(0);
 
+				const tokenPayload = app.get(JwtService).decode(response.body.accessToken);
+				const accessTokenDuration = Number(process.env["ACCESS_TOKEN_DURATION"]);
+				expect(tokenPayload.exp - tokenPayload.iat).toBe(accessTokenDuration);
+			});
+
+			for (const { test: testName, data, status } of [
+				{
+					test: "POST 401 wrong password",
+					data: () => ({ email: user.email, password: "wrong password" }),
+					status: 401,
+				},
+				{
+					test: "POST 401 unknown email address",
+					data: () => ({ email: "unknown.email@example.com", password: userPassword }),
+					status: 401,
+				},
+				{
+					test: "POST 400 no email provided",
+					data: () => ({ password: userPassword }),
+					status: 400,
+				},
+				{
+					test: "POST 400 empty email provided",
+					data: () => ({ email: "", password: userPassword }),
+					status: 400,
+				},
+				{
+					test: "POST 400 invalid email provided",
+					data: () => ({ email: "not an email address", password: userPassword }),
+					status: 400,
+				},
+				{
+					test: "POST 400 no password provided",
+					data: () => ({ email: user.email }),
+					status: 400,
+				},
+				{
+					test: "POST 400 empty password",
+					data: () => ({ email: user.email, password: "" }),
+					status: 400,
+				},
+			]) {
+				test(testName, async () => {
+					await request(server)
+						.post("/auth/login")
+						.send(data())
+						.expect(status)
+						.expect("Content-Type", /json/);
+				});
+			}
+		});
+
+		describe("/refresh", () => {
+			test("POST 200", async () => {
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken })
+					.expect(200)
+					.expect("Content-Type", /json/);
+				const newAccessToken = response.body.accessToken;
+				expect(newAccessToken).toBeDefined();
+				expect(newAccessToken.length).toBeGreaterThan(0);
+				const newRefreshToken = response.body.refreshToken;
+				expect(newRefreshToken).toBeDefined();
+				expect(newRefreshToken.length).toBeGreaterThan(0);
+
+				await request(server)
+					.get("/user/" + user.id)
+					.set("Authorization", `Bearer ${newAccessToken}`)
+					.expect(200);
+
+				// Old refresh token must be revoked
+				await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+
+				// New refresh token must work
+				await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken: newRefreshToken })
+					.expect(200)
+					.expect("Content-Type", /json/);
+			});
+
+			test("POST 401 invalid token", async () => {
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken: "not a valid token" })
+					.expect(401)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			});
+
+			test("POST 401 revoked token", async () => {
+				await request(server).post("/auth/logout").send({ refreshToken }).expect(200);
+
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			});
+
+			test("POST 401 expired token", async () => {
+				await makeRefreshTokenExpired();
+
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			});
+
+			test("POST 400 no token provided", async () => {
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({})
+					.expect(400)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			});
+
+			test("POST 400 empty token", async () => {
+				const response = await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken: "" })
+					.expect(400)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			});
+		});
+
+		describe("/logout", () => {
+			test("POST 200", async () => {
+				const response = await request(server)
+					.post("/auth/logout")
+					.send({ refreshToken })
+					.expect(200)
+					.expect("Content-Type", /json/);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+
+				await request(server)
+					.post("/auth/refresh")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+			});
+
+			test("POST 401 revoked token", async () => {
+				await request(server)
+					.post("/auth/logout")
+					.send({ refreshToken })
+					.expect(200)
+					.expect("Content-Type", /json/);
+				await request(server)
+					.post("/auth/logout")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+			});
+
+			test("POST 401 expired token", async () => {
+				await makeRefreshTokenExpired();
+
+				await request(server)
+					.post("/auth/logout")
+					.send({ refreshToken })
+					.expect(401)
+					.expect("Content-Type", /json/);
+			});
+		});
+
+		test("Access tokens expire", async () => {
 			await request(server)
-				.post("/auth/login")
-				.send({ email: user.email, password: "wrong password" })
+				.get("/user/" + user.id)
+				.set("Authorization", `Bearer ${accessToken}`)
+				.expect(200);
+			const expiredAccessToken = await makeExpiredAccessToken(accessToken);
+			const response = await request(server)
+				.get("/user/" + user.id)
+				.set("Authorization", `Bearer ${expiredAccessToken}`)
 				.expect(401)
 				.expect("Content-Type", /json/);
-			await request(server)
-				.post("/auth/login")
-				.send({ email: user.email })
-				.expect(400)
-				.expect("Content-Type", /json/);
-			await request(server)
-				.post("/auth/login")
-				.send({ email: "wrong.email@example.com", password: userPassword })
-				.expect(401)
-				.expect("Content-Type", /json/);
-			await request(server)
-				.post("/auth/login")
-				.send({ password: userPassword })
-				.expect(400)
-				.expect("Content-Type", /json/);
+			expect(response.body.name).toBe("TokenExpiredError");
 		});
 	});
 

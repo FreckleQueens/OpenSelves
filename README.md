@@ -19,7 +19,7 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [x] Single command dev env build and start (client and server)
 - [ ] basic auth with email and password (createdAt, email, passwordHash)
   - [x] Basic API with jwt
-  - [ ] Refresh tokens and expiration time tuning
+  - [x] Refresh tokens and expiration time tuning
   - [ ] Client logic
   - [ ] Client interface
 - [ ] make tests db separate from dev db

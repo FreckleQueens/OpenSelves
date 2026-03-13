@@ -1,9 +1,9 @@
-import { JwtPayload } from "../data/jwt-payload.data";
+import { AccessTokenPayload } from "../session/data/access-token-payload.data";
 
 declare global {
 	declare namespace Express {
 		export interface Request {
-			jwtPayload: JwtPayload;
+			accessTokenPayload: AccessTokenPayload;
 		}
 	}
 }
