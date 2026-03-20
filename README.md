@@ -10,9 +10,21 @@ A free and open source alternative to Simply Plural (R.I.P.)
 
 ---
 
+## Technical overview
+- By default, the user's primary data source is on the server to allow syncing and provide online services
+- Clients can go offline. In this situation they will cache CRUD operations. If server data changes in the meantime,
+clients will prompt the user on what to do when they go back online
+- Client can run in a local-only mode where it starts the server locally (without online features such as user
+accounts). This gives the choice to users to use the app without relying on an internet connection
+- Switching between default mode and local-only mode (and vice versa) is done by exporting data from the old server and
+importing it in the new server
+
+---
+
 ## 🚀 Roadmap
 
-This is my personal todo list. It is not a promise and may change at anytime without prior notice. There is no deadline or ETA
+This is my personal todo list. It is not a promise and may change at anytime without prior notice. There is no deadline
+or ETA
 
 ### 0.1.0
 - [x] DB orm (prisma?)
@@ -20,8 +32,10 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] basic auth with email and password (createdAt, email, passwordHash)
   - [x] Basic API with jwt
   - [x] Refresh tokens and expiration time tuning
-  - [ ] Client logic
-  - [ ] Client interface
+  - [x] Client logic
+  - [x] Client interface
+  - [ ] Client logout
+- [ ] test cannot create 2 users with same email address
 - [ ] make tests db separate from dev db
 - [ ] private registration gated by unsecure clear-text password in app logs
 - [ ] add member (created_at, updated_at, name, pronouns, description)
@@ -29,6 +43,7 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] edit member
 - [ ] delete member
 - [ ] archive member
+- [ ] client: make server url configured in environment variable
 - [ ] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0
@@ -39,6 +54,7 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
 - [ ] move registration password from app logs to config
+- [ ] PWA (service worker)
 
 ### 0.3.0
 - [ ] add front (created_at, start_at, end_at, member_id, note)
@@ -52,6 +68,7 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
+- [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
 
 ### 0.5.0
 - [ ] simply plural data importer (save all simply plural ids!)
@@ -82,7 +99,8 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 - [ ] Member custom fields
 - [ ] Friends, individual friend privacy settings (share members, share front) turned off by default
 - [ ] Privacy buckets (members, groups, custom fields)
-- [ ] Front change notifications (per-friend toggle, per-member inhibition toggle) with generic concept of notifications (must be able to show history to user later
+- [ ] Front change notifications (per-friend toggle, per-member inhibition toggle) with generic concept of notifications
+(must be able to show history to user later)
 - [ ] User documentation
 
 ### Medium priority
@@ -107,7 +125,8 @@ This is my personal todo list. It is not a promise and may change at anytime wit
 ## Ideas for future releases
 - Member onboarding procedure (needs thought out UX)
 - Make different types of groups? (sub-system, geographical, tag...) -> "visual only"
-- Public system page (optional, show name, optional show {profile picture, description, fronts, members}) -> needs a separate privacy setting for individual members
+- Public system page (optional, show name, optional show {profile picture, description, fronts, members}) -> needs a
+separate privacy setting for individual members
 - Public member page
 - Automatic PluralKit integration
 - Instant Messaging app designed for plural people first

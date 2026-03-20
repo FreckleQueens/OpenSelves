@@ -1,2 +1,20 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+    import {Storage} from "$lib/storage";
+    import {goto} from "$app/navigation";
+    import {resolve} from "$app/paths";
+    import {Block, Preloader} from "konsta/svelte";
+
+
+    (async () => {
+        const storage = await Storage.getStorage();
+        if (storage.isOffline()) {
+            await goto(resolve("/auth"));
+        } else {
+            await goto(resolve("/main"));
+        }
+    })();
+</script>
+
+<Block class="text-center">
+    <Preloader />
+</Block>

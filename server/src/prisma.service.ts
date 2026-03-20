@@ -1,16 +1,14 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
+import { ConfigData } from "./config.data";
 import { PrismaClient } from "./generated/prisma/client";
 
 @Injectable()
 export class PrismaService extends PrismaClient {
-	constructor() {
-		if (!process.env["DATABASE_URL"]) {
-			throw new Error("Missing DATABASE_URL environment variable");
-		}
-
-		const dbUrl = new URL(process.env["DATABASE_URL"]);
+	constructor(configService: ConfigService<ConfigData>) {
+		const dbUrl = new URL(configService.getOrThrow("DATABASE_URL", { infer: true }));
 		const adapter = new PrismaMariaDb({
 			user: dbUrl.username,
 			password: dbUrl.password,

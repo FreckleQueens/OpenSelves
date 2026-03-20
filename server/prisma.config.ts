@@ -1,4 +1,5 @@
 import "dotenv/config";
+
 import { defineConfig } from "prisma/config";
 
 if (!process.env["SHADOW_DATABASE_URL"]) {

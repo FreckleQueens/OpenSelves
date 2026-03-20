@@ -1,24 +1,51 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
-import request from "supertest";
+import request, { Response } from "supertest";
 import { App } from "supertest/types";
 
-import { AppModule } from "../src/app.module";
+import { TOKEN_EXPIRED_ERROR } from "../../common/api.constants";
+import { AppModule, configureApp } from "../src/app.module";
+import { ConfigData } from "../src/config.data";
 import { User } from "../src/generated/prisma/client";
 import { PrismaService } from "../src/prisma.service";
 import { waitFor } from "./utils";
 
+const expectCookies = request.cookies;
+
 describe("AppController (e2e)", () => {
 	let app: INestApplication<App>;
 	let server: App;
+	let configService: ConfigService<ConfigData>;
 
 	let user: Omit<User, "passwordHash">;
-	let accessToken: string;
-	let refreshToken: string;
+	let cookies: string;
 	const userPassword = "12345678";
 
 	let user2: Omit<User, "passwordHash">;
+
+	function convertResponseCookiesToRequestCookies(response: Response): string {
+		const responseCookies: string[] = response.get("Set-Cookie") || [];
+		return responseCookies.map((str) => str.split(";")[0]).join("; ");
+	}
+
+	function extractCookie(cookieName: string, cookies: string) {
+		if (!cookies) {
+			throw new Error("undefined cookies");
+		}
+
+		const value = cookies
+			.split(/; /)
+			.map((str) => str.split("="))
+			.find((entry) => entry[0] === cookieName)?.[1];
+
+		if (!value) {
+			console.log(cookies);
+			throw new Error(`${cookieName} not found in cookies`);
+		}
+		return value;
+	}
 
 	async function makeExpiredAccessToken(originalTokenForPayload: string) {
 		const jwtService = app.get(JwtService);
@@ -31,13 +58,14 @@ describe("AppController (e2e)", () => {
 	}
 
 	async function makeRefreshTokenExpired() {
-		const refreshTokenDuration = process.env["REFRESH_TOKEN_DURATION"];
-		if (!refreshTokenDuration) {
-			throw new Error("REFRESH_TOKEN_DURATION env variable not defined");
-		}
+		const refreshTokenDuration = configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+			infer: true,
+		});
+
+		const refreshToken = extractCookie("refreshToken", cookies);
 
 		// time is (refresh token duration + 1 second) ago
-		const time = new Date(Date.now() - parseInt(refreshTokenDuration) * 1000 - 1000);
+		const time = new Date(Date.now() - refreshTokenDuration * 1000 - 1000);
 		await app.get(PrismaService).session.update({
 			data: { createdAt: time, updatedAt: time },
 			where: { token: refreshToken },
@@ -50,11 +78,8 @@ describe("AppController (e2e)", () => {
 		}).compile();
 
 		app = moduleFixture.createNestApplication();
-		app.useGlobalPipes(
-			new ValidationPipe({
-				transform: true,
-			}),
-		);
+		configureApp(app);
+		configService = app.get(ConfigService);
 		await app.init();
 		server = app.getHttpServer();
 	});
@@ -71,14 +96,11 @@ describe("AppController (e2e)", () => {
 				.send({ email: "jane@example.com", password: userPassword })
 				.expect(201)
 		).body;
-		const response = (
-			await request(server)
-				.post("/auth/login")
-				.send({ email: user.email, password: userPassword })
-				.expect(200)
-		).body;
-		accessToken = response.accessToken;
-		refreshToken = response.refreshToken;
+		const response = await request(server)
+			.post("/auth/login")
+			.send({ email: user.email, password: userPassword })
+			.expect(200);
+		cookies = convertResponseCookiesToRequestCookies(response);
 
 		user2 = (
 			await request(server)
@@ -95,14 +117,41 @@ describe("AppController (e2e)", () => {
 					.post("/auth/login")
 					.send({ email: user.email, password: userPassword })
 					.expect(200)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).toBeDefined();
-				expect(response.body.accessToken.length).toBeGreaterThan(0);
-				expect(response.body.refreshToken).toBeDefined();
-				expect(response.body.refreshToken.length).toBeGreaterThan(0);
+					.expect("Content-Type", /json/)
+					.expect(
+						// TODO@supertest: the case is wrong because of a bug in supertest, fix all TODOs in tag when this eventually fails
+						expectCookies
+							.set({
+								name: "accesstoken",
+								options: {
+									httponly: true,
+									"max-age": configService.getOrThrow("ACCESS_TOKEN_DURATION", {
+										infer: true,
+									}),
+								},
+							})
+							.set({
+								name: "refreshtoken",
+								options: {
+									httponly: true,
+									"max-age": configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+										infer: true,
+									}),
+								},
+							}),
+					);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+				expect(response.body.userId).toBeDefined();
 
-				const tokenPayload = app.get(JwtService).decode(response.body.accessToken);
-				const accessTokenDuration = Number(process.env["ACCESS_TOKEN_DURATION"]);
+				const accessToken = extractCookie(
+					"accessToken",
+					convertResponseCookiesToRequestCookies(response),
+				);
+				const tokenPayload = app.get(JwtService).decode(accessToken);
+				const accessTokenDuration = configService.getOrThrow("ACCESS_TOKEN_DURATION", {
+					infer: true,
+				});
 				expect(tokenPayload.exp - tokenPayload.iat).toBe(accessTokenDuration);
 			});
 
@@ -148,97 +197,100 @@ describe("AppController (e2e)", () => {
 						.post("/auth/login")
 						.send(data())
 						.expect(status)
-						.expect("Content-Type", /json/);
+						.expect("Content-Type", /json/)
+						.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
 				});
 			}
 		});
 
 		describe("/refresh", () => {
+			async function testAuthRefreshFails(cookies: string, status: number) {
+				const response = await request(server)
+					.post("/auth/refresh")
+					.set("Cookie", cookies)
+					.expect(status)
+					.expect("Content-Type", /json/)
+					.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+			}
+
 			test("POST 200", async () => {
 				const response = await request(server)
 					.post("/auth/refresh")
-					.send({ refreshToken })
+					.set("Cookie", cookies)
 					.expect(200)
-					.expect("Content-Type", /json/);
-				const newAccessToken = response.body.accessToken;
-				expect(newAccessToken).toBeDefined();
-				expect(newAccessToken.length).toBeGreaterThan(0);
-				const newRefreshToken = response.body.refreshToken;
-				expect(newRefreshToken).toBeDefined();
-				expect(newRefreshToken.length).toBeGreaterThan(0);
+					.expect("Content-Type", /json/)
+					.expect(
+						// TODO@supertest
+						expectCookies
+							.set({
+								name: "accesstoken",
+								options: {
+									httponly: true,
+									"max-age": configService.getOrThrow("ACCESS_TOKEN_DURATION", {
+										infer: true,
+									}),
+								},
+							})
+							.set({
+								name: "refreshtoken",
+								options: {
+									httponly: true,
+									"max-age": configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+										infer: true,
+									}),
+								},
+							}),
+					);
+				expect(response.body.accessToken).not.toBeDefined();
+				expect(response.body.refreshToken).not.toBeDefined();
+
+				const newCookies = convertResponseCookiesToRequestCookies(response);
+
+				const oldRefreshToken = extractCookie("refreshToken", cookies);
+				const newRefreshToken = extractCookie(
+					"refreshToken",
+					convertResponseCookiesToRequestCookies(response),
+				);
+				expect(newRefreshToken).not.toBe(oldRefreshToken);
 
 				await request(server)
 					.get("/user/" + user.id)
-					.set("Authorization", `Bearer ${newAccessToken}`)
+					.set("Cookie", newCookies)
 					.expect(200);
 
 				// Old refresh token must be revoked
-				await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken })
-					.expect(401)
-					.expect("Content-Type", /json/);
+				await testAuthRefreshFails(cookies, 401);
 
 				// New refresh token must work
 				await request(server)
 					.post("/auth/refresh")
-					.send({ refreshToken: newRefreshToken })
+					.set("Cookie", newCookies)
 					.expect(200)
 					.expect("Content-Type", /json/);
 			});
 
 			test("POST 401 invalid token", async () => {
-				const response = await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken: "not a valid token" })
-					.expect(401)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				await testAuthRefreshFails("refreshToken=notavalidtoken", 401);
 			});
 
 			test("POST 401 revoked token", async () => {
-				await request(server).post("/auth/logout").send({ refreshToken }).expect(200);
-
-				const response = await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken })
-					.expect(401)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				await request(server).post("/auth/logout").set("Cookie", cookies).expect(200);
+				await testAuthRefreshFails(cookies, 401);
 			});
 
 			test("POST 401 expired token", async () => {
 				await makeRefreshTokenExpired();
-
-				const response = await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken })
-					.expect(401)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				await testAuthRefreshFails(cookies, 401);
 			});
 
-			test("POST 400 no token provided", async () => {
-				const response = await request(server)
-					.post("/auth/refresh")
-					.send({})
-					.expect(400)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+			test("POST 401 no token provided", async () => {
+				await testAuthRefreshFails("", 401);
 			});
 
-			test("POST 400 empty token", async () => {
-				const response = await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken: "" })
-					.expect(400)
-					.expect("Content-Type", /json/);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+			test("POST 401 empty token", async () => {
+				await testAuthRefreshFails("refreshToken=", 401);
 			});
 		});
 
@@ -246,28 +298,35 @@ describe("AppController (e2e)", () => {
 			test("POST 200", async () => {
 				const response = await request(server)
 					.post("/auth/logout")
-					.send({ refreshToken })
+					.set("Cookie", cookies)
 					.expect(200)
-					.expect("Content-Type", /json/);
+					.expect("Content-Type", /json/)
+					.expect(
+						expectCookies
+							.set({
+								name: "accesstoken",
+								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
+							})
+							.set({
+								name: "refreshtoken",
+								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
+							}),
+					); // TODO@supertest
 				expect(response.body.accessToken).not.toBeDefined();
 				expect(response.body.refreshToken).not.toBeDefined();
 
-				await request(server)
-					.post("/auth/refresh")
-					.send({ refreshToken })
-					.expect(401)
-					.expect("Content-Type", /json/);
+				// /auth/refresh already tested
 			});
 
 			test("POST 401 revoked token", async () => {
 				await request(server)
 					.post("/auth/logout")
-					.send({ refreshToken })
+					.set("Cookie", cookies)
 					.expect(200)
 					.expect("Content-Type", /json/);
 				await request(server)
 					.post("/auth/logout")
-					.send({ refreshToken })
+					.set("Cookie", cookies)
 					.expect(401)
 					.expect("Content-Type", /json/);
 			});
@@ -277,7 +336,7 @@ describe("AppController (e2e)", () => {
 
 				await request(server)
 					.post("/auth/logout")
-					.send({ refreshToken })
+					.set("Cookie", cookies)
 					.expect(401)
 					.expect("Content-Type", /json/);
 			});
@@ -286,15 +345,16 @@ describe("AppController (e2e)", () => {
 		test("Access tokens expire", async () => {
 			await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200);
+			const accessToken = extractCookie("accessToken", cookies);
 			const expiredAccessToken = await makeExpiredAccessToken(accessToken);
 			const response = await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${expiredAccessToken}`)
+				.set("Cookie", `accessToken=${expiredAccessToken}`)
 				.expect(401)
 				.expect("Content-Type", /json/);
-			expect(response.body.name).toBe("TokenExpiredError");
+			expect(response.body.name).toBe(TOKEN_EXPIRED_ERROR);
 		});
 	});
 
@@ -326,7 +386,7 @@ describe("AppController (e2e)", () => {
 		test("POST authenticated 401", async () => {
 			await request(server)
 				.post("/user")
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ email: "john@example.com", password: "12345678" })
 				.expect(401)
 				.expect("Content-Type", /json/);
@@ -335,7 +395,7 @@ describe("AppController (e2e)", () => {
 		test("GET 200", async () => {
 			const response = await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200)
 				.expect("Content-Type", /json/);
 			expect(response.body).toEqual({
@@ -355,7 +415,7 @@ describe("AppController (e2e)", () => {
 		test("GET other user 401", async () => {
 			await request(server)
 				.get("/user/" + user2.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
@@ -368,7 +428,7 @@ describe("AppController (e2e)", () => {
 				.expect(404);
 			const response = await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200);
 			expect(response.body.email).toBe(user.email);
 			expect(response.body.email).not.toBe(newEmail);
@@ -379,12 +439,12 @@ describe("AppController (e2e)", () => {
 
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ email: newEmail })
 				.expect(200);
 			const response = await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200);
 			expect(response.body.email).toBe(newEmail);
 			expect(response.body.email).not.toBe(user.email);
@@ -403,7 +463,7 @@ describe("AppController (e2e)", () => {
 			const newEmail = "new.jane@example.org";
 			await request(server)
 				.patch("/user/" + user2.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ email: newEmail })
 				.expect(401)
 				.expect("Content-Type", /json/);
@@ -413,12 +473,12 @@ describe("AppController (e2e)", () => {
 			const newEmail = "not an email address";
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ email: newEmail })
 				.expect(400);
 			const response = await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200);
 			expect(response.body.email).toBe(user.email);
 			expect(response.body.email).not.toBe(newEmail);
@@ -429,7 +489,7 @@ describe("AppController (e2e)", () => {
 			const newPassword = "87654321";
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ oldPassword, newPassword })
 				.expect(200);
 		});
@@ -437,7 +497,7 @@ describe("AppController (e2e)", () => {
 		test("PATCH missing oldPassword 400", async () => {
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ newPassword: "87654321" })
 				.expect(400);
 		});
@@ -445,7 +505,7 @@ describe("AppController (e2e)", () => {
 		test("PATCH missing newPassword 400", async () => {
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ oldPassword: userPassword })
 				.expect(400);
 		});
@@ -455,7 +515,7 @@ describe("AppController (e2e)", () => {
 			const newPassword = "87654321";
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ oldPassword, newPassword })
 				.expect(401);
 		});
@@ -465,7 +525,7 @@ describe("AppController (e2e)", () => {
 			const newPassword = "short"; // Less than 8 characters
 			await request(server)
 				.patch("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.send({ oldPassword, newPassword })
 				.expect(400);
 		});
@@ -473,11 +533,11 @@ describe("AppController (e2e)", () => {
 		test("DELETE 200", async () => {
 			await request(server)
 				.delete("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(200);
 			await request(server)
 				.get("/user/" + user.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(404);
 		});
 
@@ -491,7 +551,7 @@ describe("AppController (e2e)", () => {
 		test("DELETE other user 401", async () => {
 			await request(server)
 				.delete("/user/" + user2.id)
-				.set("Authorization", `Bearer ${accessToken}`)
+				.set("Cookie", cookies)
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});

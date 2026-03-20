@@ -34,6 +34,7 @@
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
+		"sass-embedded": "^1.98.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"typescript": "^5.9.3",
@@ -45,6 +46,9 @@
 	"dependencies": {
 		"@capacitor/android": "^8.2.0",
 		"@capacitor/cli": "^8.2.0",
-		"@capacitor/core": "^8.2.0"
+		"@capacitor/core": "^8.2.0",
+		"@tailwindcss/vite": "^4.2.1",
+		"konsta": "^5.0.7",
+		"tailwindcss": "^4.2.1"
 	}
 }

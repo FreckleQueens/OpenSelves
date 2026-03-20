@@ -24,7 +24,7 @@ import { UserService } from "./user.service";
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
-	@Get("/:id")
+	@Get(":id")
 	public async getUserById(@Req() request: Request, @Param() params: FindOneParams) {
 		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();
@@ -38,7 +38,7 @@ export class UserController {
 	}
 
 	@Public({ allowAuthenticatedUsers: false })
-	@Post("/")
+	@Post("")
 	public async createUser(@Body() createUserDto: CreateUserDto) {
 		const hashedPassword = await this.userService.hashPassword(createUserDto.password);
 		const createdUser = await this.userService.createUser({
@@ -48,7 +48,7 @@ export class UserController {
 		return this.getUserResponseForOwner(createdUser);
 	}
 
-	@Patch("/:id")
+	@Patch(":id")
 	public async updateUser(
 		@Req() request: Request,
 		@Param() params: FindOneParams,
@@ -84,7 +84,7 @@ export class UserController {
 		return await this.userService.updateUser(userWhere, patchData);
 	}
 
-	@Delete("/:id")
+	@Delete(":id")
 	public async deleteUser(@Req() request: Request, @Param() params: FindOneParams) {
 		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();

@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { randomBytes } from "crypto";
 
+import { ConfigData } from "../../config.data";
 import { Session, User } from "../../generated/prisma/client";
 import { SessionWhereUniqueInput } from "../../generated/prisma/models/Session";
 import { PrismaService } from "../../prisma.service";
@@ -10,6 +12,7 @@ import { AccessTokenPayload } from "./data/access-token-payload.data";
 @Injectable()
 export class SessionService {
 	constructor(
+		private readonly configService: ConfigService<ConfigData>,
 		private readonly prismaService: PrismaService,
 		private readonly jwtService: JwtService,
 	) {}
@@ -32,11 +35,10 @@ export class SessionService {
 	}
 
 	public hasSessionExpired(session: Session) {
-		const refreshTokenDuration = process.env["REFRESH_TOKEN_DURATION"];
-		if (!refreshTokenDuration) {
-			throw new Error("REFRESH_TOKEN_DURATION env variable not defined");
-		}
-		return Date.now() - session.updatedAt.getTime() >= parseInt(refreshTokenDuration) * 1000;
+		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+			infer: true,
+		});
+		return Date.now() - session.updatedAt.getTime() >= refreshTokenDuration * 1000;
 	}
 
 	public async refreshSession(token: string) {
@@ -49,16 +51,15 @@ export class SessionService {
 	}
 
 	public async revokeSession(token: string) {
-		const refreshTokenDuration = process.env["REFRESH_TOKEN_DURATION"];
-		if (!refreshTokenDuration) {
-			throw new Error("REFRESH_TOKEN_DURATION env variable not defined");
-		}
+		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+			infer: true,
+		});
 		return this.prismaService.session.delete({
 			where: {
 				token: token,
 				AND: {
 					updatedAt: {
-						gte: new Date(Date.now() - parseInt(refreshTokenDuration) * 1000),
+						gte: new Date(Date.now() - refreshTokenDuration * 1000),
 					},
 				},
 			},
@@ -66,10 +67,9 @@ export class SessionService {
 	}
 
 	private generateNewSessionToken() {
-		const refreshTokenSize = process.env["REFRESH_TOKEN_SIZE"];
-		if (!refreshTokenSize) {
-			throw new Error("REFRESH_TOKEN_SIZE env variable not defined");
-		}
-		return Buffer.from(randomBytes(parseInt(refreshTokenSize))).toString("hex");
+		const refreshTokenSize = this.configService.getOrThrow("REFRESH_TOKEN_SIZE", {
+			infer: true,
+		});
+		return Buffer.from(randomBytes(refreshTokenSize)).toString("hex");
 	}
 }

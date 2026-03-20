@@ -7,4 +7,11 @@ export class PublicAccessSettings {
 /**
  * Allow unauthenticated users.
  */
-export const Public = Reflector.createDecorator<PublicAccessSettings>();
+export const Public = Reflector.createDecorator<PublicAccessSettings>({
+	transform: (value) => {
+		return {
+			allowAuthenticatedUsers: true,
+			...value,
+		};
+	},
+});

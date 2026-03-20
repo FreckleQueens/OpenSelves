@@ -3,6 +3,7 @@ import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
 
+import { TOKEN_EXPIRED_ERROR } from "../../../common/api.constants";
 import { Public } from "./decorators/public.decorator";
 
 @Injectable()
@@ -20,7 +21,7 @@ export class AuthGuard implements CanActivate {
 		const isPublic = !!publicAccessSettings;
 
 		const request = context.switchToHttp().getRequest<Request>();
-		const authToken = this.extractTokenFromHeader(request);
+		const authToken = this.extractTokenFromCookies(request);
 
 		if (isPublic) {
 			if (!publicAccessSettings.allowAuthenticatedUsers && authToken !== undefined) {
@@ -31,7 +32,9 @@ export class AuthGuard implements CanActivate {
 		}
 
 		if (authToken === undefined) {
-			throw new UnauthorizedException();
+			throw new UnauthorizedException({
+				name: TOKEN_EXPIRED_ERROR,
+			});
 		}
 
 		try {
@@ -42,8 +45,11 @@ export class AuthGuard implements CanActivate {
 		return true;
 	}
 
-	private extractTokenFromHeader(request: Request): string | undefined {
-		const [type, token] = request.headers.authorization?.split(" ") ?? [];
-		return type === "Bearer" ? token : undefined;
+	private extractTokenFromCookies(request: Request): string | undefined {
+		const refreshToken = request.cookies["accessToken"] as unknown;
+		if (typeof refreshToken !== "string") {
+			return undefined;
+		}
+		return refreshToken;
 	}
 }
