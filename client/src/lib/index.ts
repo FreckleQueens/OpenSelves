@@ -26,14 +26,14 @@ async function refreshAuth(): Promise<boolean> {
 	return response.ok;
 }
 
-export enum CallResponse {
+export enum CallResult {
 	AUTH_FAILED,
 }
 
 export async function call(
 	path: string,
 	options?: CallOptions,
-): Promise<CallResponse | Record<string, unknown>> {
+): Promise<CallResult | Record<string, unknown>> {
 	const headers: Record<string, string> = {
 		Accept: "application/json",
 	};
@@ -65,7 +65,7 @@ export async function call(
 				continue;
 			}
 
-			return CallResponse.AUTH_FAILED;
+			return CallResult.AUTH_FAILED;
 		}
 
 		throw new Error(

@@ -29,12 +29,12 @@ or ETA
 ### 0.1.0
 - [x] DB orm (prisma?)
 - [x] Single command dev env build and start (client and server)
-- [ ] basic auth with email and password (createdAt, email, passwordHash)
+- [x] basic auth with email and password (createdAt, email, passwordHash)
   - [x] Basic API with jwt
   - [x] Refresh tokens and expiration time tuning
   - [x] Client logic
   - [x] Client interface
-  - [ ] Client logout
+  - [x] Client logout
 - [ ] test cannot create 2 users with same email address
 - [ ] make tests db separate from dev db
 - [ ] private registration gated by unsecure clear-text password in app logs
@@ -43,41 +43,45 @@ or ETA
 - [ ] edit member
 - [ ] delete member
 - [ ] archive member
-- [ ] client: make server url configured in environment variable
+- [ ] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0
 - [ ] linting (git hooks)
 - [ ] contribution CI (test and build on every commit and PRs)
 - [ ] localization
+
+### 0.3.0
 - [ ] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
 - [ ] move registration password from app logs to config
 - [ ] PWA (service worker)
 
-### 0.3.0
+### 0.4.0
+- [ ] add icons to buttons, fields and links/navigation items
 - [ ] add front (created_at, start_at, end_at, member_id, note)
 - [ ] show front list (history table)
 - [ ] edit front
 - [ ] delete front
 - [ ] show current fronts
 
-### 0.4.0
+### 0.5.0
 - [ ] member profile picture
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
 - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
 
-### 0.5.0
+### 0.6.0
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
 ### 1.0.0
 - [ ] email verification
 - [ ] public registrations with captcha
-- [ ] accessible and pretty UI/UX
+- [ ] general UI/UX accessibility check
+- [ ] data export to json
 - [ ] review [private launch items](./private%20launch%20items.md) (not accessible publicly)
 
 ### 2.0.0
