@@ -1,20 +1,19 @@
 <script lang="ts">
-    import {Storage} from "$lib/storage";
-    import {goto} from "$app/navigation";
-    import {resolve} from "$app/paths";
-    import {Block, Preloader} from "konsta/svelte";
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
+	import { Storage } from "$lib/storage";
+	import { Block, Preloader } from "konsta/svelte";
 
-
-    (async () => {
-        const storage = await Storage.getStorage();
-        if (storage.isOffline()) {
-            await goto(resolve("/auth"));
-        } else {
-            await goto(resolve("/main"));
-        }
-    })();
+	(async () => {
+		const storage = await Storage.getStorage();
+		if (storage.isOffline()) {
+			await goto(resolve("/auth"));
+		} else {
+			await goto(resolve("/main"));
+		}
+	})();
 </script>
 
 <Block class="text-center">
-    <Preloader />
+	<Preloader />
 </Block>
