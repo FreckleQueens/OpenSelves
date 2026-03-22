@@ -27,4 +27,8 @@ export class PrismaService extends PrismaClient implements OnApplicationShutdown
 			},
 		});
 	}
+
+	async onApplicationShutdown() {
+		await this.$disconnect();
+	}
 }
