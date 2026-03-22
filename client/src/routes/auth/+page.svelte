@@ -70,6 +70,7 @@
 
         if (!response.ok) {
             forms[activeForm].generalError = result.message;
+            return;
         }
         console.log(result);
         return forms[activeForm].onSuccess(result);
