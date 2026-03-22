@@ -73,6 +73,8 @@ describe("AppController (e2e)", () => {
 	}
 
 	beforeAll(async () => {
+		PrismaService.dbUrlConfigKey = "TEST_DB_URL";
+
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
 		}).compile();

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
@@ -6,9 +6,13 @@ import { ConfigData } from "./config.data";
 import { PrismaClient } from "./generated/prisma/client";
 
 @Injectable()
-export class PrismaService extends PrismaClient {
+export class PrismaService extends PrismaClient implements OnApplicationShutdown {
+	public static dbUrlConfigKey: keyof ConfigData = "DATABASE_URL";
+
 	constructor(configService: ConfigService<ConfigData>) {
-		const dbUrl = new URL(configService.getOrThrow("DATABASE_URL", { infer: true }));
+		const dbUrl = new URL(
+			configService.getOrThrow(PrismaService.dbUrlConfigKey, { infer: true }),
+		);
 		const adapter = new PrismaMariaDb({
 			user: dbUrl.username,
 			password: dbUrl.password,
