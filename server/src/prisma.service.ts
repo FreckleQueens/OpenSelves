@@ -9,17 +9,21 @@ import { PrismaClient } from "./generated/prisma/client";
 export class PrismaService extends PrismaClient implements OnApplicationShutdown {
 	public static dbUrlConfigKey: keyof ConfigData = "DATABASE_URL";
 
-	constructor(configService: ConfigService<ConfigData>) {
-		const dbUrl = new URL(
-			configService.getOrThrow(PrismaService.dbUrlConfigKey, { infer: true }),
-		);
-		const adapter = new PrismaMariaDb({
+	public static getAdapter(dbRawUrl: string): PrismaMariaDb {
+		const dbUrl = new URL(dbRawUrl);
+		return new PrismaMariaDb({
 			user: dbUrl.username,
 			password: dbUrl.password,
 			host: dbUrl.hostname,
 			port: dbUrl.port !== undefined ? parseInt(dbUrl.port) : undefined,
 			database: dbUrl.pathname.substring(1),
 		});
+	}
+
+	constructor(configService: ConfigService<ConfigData>) {
+		const adapter = PrismaService.getAdapter(
+			configService.getOrThrow(PrismaService.dbUrlConfigKey, { infer: true }),
+		);
 		super({
 			adapter,
 			omit: {

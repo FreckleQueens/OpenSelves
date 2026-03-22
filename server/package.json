@@ -18,10 +18,11 @@
 		"test:cov": "jest --coverage",
 		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
 		"test:e2e": "yarn test:prisma:reset && NODE_OPTIONS=\"--experimental-vm-modules\" jest --config ./test/jest-e2e.json",
-		"dev": "yarn build && yarn start:dev",
-		"package": "yarn build && node --build-sea sea-config.json",
 		"test:prisma": "yarn prisma --config ./prisma-test.config.ts",
-		"test:prisma:reset": "yarn test:prisma -- migrate reset --force"
+		"test:prisma:reset": "yarn test:prisma -- migrate reset --force",
+		"dev": "yarn build && yarn start:dev",
+		"dev:seed": "yarn prisma db seed",
+		"package": "yarn build && node --build-sea sea-config.json"
 	},
 	"packageManager": "yarn@4.13.0",
 	"dependencies": {
@@ -47,11 +48,13 @@
 		"@nestjs/schematics": "^11.0.0",
 		"@nestjs/testing": "^11.0.1",
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
+		"@types/bun": "^1",
 		"@types/cookie-parser": "^1.4.10",
 		"@types/express": "^5.0.0",
 		"@types/jest": "^30.0.0",
 		"@types/node": "^22.10.7",
 		"@types/supertest": "^7.2.0",
+		"bun": "^1.3.11",
 		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-prettier": "^5.2.2",
