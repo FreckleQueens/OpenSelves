@@ -1,4 +1,8 @@
 // place files you want to import through the `$lib` alias in this folder.
+import { goto } from "$app/navigation";
+import { resolve } from "$app/paths";
+import { Storage } from "$lib/storage";
+
 import { TOKEN_EXPIRED_ERROR } from "../../../common/api.constants";
 
 export const SERVER_URL = "http://127.0.0.1:3000";
@@ -79,4 +83,10 @@ export async function call(
 	}
 
 	return responseBody;
+}
+
+export async function handleLogout() {
+	const storage = await Storage.getStorage();
+	await storage.setOffline();
+	await goto(resolve("/"));
 }

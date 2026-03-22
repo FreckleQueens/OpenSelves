@@ -4,7 +4,7 @@
     import {Storage} from "$lib/storage";
     import {goto} from "$app/navigation";
     import {resolve} from "$app/paths";
-    import {call, CallResult} from "$lib";
+    import {call, CallResult, handleLogout} from "$lib";
 
     let user: {
         id: string;
@@ -25,8 +25,7 @@
 
         const response = await call(`/user/${storage.getKey()}`);
         if (response === CallResult.AUTH_FAILED) {
-            await storage.setOffline();
-            await goto(resolve("/"));
+            await handleLogout();
         } else {
             if (!("id" in response && "email" in response)) {
                 throw new Error("Bad server response");
@@ -43,9 +42,7 @@
             method: "POST",
         });
         if (typeof result === "object") {
-            const storage = await Storage.getStorage();
-            await storage.setOffline();
-            await goto(resolve("/"));
+            await handleLogout();
         }
     };
 </script>

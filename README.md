@@ -35,8 +35,10 @@ or ETA
   - [x] Client logic
   - [x] Client interface
   - [x] Client logout
+- [x] refactor logout handling (onServerLoggedOut => set storage key to offline, navigate to "/")
 - [ ] test cannot create 2 users with same email address
 - [ ] make tests db separate from dev db
+- [ ] populate dev db with test data
 - [ ] private registration gated by unsecure clear-text password in app logs
 - [ ] add member (created_at, updated_at, name, pronouns, description)
 - [ ] show member
