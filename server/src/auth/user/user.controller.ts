@@ -1,5 +1,6 @@
 import {
 	Body,
+	ConflictException,
 	Controller,
 	Delete,
 	Get,
@@ -10,6 +11,7 @@ import {
 	Req,
 	UnauthorizedException,
 } from "@nestjs/common";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import type { Request } from "express";
 
 import { User } from "../../generated/prisma/client";
@@ -41,10 +43,23 @@ export class UserController {
 	@Post("")
 	public async createUser(@Body() createUserDto: CreateUserDto) {
 		const hashedPassword = await this.userService.hashPassword(createUserDto.password);
-		const createdUser = await this.userService.createUser({
-			email: createUserDto.email,
-			passwordHash: hashedPassword,
-		});
+		let createdUser: User;
+		try {
+			createdUser = await this.userService.createUser({
+				email: createUserDto.email,
+				passwordHash: hashedPassword,
+			});
+		} catch (error) {
+			if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+				throw new ConflictException(
+					{
+						message: "User with this email address already exists.",
+					},
+					{ cause: error },
+				);
+			}
+			throw error;
+		}
 		return this.getUserResponseForOwner(createdUser);
 	}
 

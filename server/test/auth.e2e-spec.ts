@@ -383,6 +383,18 @@ describe("AppController (e2e)", () => {
 			});
 		}
 
+		test("POST existing email address 409", async () => {
+			await request(server)
+				.post("/user")
+				.send({ email: "john@example.com", password: "12345678" })
+				.expect(201);
+			await request(server)
+				.post("/user")
+				.send({ email: "john@example.com", password: "87654321" })
+				.expect(409)
+				.expect("Content-Type", /json/);
+		});
+
 		test("POST authenticated 401", async () => {
 			await request(server)
 				.post("/user")
