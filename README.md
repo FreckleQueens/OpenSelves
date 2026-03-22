@@ -39,7 +39,7 @@ or ETA
 - [x] test cannot create 2 users with same email address
 - [x] make tests db separate from dev db
 - [x] populate dev db with test data
-- [ ] private registration gated by unsecure clear-text password in app logs
+- [x] private registration gated by unsecure clear-text password in config
 - [ ] add member (created_at, updated_at, name, pronouns, description)
 - [ ] show member
 - [ ] edit member
@@ -57,7 +57,6 @@ or ETA
 - [ ] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
-- [ ] move registration password from app logs to config
 - [ ] PWA (service worker)
 
 ### 0.4.0

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {Block, List} from "konsta/svelte";
+    import {Card} from "konsta/svelte";
     import {onMount, type Snippet} from "svelte";
     import type {AuthFormData} from "$lib";
 
@@ -24,14 +24,13 @@
         }
     });
 </script>
+
 <div bind:this={inputsContainer}>
-    {#if formState.generalError}
-        <Block class="text-red-500" inset nested>
-            <p>Error: {formState.generalError}</p>
-        </Block>
-    {/if}
-    <List nested>
-        {@render children()}
-    </List>
-    <Block/>
+    {@render children()}
 </div>
+
+{#if formState.generalError}
+    <Card class="k-color-brand-red">
+        <p>Error: {formState.generalError}</p>
+    </Card>
+{/if}

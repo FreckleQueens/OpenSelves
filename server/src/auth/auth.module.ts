@@ -17,11 +17,6 @@ import { UserService } from "./user/user.service";
 			inject: [ConfigService],
 			useFactory: (configService: ConfigService<ConfigData>) => {
 				const jwtSecret = configService.getOrThrow("JWT_SECRET", { infer: true });
-				if (!jwtSecret || jwtSecret === "CHANGE_ME") {
-					throw new Error(
-						"Please set JWT_SECRET environment variable to secure random string.",
-					);
-				}
 				return {
 					global: true,
 					secret: jwtSecret,

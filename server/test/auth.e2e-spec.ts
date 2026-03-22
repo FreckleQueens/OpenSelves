@@ -18,6 +18,7 @@ describe("AppController (e2e)", () => {
 	let app: INestApplication<App>;
 	let server: App;
 	let configService: ConfigService<ConfigData>;
+	let registrationPassword: string;
 
 	let user: Omit<User, "passwordHash">;
 	let cookies: string;
@@ -82,6 +83,7 @@ describe("AppController (e2e)", () => {
 		app = moduleFixture.createNestApplication();
 		configureApp(app);
 		configService = app.get(ConfigService);
+		registrationPassword = configService.getOrThrow("REGISTRATION_PASSWORD", { infer: true });
 		await app.init();
 		server = app.getHttpServer();
 	});
@@ -95,7 +97,7 @@ describe("AppController (e2e)", () => {
 		user = (
 			await request(server)
 				.post("/user")
-				.send({ email: "jane@example.com", password: userPassword })
+				.send({ email: "jane@example.com", password: userPassword, registrationPassword })
 				.expect(201)
 		).body;
 		const response = await request(server)
@@ -107,7 +109,7 @@ describe("AppController (e2e)", () => {
 		user2 = (
 			await request(server)
 				.post("/user")
-				.send({ email: "bob@example.com", password: userPassword })
+				.send({ email: "bob@example.com", password: userPassword, registrationPassword })
 				.expect(201)
 		).body;
 	});
@@ -364,7 +366,7 @@ describe("AppController (e2e)", () => {
 		test("POST 201", async () => {
 			const response = await request(server)
 				.post("/user")
-				.send({ email: "john@example.com", password: "12345678" })
+				.send({ email: "john@example.com", password: "12345678", registrationPassword })
 				.expect(201)
 				.expect("Content-Type", /json/);
 			expect(Object.keys(response.body)).toEqual(["id", "email", "createdAt"]);
@@ -379,7 +381,7 @@ describe("AppController (e2e)", () => {
 			test(`POST ${testCase.test} 400`, async () => {
 				await request(server)
 					.post("/user")
-					.send(testCase)
+					.send({ registrationPassword, ...testCase })
 					.expect(400)
 					.expect("Content-Type", /json/);
 			});
@@ -388,11 +390,11 @@ describe("AppController (e2e)", () => {
 		test("POST existing email address 409", async () => {
 			await request(server)
 				.post("/user")
-				.send({ email: "john@example.com", password: "12345678" })
+				.send({ email: "john@example.com", password: "12345678", registrationPassword })
 				.expect(201);
 			await request(server)
 				.post("/user")
-				.send({ email: "john@example.com", password: "87654321" })
+				.send({ email: "john@example.com", password: "87654321", registrationPassword })
 				.expect(409)
 				.expect("Content-Type", /json/);
 		});
@@ -401,6 +403,14 @@ describe("AppController (e2e)", () => {
 			await request(server)
 				.post("/user")
 				.set("Cookie", cookies)
+				.send({ email: "john@example.com", password: "12345678", registrationPassword })
+				.expect(401)
+				.expect("Content-Type", /json/);
+		});
+
+		test("POST without general registration password 401", async () => {
+			await request(server)
+				.post("/user")
 				.send({ email: "john@example.com", password: "12345678" })
 				.expect(401)
 				.expect("Content-Type", /json/);

@@ -11,9 +11,11 @@ import {
 	Req,
 	UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import type { Request } from "express";
 
+import { ConfigData } from "../../config.data";
 import { User } from "../../generated/prisma/client";
 import { UserUpdateInput } from "../../generated/prisma/models/User";
 import { Public } from "../decorators/public.decorator";
@@ -24,7 +26,10 @@ import { UserService } from "./user.service";
 
 @Controller("user")
 export class UserController {
-	constructor(private readonly userService: UserService) {}
+	constructor(
+		private readonly configService: ConfigService<ConfigData>,
+		private readonly userService: UserService,
+	) {}
 
 	@Get(":id")
 	public async getUserById(@Req() request: Request, @Param() params: FindOneParams) {
@@ -42,6 +47,17 @@ export class UserController {
 	@Public({ allowAuthenticatedUsers: false })
 	@Post("")
 	public async createUser(@Body() createUserDto: CreateUserDto) {
+		if (!createUserDto.registrationPassword) {
+			throw new UnauthorizedException("Missing registration password.");
+		}
+
+		if (
+			createUserDto.registrationPassword !==
+			this.configService.getOrThrow("REGISTRATION_PASSWORD", { infer: true })
+		) {
+			throw new UnauthorizedException("Wrong registration password.");
+		}
+
 		const hashedPassword = await this.userService.hashPassword(createUserDto.password);
 		let createdUser: User;
 		try {

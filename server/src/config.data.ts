@@ -15,6 +15,8 @@ export interface ConfigData {
 	REFRESH_TOKEN_DURATION: number;
 
 	REFRESH_TOKEN_SIZE: number;
+
+	REGISTRATION_PASSWORD: string;
 }
 
 interface ExtendedJoi extends Joi.Root {
@@ -46,7 +48,10 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		)
 		.required(),
 
-	JWT_SECRET: Joi.string().min(32).alphanum().required(),
+	JWT_SECRET: Joi.string().min(32).alphanum().not("CHANGE_ME").required().messages({
+		"any.invalid": "Please set JWT_SECRET environment variable to secure random string",
+		"any.required": "Please set JWT_SECRET environment variable to secure random string",
+	}),
 
 	ACCESS_TOKEN_DURATION: Joi.number()
 		.positive()
@@ -56,4 +61,9 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	REFRESH_TOKEN_DURATION: Joi.number().positive().required(),
 
 	REFRESH_TOKEN_SIZE: Joi.number().min(16).required(),
+
+	REGISTRATION_PASSWORD: Joi.string().min(8).not("CHANGE_ME").required().messages({
+		"any.invalid": "Please set REGISTER_PASSWORD environment variable to secure random string",
+		"any.required": "Please set REGISTER_PASSWORD environment variable to secure random string",
+	}),
 });

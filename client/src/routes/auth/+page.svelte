@@ -146,9 +146,9 @@
                 >
                     <LoginFields formState={forms.login}/>
 
-                    <BlockFooter>
+                    <Block class="mt-0">
                         <Button type="submit" tonal>Login</Button>
-                    </BlockFooter>
+                    </Block>
                 </form>
             {:else if activeForm === "register"}
                 <form
@@ -158,9 +158,9 @@
                 >
                     <RegisterFields formState={forms.register}/>
 
-                    <BlockFooter>
+                    <Block class="mt-0">
                         <Button type="submit" tonal>Register</Button>
-                    </BlockFooter>
+                    </Block>
                 </form>
             {/if}
         </div>
