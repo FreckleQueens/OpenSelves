@@ -5,7 +5,8 @@
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
-	import { Block, BlockTitle, Button, Preloader } from "konsta/svelte";
+	import Icon from "@iconify/svelte";
+	import { Block, BlockTitle, Button, Preloader, useTheme } from "konsta/svelte";
 	import { onMount } from "svelte";
 
 	let user:
@@ -84,6 +85,12 @@
 
 	<BlockTitle medium>Actions</BlockTitle>
 	<Block strong inset>
-		<Button tonal raised onclick={logoutButtonOnclick}>Logout</Button>
+		<Button tonal raised onclick={logoutButtonOnclick}>
+			<Icon
+				icon={useTheme() === "ios" ? "f7:square-arrow-left" : "ic:round-logout"}
+				class="text-2xl mr-1"
+			/>
+			Logout
+		</Button>
 	</Block>
 </AppPage>

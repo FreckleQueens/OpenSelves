@@ -20,6 +20,7 @@
 	"devDependencies": {
 		"@eslint/compat": "^2.0.2",
 		"@eslint/js": "^9.39.2",
+		"@iconify/svelte": "^5.2.1",
 		"@playwright/test": "^1.58.2",
 		"@prisma-idb/idb-client-generator": "^0.34.0",
 		"@sveltejs/adapter-static": "^3.0.10",

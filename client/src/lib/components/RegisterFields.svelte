@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { AuthFormData } from "$lib";
 	import AuthFields from "$lib/components/AuthFields.svelte";
-	import { BlockTitle, List, ListInput } from "konsta/svelte";
+	import Icon from "@iconify/svelte";
+	import { BlockTitle, List, ListInput, useTheme } from "konsta/svelte";
 
 	let { formState }: { formState: AuthFormData } = $props();
 </script>
@@ -19,7 +20,14 @@
 			error={formState.errors["email"] || ""}
 			pattern="^.+@.+\..{'{'}2,}$"
 			required
-		/>
+		>
+			{#snippet media()}
+				<Icon
+					icon={useTheme() === "ios" ? "f7:at-alt" : "ic:round-alternate-email"}
+					class="text-2xl"
+				/>
+			{/snippet}
+		</ListInput>
 		<ListInput
 			label="Password"
 			floatingLabel
@@ -31,7 +39,14 @@
 			minlength={8}
 			required
 			autocomplete="new-password"
-		/>
+		>
+			{#snippet media()}
+				<Icon
+					icon={useTheme() === "ios" ? "f7:lock-shield" : "ic:round-password"}
+					class="text-2xl"
+				/>
+			{/snippet}
+		</ListInput>
 	</List>
 
 	<BlockTitle>Authorization</BlockTitle>
@@ -47,6 +62,10 @@
 			pattern=".{'{'}8,}"
 			minlength={8}
 			autocomplete="current-password"
-		/>
+		>
+			{#snippet media()}
+				<Icon icon={useTheme() === "ios" ? "f7:lock" : "ic:round-key"} class="text-2xl" />
+			{/snippet}
+		</ListInput>
 	</List>
 </AuthFields>

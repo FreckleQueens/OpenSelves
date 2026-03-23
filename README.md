@@ -47,6 +47,7 @@ or ETA
   - [x] edit member
   - [x] delete member
   - [ ] server sync
+- [x] add icons to buttons, fields and links/navigation items
 - [ ] archive member (test flow of performing client IndexedDB migration)
 - [ ] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
@@ -63,7 +64,6 @@ or ETA
 - [ ] PWA (service worker)
 
 ### 0.4.0
-- [ ] add icons to buttons, fields and links/navigation items
 - [ ] add front (created_at, start_at, end_at, member_id, note)
 - [ ] show front list (history table)
 - [ ] edit front

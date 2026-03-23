@@ -6,7 +6,16 @@
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
 	import { Storage } from "$lib/storage";
-	import { Block, Button, Dialog, DialogButton, Segmented, SegmentedButton } from "konsta/svelte";
+	import Icon from "@iconify/svelte";
+	import {
+		Block,
+		Button,
+		Dialog,
+		DialogButton,
+		Segmented,
+		SegmentedButton,
+		useTheme,
+	} from "konsta/svelte";
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
 
@@ -94,19 +103,29 @@
 	});
 </script>
 
-<AppPage loading={!loaded}>
+<AppPage showMenu={false} loading={!loaded}>
 	<Block>
 		<Segmented strong rounded class="text-4xl">
 			<SegmentedButton
 				active={activeForm === "login"}
 				onclick={() => (activeForm = forms.login.name)}
 			>
+				<Icon
+					icon={useTheme() === "ios" ? "f7:square-arrow-right" : "ic:round-login"}
+					class="text-2xl mr-1"
+				/>
 				Login
 			</SegmentedButton>
 			<SegmentedButton
 				active={activeForm === "register"}
 				onclick={() => (activeForm = forms.register.name)}
 			>
+				<Icon
+					icon={useTheme() === "ios"
+						? "f7:person-crop-circle-badge-plus"
+						: "material-symbols:group-add-rounded"}
+					class="text-2xl mr-1"
+				/>
 				Register
 			</SegmentedButton>
 		</Segmented>
@@ -152,7 +171,13 @@
 		</p>
 
 		{#snippet buttons()}
-			<DialogButton strong onclick={loginFromRegistration}>Login</DialogButton>
+			<DialogButton strong onclick={loginFromRegistration}>
+				<Icon
+					icon={useTheme() === "ios" ? "f7:square-arrow-right" : "ic:round-login"}
+					class="text-2xl mr-2"
+				/>
+				Login
+			</DialogButton>
 		{/snippet}
 	</Dialog>
 </AppPage>

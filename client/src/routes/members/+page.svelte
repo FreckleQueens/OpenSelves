@@ -5,7 +5,8 @@
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
-	import { Card, Fab, Link } from "konsta/svelte";
+	import Icon from "@iconify/svelte";
+	import { Card, Fab, Link, useTheme } from "konsta/svelte";
 	import { onMount } from "svelte";
 
 	import type { Member } from "../../generated/prisma/client/generated/browser";
@@ -33,15 +34,23 @@
 		onclick={addMemberButtonOnClick}
 	>
 		{#snippet icon()}
-			<p>+</p>
+			<Icon icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"} class="text-2xl" />
 		{/snippet}
 	</Fab>
 
 	{#each members as member (member.id)}
 		<Link href={`/members/edit/${member.id}`} class="block">
-			<Card>
-				<p>{member.name}</p>
-				<p class="opacity-70">{member.pronouns}</p>
+			<Card raised>
+				<div class="flex items-center">
+					<Icon
+						icon={useTheme() === "ios" ? "f7:person" : "ic:round-person"}
+						class="text-4xl mr-2"
+					/>
+					<div>
+						<p>{member.name}</p>
+						<p class="opacity-70">{member.pronouns}</p>
+					</div>
+				</div>
 			</Card>
 		</Link>
 	{/each}

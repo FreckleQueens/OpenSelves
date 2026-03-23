@@ -4,6 +4,7 @@
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
+	import Icon from "@iconify/svelte";
 	import {
 		Block,
 		BlockTitle,
@@ -13,9 +14,9 @@
 		Link,
 		List,
 		ListInput,
-		NavbarBackLink,
 		Segmented,
 		SegmentedButton,
+		useTheme,
 	} from "konsta/svelte";
 	import { onMount } from "svelte";
 
@@ -33,7 +34,7 @@
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	});
-	let originalMember: Member | null = null;
+	let originalMember: Member | null = $state(null);
 
 	let mounted = $state(false);
 	onMount(async () => {
@@ -54,13 +55,20 @@
 		Tab,
 		{
 			title: string;
+			iosIcon: string;
+			materialIcon: string;
 		}
-	> = {};
-	tabs[Tab.INFO] = {
-		title: "Info",
-	};
-	tabs[Tab.SETTINGS] = {
-		title: "Settings",
+	> = {
+		[Tab.INFO]: {
+			title: "Info",
+			iosIcon: "f7:info-circle",
+			materialIcon: "ic:round-info",
+		},
+		[Tab.SETTINGS]: {
+			title: "Settings",
+			iosIcon: "f7:ellipsis",
+			materialIcon: "ic:round-settings",
+		},
 	};
 
 	let form: HTMLFormElement;
@@ -97,18 +105,21 @@
 		await goto(resolve("/members"));
 	}
 
-	let showBackLinkConfirmDialog = $state(false);
+	let showSaveConfirmDialog = $state(false);
+	const hasMemberChanged = () => {
+		console.log(JSON.stringify(member), JSON.stringify(originalMember));
+		return JSON.stringify(member) !== JSON.stringify(originalMember);
+	};
 	async function backLinkOnClick(e: Event) {
 		e.preventDefault();
-		if (JSON.stringify(member) !== JSON.stringify(originalMember)) {
-			showBackLinkConfirmDialog = true;
+		if (hasMemberChanged()) {
+			showSaveConfirmDialog = true;
 		} else {
 			discardChanges();
 		}
 	}
-	function closeBackLinkConfirmDialog() {
-		showBackLinkConfirmDialog = false;
-	}
+
+	let showDiscardChangesDialog = $state(false);
 	function discardChanges() {
 		history.back();
 	}
@@ -121,17 +132,40 @@
 	}
 </script>
 
-<Dialog opened={showBackLinkConfirmDialog} onBackdropClick={closeBackLinkConfirmDialog}>
+<Dialog opened={showSaveConfirmDialog} onBackdropClick={() => (showSaveConfirmDialog = false)}>
 	{#snippet title()}
 		Save changes?
 	{/snippet}
 
 	{#snippet buttons()}
-		<DialogButton onClick={closeBackLinkConfirmDialog}>Cancel</DialogButton>
-		<DialogButton strong class="k-color-brand-red" onClick={discardChanges}>
-			No (discard)
+		<DialogButton onClick={() => (showSaveConfirmDialog = false)}>Cancel</DialogButton>
+		<DialogButton strong onClick={formOnSubmit}>
+			<Icon
+				icon={useTheme() === "ios" ? "f7:floppy-disk" : "ic:round-save"}
+				class="text-2xl mr-2"
+			/>
+			Save
 		</DialogButton>
-		<DialogButton strong onClick={formOnSubmit}>Yes</DialogButton>
+	{/snippet}
+</Dialog>
+
+<Dialog
+	opened={showDiscardChangesDialog}
+	onBackdropClick={() => (showDiscardChangesDialog = false)}
+>
+	{#snippet title()}
+		Discard changes?
+	{/snippet}
+
+	{#snippet buttons()}
+		<DialogButton onClick={() => (showDiscardChangesDialog = false)}>Cancel</DialogButton>
+		<DialogButton strong onClick={discardChanges} class="k-color-brand-red">
+			<Icon
+				icon={useTheme() === "ios" ? "f7:xmark-circle" : "ic:round-cancel"}
+				class="text-2xl mr-2"
+			/>
+			Discard
+		</DialogButton>
 	{/snippet}
 </Dialog>
 
@@ -143,17 +177,41 @@
 	Are you sure you want to delete this member? This action cannot be reverted.
 
 	{#snippet buttons()}
-		<DialogButton onClick={() => (openDeleteMemberDialog = false)}>No</DialogButton>
-		<DialogButton strong onClick={deleteMember}>Yes</DialogButton>
+		<DialogButton onClick={() => (openDeleteMemberDialog = false)}>Cancel</DialogButton>
+		<DialogButton strong onClick={deleteMember} class="k-color-brand-red">
+			<Icon
+				icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
+				class="text-2xl mr-2"
+			/>
+			Delete
+		</DialogButton>
 	{/snippet}
 </Dialog>
 
 <AppPage title="" loading={!mounted} showMenu={false}>
 	{#snippet navbarLeft()}
-		<NavbarBackLink onClick={backLinkOnClick} />
+		<Link onClick={backLinkOnClick}>
+			<Icon
+				icon={useTheme() === "ios" ? "f7:arrow-left" : "ic:round-arrow-back"}
+				class="text-2xl"
+			/>
+		</Link>
+		{#if hasMemberChanged()}
+			<Link onClick={() => (showDiscardChangesDialog = true)}>
+				<Icon
+					icon={useTheme() === "ios" ? "f7:xmark-circle" : "ic:round-cancel"}
+					class="text-2xl"
+				/>
+			</Link>
+		{/if}
 	{/snippet}
 	{#snippet navbarRight()}
-		<Link onClick={formOnSubmit}>Save</Link>
+		<Link onClick={formOnSubmit}>
+			<Icon
+				icon={useTheme() === "ios" ? "f7:floppy-disk" : "ic:round-save"}
+				class="text-2xl"
+			/>
+		</Link>
 	{/snippet}
 
 	{#snippet subnavbar()}
@@ -161,47 +219,76 @@
 			{#each Object.entries(tabs) as [key, tab] (key)}
 				<SegmentedButton
 					active={activeTab === parseInt(key)}
-					onClick={() => (activeTab = parseInt(key))}>{tab.title}</SegmentedButton
+					onClick={() => (activeTab = parseInt(key))}
 				>
+					<Icon
+						icon={useTheme() === "ios" ? tab.iosIcon : tab.materialIcon}
+						class="text-2xl mr-1"
+					/>
+					{tab.title}
+				</SegmentedButton>
 			{/each}
 		</Segmented>
 	{/snippet}
 
-	{#if activeTab === Tab.INFO}
-		<form bind:this={form} onsubmit={formOnSubmit}>
-			<List>
-				<ListInput
-					name="name"
-					label="Name"
-					floatingLabel
-					required
-					bind:value={member.name}
-				/>
-				<ListInput
-					name="pronouns"
-					label="Pronouns"
-					floatingLabel
-					bind:value={member.pronouns}
-				/>
-				<ListInput
-					name="description"
-					label="Description"
-					floatingLabel
-					type="textarea"
-					autocomplete="off"
-					inputClass="min-h-20"
-					bind:value={member.description}
-				/>
-			</List>
-		</form>
-	{:else if activeTab === Tab.SETTINGS}
+	<form bind:this={form} onsubmit={formOnSubmit} class:hidden={activeTab !== Tab.INFO}>
+		<List>
+			<ListInput name="name" label="Name" floatingLabel required bind:value={member.name}>
+				{#snippet media()}
+					<Icon
+						icon={useTheme() === "ios"
+							? "f7:square-pencil"
+							: "ic:round-drive-file-rename-outline"}
+						class="text-2xl"
+					/>
+				{/snippet}
+			</ListInput>
+			<ListInput name="pronouns" label="Pronouns" floatingLabel bind:value={member.pronouns}>
+				{#snippet media()}
+					<Icon icon="heroicons:slash-20-solid" class="text-2xl" />
+				{/snippet}
+			</ListInput>
+			<ListInput
+				name="description"
+				label="Description"
+				floatingLabel
+				type="textarea"
+				autocomplete="off"
+				inputClass="min-h-20"
+				bind:value={member.description}
+			>
+				{#snippet media()}
+					<Icon
+						icon={useTheme() === "ios" ? "f7:doc-text" : "ic:round-description"}
+						class="text-2xl"
+					/>
+				{/snippet}
+			</ListInput>
+		</List>
+	</form>
+
+	<div class:hidden={activeTab !== Tab.SETTINGS}>
 		{#if member.id}
-			<BlockTitle class="text-brand-red">Danger zone</BlockTitle>
+			<BlockTitle class="text-brand-red">
+				<p class="flex items-center border-b-1 border-b-brand-red flex-1">
+					<Icon
+						icon={useTheme() === "ios"
+							? "f7:exclamationmark-triangle"
+							: "ic:round-warning"}
+						class="text-2xl mr-1"
+					/>
+					Danger zone
+				</p>
+			</BlockTitle>
 			<Block>
-				<Button onClick={() => (openDeleteMemberDialog = true)}
-					>Delete member (irreversible)</Button
-				>
+				<Button onClick={() => (openDeleteMemberDialog = true)} class="k-color-brand-red">
+					<Icon
+						icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
+						class="text-2xl mr-1"
+					/>
+					Delete member (irreversible)
+				</Button>
 			</Block>
 		{/if}
-	{/if}
+	</div>
 </AppPage>

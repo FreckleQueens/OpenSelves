@@ -1027,6 +1027,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@iconify/svelte@npm:^5.2.1":
+  version: 5.2.1
+  resolution: "@iconify/svelte@npm:5.2.1"
+  dependencies:
+    "@iconify/types": "npm:^2.0.0"
+  peerDependencies:
+    svelte: ">5.0.0"
+  checksum: 10c0/0fb200a183dab46372faedb6972bfac1652540ca088883214fb5ea8247f8caf2faba7dd9d6021aa95b15b82f5c9074d4a1662039fb2a424ae05111a29c922760
+  languageName: node
+  linkType: hard
+
+"@iconify/types@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@iconify/types@npm:2.0.0"
+  checksum: 10c0/65a3be43500c7ccacf360e136d00e1717f050b7b91da644e94370256ac66f582d59212bdb30d00788aab4fc078262e91c95b805d1808d654b72f6d2072a7e4b2
+  languageName: node
+  linkType: hard
+
 "@inquirer/ansi@npm:^1.0.2":
   version: 1.0.2
   resolution: "@inquirer/ansi@npm:1.0.2"
@@ -8718,6 +8736,7 @@ __metadata:
     "@capacitor/core": "npm:^8.2.0"
     "@eslint/compat": "npm:^2.0.2"
     "@eslint/js": "npm:^9.39.2"
+    "@iconify/svelte": "npm:^5.2.1"
     "@paralleldrive/cuid2": "npm:^3.3.0"
     "@playwright/test": "npm:^1.58.2"
     "@prisma-idb/idb-client-generator": "npm:^0.34.0"
