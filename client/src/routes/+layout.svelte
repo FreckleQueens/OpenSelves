@@ -5,6 +5,21 @@
 	import { App, Page } from "konsta/svelte";
 
 	let { children } = $props();
+
+	function isIos() {
+		return (
+			[
+				"iPad Simulator",
+				"iPhone Simulator",
+				"iPod Simulator",
+				"iPad",
+				"iPhone",
+				"iPod",
+			].includes(navigator.platform) ||
+			// iPad on iOS 13 detection
+			(navigator.userAgent.includes("Mac") && "ontouchend" in document)
+		);
+	}
 </script>
 
 <svelte:head>
@@ -19,7 +34,7 @@
 	/>
 </svelte:head>
 
-<App safeAreas>
+<App safeAreas theme={isIos() ? "ios" : "material"}>
 	<div class="safe-areas">
 		<Page>
 			{@render children()}
