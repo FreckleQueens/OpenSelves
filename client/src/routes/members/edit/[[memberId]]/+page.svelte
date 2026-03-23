@@ -148,7 +148,7 @@
 	{/snippet}
 </Dialog>
 
-<AppPage title="" loading={!mounted}>
+<AppPage title="" loading={!mounted} showMenu={false}>
 	{#snippet navbarLeft()}
 		<NavbarBackLink onClick={backLinkOnClick} />
 	{/snippet}

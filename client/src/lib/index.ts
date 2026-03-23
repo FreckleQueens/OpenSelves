@@ -90,3 +90,8 @@ export async function handleLogout() {
 	await storage.setOffline();
 	await goto(resolve("/"));
 }
+
+export enum MenuItem {
+	HOME,
+	MEMBERS,
+}

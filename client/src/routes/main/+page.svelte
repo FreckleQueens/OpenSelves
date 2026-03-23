@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { CallResult, call, handleLogout } from "$lib";
+	import { CallResult, MenuItem, call, handleLogout } from "$lib";
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
@@ -68,7 +68,7 @@
 	};
 </script>
 
-<AppPage>
+<AppPage activeMenuItem={MenuItem.HOME}>
 	<Block>
 		<p class="text-2xl">Welcome to OpenSelves!</p>
 	</Block>

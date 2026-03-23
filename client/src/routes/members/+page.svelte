@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
+	import { MenuItem } from "$lib";
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
@@ -26,7 +27,7 @@
 	}
 </script>
 
-<AppPage>
+<AppPage activeMenuItem={MenuItem.MEMBERS}>
 	<Fab
 		class="fixed right-safe-4 bottom-safe-4 z-20 k-color-brand-primary"
 		onclick={addMemberButtonOnClick}
