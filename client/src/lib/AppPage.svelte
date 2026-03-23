@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { Navbar, Preloader } from "konsta/svelte";
 
-	let { children, navbar, navbarLeft, navbarRight, title, loading } = $props();
+	let { children, navbar, navbarLeft, navbarRight, subnavbar, title, loading } = $props();
 </script>
 
 <Navbar
 	title={typeof title === "string" ? title : "Open Selves"}
 	left={navbarLeft}
 	right={navbarRight}
+	{subnavbar}
 >
 	{#if loading}{:else if navbar}
 		{@render navbar()}

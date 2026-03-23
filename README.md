@@ -45,7 +45,7 @@ or ETA
   - [x] add member (created_at, updated_at, name, pronouns, description)
   - [x] show member
   - [x] edit member
-  - [ ] delete member
+  - [x] delete member
   - [ ] server sync
 - [ ] archive member (test flow of performing client IndexedDB migration)
 - [ ] client: make server url openselves.org in production
