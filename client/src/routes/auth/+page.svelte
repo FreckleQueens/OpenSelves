@@ -2,18 +2,11 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { type AuthFormData, SERVER_URL } from "$lib";
+	import AppPage from "$lib/AppPage.svelte";
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
 	import { Storage } from "$lib/storage";
-	import {
-		Block,
-		Button,
-		Dialog,
-		DialogButton,
-		Preloader,
-		Segmented,
-		SegmentedButton,
-	} from "konsta/svelte";
+	import { Block, Button, Dialog, DialogButton, Segmented, SegmentedButton } from "konsta/svelte";
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
 
@@ -101,9 +94,7 @@
 	});
 </script>
 
-{#if !loaded}
-	<Preloader />
-{:else}
+<AppPage loading={!loaded}>
 	<Block>
 		<Segmented strong rounded class="text-4xl">
 			<SegmentedButton
@@ -164,7 +155,7 @@
 			<DialogButton strong onclick={loginFromRegistration}>Login</DialogButton>
 		{/snippet}
 	</Dialog>
-{/if}
+</AppPage>
 
 <style lang="scss">
 	form {

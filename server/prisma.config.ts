@@ -7,10 +7,10 @@ if (!process.env["SHADOW_DATABASE_URL"]) {
 }
 
 export default defineConfig({
-	schema: "prisma/schema.prisma",
+	schema: "../common/prisma/schema.prisma",
 	migrations: {
-		path: "prisma/migrations",
-		seed: "bun ./prisma/seed.ts",
+		path: "../common/prisma/migrations",
+		seed: "bun ../common/prisma/seed.ts",
 	},
 	datasource: {
 		url: process.env["DATABASE_URL"],

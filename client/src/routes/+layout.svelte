@@ -2,7 +2,7 @@
 	import "../app.css";
 
 	import favicon from "$lib/assets/favicon.svg";
-	import { App, Navbar, Page } from "konsta/svelte";
+	import { App, Page } from "konsta/svelte";
 
 	let { children } = $props();
 </script>
@@ -22,7 +22,6 @@
 <App safeAreas>
 	<div class="safe-areas">
 		<Page>
-			<Navbar title="Open Selves" />
 			{@render children()}
 		</Page>
 	</div>

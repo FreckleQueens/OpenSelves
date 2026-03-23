@@ -2,6 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { CallResult, call, handleLogout } from "$lib";
+	import AppPage from "$lib/AppPage.svelte";
+	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import { Block, BlockTitle, Button, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
@@ -37,6 +39,22 @@
 				id: `${response.id}`,
 				email: `${response.email}`,
 			};
+
+			const idb = await IDB.getClient();
+			await idb.user.upsert(
+				{
+					where: { id: `${response.id}` },
+					update: { email: `${response.email}` },
+					create: {
+						id: `${response.id}`,
+						email: `${response.email}`,
+						passwordHash: "",
+					},
+				},
+				{
+					addToOutbox: false,
+				},
+			);
 		}
 	});
 
@@ -50,20 +68,22 @@
 	};
 </script>
 
-<Block>
-	<p class="text-2xl">Welcome to OpenSelves!</p>
-</Block>
+<AppPage>
+	<Block>
+		<p class="text-2xl">Welcome to OpenSelves!</p>
+	</Block>
 
-<BlockTitle medium>Status</BlockTitle>
-<Block strong inset>
-	{#if user}
-		<p>You are logged in as user #{user.id}, {user.email}</p>
-	{:else}
-		<Preloader />
-	{/if}
-</Block>
+	<BlockTitle medium>Status</BlockTitle>
+	<Block strong inset>
+		{#if user}
+			<p>You are logged in as user #{user.id}, {user.email}</p>
+		{:else}
+			<Preloader />
+		{/if}
+	</Block>
 
-<BlockTitle medium>Actions</BlockTitle>
-<Block strong inset>
-	<Button tonal raised onclick={logoutButtonOnclick}>Logout</Button>
-</Block>
+	<BlockTitle medium>Actions</BlockTitle>
+	<Block strong inset>
+		<Button tonal raised onclick={logoutButtonOnclick}>Logout</Button>
+	</Block>
+</AppPage>

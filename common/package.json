@@ -1,0 +1,7 @@
+{
+	"name": "openselves-common",
+	"packageManager": "yarn@4.13.0",
+	"devDependencies": {
+		"argon2": "^0.44.0"
+	}
+}

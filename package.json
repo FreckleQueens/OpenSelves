@@ -6,5 +6,10 @@
 	"packageManager": "yarn@4.13.0",
 	"devDependencies": {
 		"concurrently": "^9.2.1"
-	}
+	},
+	"workspaces": [
+		"common",
+		"client",
+		"server"
+	]
 }

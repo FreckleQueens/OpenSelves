@@ -11,5 +11,9 @@
 }
 
 @theme {
-	--color-brand-red: #dc0000;
+	--color-brand-primary: #df6800;
+	--color-brand-secondary: #cc407f;
+	--color-brand-link: #6184d8;
+	--color-brand-green: #28a460;
+	--color-brand-red: #d72638;
 }

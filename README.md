@@ -40,11 +40,14 @@ or ETA
 - [x] make tests db separate from dev db
 - [x] populate dev db with test data
 - [x] private registration gated by unsecure clear-text password in config
-- [ ] add member (created_at, updated_at, name, pronouns, description)
-- [ ] show member
-- [ ] edit member
-- [ ] delete member
-- [ ] archive member
+- [ ] system mapping
+  - [x] client offline mode with prisma-idb
+  - [x] add member (created_at, updated_at, name, pronouns, description)
+  - [x] show member
+  - [x] edit member
+  - [ ] delete member
+  - [ ] server sync
+- [ ] archive member (test flow of performing client IndexedDB migration)
 - [ ] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
 
