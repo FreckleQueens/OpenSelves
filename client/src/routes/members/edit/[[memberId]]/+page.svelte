@@ -106,10 +106,7 @@
 	}
 
 	let showSaveConfirmDialog = $state(false);
-	const hasMemberChanged = () => {
-		console.log(JSON.stringify(member), JSON.stringify(originalMember));
-		return JSON.stringify(member) !== JSON.stringify(originalMember);
-	};
+	const hasMemberChanged = () => JSON.stringify(member) !== JSON.stringify(originalMember);
 	async function backLinkOnClick(e: Event) {
 		e.preventDefault();
 		if (hasMemberChanged()) {
@@ -270,7 +267,7 @@
 	<div class:hidden={activeTab !== Tab.SETTINGS}>
 		{#if member.id}
 			<BlockTitle class="text-brand-red">
-				<p class="flex items-center border-b-1 border-b-brand-red flex-1">
+				<p class="flex items-center border-b border-b-brand-red flex-1">
 					<Icon
 						icon={useTheme() === "ios"
 							? "f7:exclamationmark-triangle"
