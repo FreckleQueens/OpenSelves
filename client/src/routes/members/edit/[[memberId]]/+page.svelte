@@ -14,8 +14,10 @@
 		Link,
 		List,
 		ListInput,
+		ListItem,
 		Segmented,
 		SegmentedButton,
+		Toggle,
 		useTheme,
 	} from "konsta/svelte";
 	import { onMount } from "svelte";
@@ -33,6 +35,8 @@
 		description: "",
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		isArchived: false,
+		archivedReason: null,
 	});
 	let originalMember: Member | null = $state(null);
 
@@ -89,6 +93,8 @@
 					name: formData["name"],
 					description: formData["description"],
 					pronouns: formData["pronouns"],
+					isArchived: !!formData["isArchived"],
+					archivedReason: formData["archivedReason"],
 				},
 			});
 		} else {
@@ -98,6 +104,8 @@
 					name: formData["name"],
 					description: formData["description"],
 					pronouns: formData["pronouns"],
+					isArchived: !!formData["isArchived"],
+					archivedReason: formData["archivedReason"],
 				},
 			});
 		}
@@ -228,64 +236,108 @@
 		</Segmented>
 	{/snippet}
 
-	<form bind:this={form} onsubmit={formOnSubmit} class:hidden={activeTab !== Tab.INFO}>
-		<List>
-			<ListInput name="name" label="Name" floatingLabel required bind:value={member.name}>
-				{#snippet media()}
-					<Icon
-						icon={useTheme() === "ios"
-							? "f7:square-pencil"
-							: "ic:round-drive-file-rename-outline"}
-						class="text-2xl"
-					/>
-				{/snippet}
-			</ListInput>
-			<ListInput name="pronouns" label="Pronouns" floatingLabel bind:value={member.pronouns}>
-				{#snippet media()}
-					<Icon icon="heroicons:slash-20-solid" class="text-2xl" />
-				{/snippet}
-			</ListInput>
-			<ListInput
-				name="description"
-				label="Description"
-				floatingLabel
-				type="textarea"
-				autocomplete="off"
-				inputClass="min-h-20"
-				bind:value={member.description}
-			>
-				{#snippet media()}
-					<Icon
-						icon={useTheme() === "ios" ? "f7:doc-text" : "ic:round-description"}
-						class="text-2xl"
-					/>
-				{/snippet}
-			</ListInput>
-		</List>
-	</form>
+	<form bind:this={form} onsubmit={formOnSubmit}>
+		<div class:hidden={activeTab !== Tab.INFO}>
+			<List>
+				<ListInput name="name" label="Name" floatingLabel required bind:value={member.name}>
+					{#snippet media()}
+						<Icon
+							icon={useTheme() === "ios"
+								? "f7:square-pencil"
+								: "ic:round-drive-file-rename-outline"}
+							class="text-2xl"
+						/>
+					{/snippet}
+				</ListInput>
+				<ListInput
+					name="pronouns"
+					label="Pronouns"
+					floatingLabel
+					bind:value={member.pronouns}
+				>
+					{#snippet media()}
+						<Icon icon="heroicons:slash-20-solid" class="text-2xl" />
+					{/snippet}
+				</ListInput>
+				<ListInput
+					name="description"
+					label="Description"
+					floatingLabel
+					type="textarea"
+					autocomplete="off"
+					inputClass="min-h-20"
+					bind:value={member.description}
+				>
+					{#snippet media()}
+						<Icon
+							icon={useTheme() === "ios" ? "f7:doc-text" : "ic:round-description"}
+							class="text-2xl"
+						/>
+					{/snippet}
+				</ListInput>
+			</List>
+		</div>
 
-	<div class:hidden={activeTab !== Tab.SETTINGS}>
-		{#if member.id}
-			<BlockTitle class="text-brand-red">
-				<p class="flex items-center border-b border-b-brand-red flex-1">
-					<Icon
-						icon={useTheme() === "ios"
-							? "f7:exclamationmark-triangle"
-							: "ic:round-warning"}
-						class="text-2xl mr-1"
-					/>
-					Danger zone
-				</p>
-			</BlockTitle>
-			<Block>
-				<Button onClick={() => (openDeleteMemberDialog = true)} class="k-color-brand-red">
-					<Icon
-						icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
-						class="text-2xl mr-1"
-					/>
-					Delete member (irreversible)
-				</Button>
-			</Block>
-		{/if}
-	</div>
+		<div class:hidden={activeTab !== Tab.SETTINGS}>
+			{#if member.id}
+				<Block>
+					<List>
+						<ListItem label title="Archive member">
+							{#snippet after()}
+								<Toggle
+									name="isArchived"
+									checked={!!member.isArchived}
+									onChange={() => (member.isArchived = !member.isArchived)}
+								/>
+							{/snippet}
+						</ListItem>
+						<div class:hidden={!member.isArchived}>
+							<ListInput
+								name="archivedReason"
+								label="Archived reason"
+								floatingLabel
+								type="textarea"
+								autocomplete="off"
+								inputClass="min-h-6"
+								bind:value={member.archivedReason}
+							>
+								{#snippet media()}
+									<Icon
+										icon={useTheme() === "ios"
+											? "f7:gobackward"
+											: "ic:round-history"}
+										class="text-2xl"
+									/>
+								{/snippet}
+							</ListInput>
+						</div>
+					</List>
+				</Block>
+
+				<BlockTitle class="text-brand-red">
+					<p class="flex items-center border-b border-b-brand-red flex-1">
+						<Icon
+							icon={useTheme() === "ios"
+								? "f7:exclamationmark-triangle"
+								: "ic:round-warning"}
+							class="text-2xl mr-1"
+						/>
+						Danger zone
+					</p>
+				</BlockTitle>
+				<Block>
+					<Button
+						onClick={() => (openDeleteMemberDialog = true)}
+						class="k-color-brand-red"
+					>
+						<Icon
+							icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
+							class="text-2xl mr-1"
+						/>
+						Delete member (irreversible)
+					</Button>
+				</Block>
+			{/if}
+		</div>
+	</form>
 </AppPage>

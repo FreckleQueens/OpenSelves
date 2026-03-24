@@ -46,14 +46,14 @@ export abstract class Storage {
 		await this.setKey(OFFLINE_KEY);
 	}
 
-	public async get(path: string): Promise<string | undefined> {
-		return this.getRaw(`${this.key}.${path}`);
+	public async get(path: string, absolute: boolean = false): Promise<string | undefined> {
+		return this.getRaw(absolute ? path : `${this.key}.${path}`);
 	}
 
 	protected abstract getRaw(path: string): Promise<string | undefined>;
 
-	public async set(path: string, value: string): Promise<void> {
-		await this.setRaw(`${this.key}.${path}`, value);
+	public async set(path: string, value: string, absolute: boolean = false): Promise<void> {
+		await this.setRaw(absolute ? path : `${this.key}.${path}`, value);
 	}
 
 	protected abstract setRaw(path: string, value: string): Promise<void>;

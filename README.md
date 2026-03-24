@@ -48,7 +48,7 @@ or ETA
   - [x] delete member
   - [ ] server sync
 - [x] add icons to buttons, fields and links/navigation items
-- [ ] archive member (test flow of performing client IndexedDB migration)
+- [x] archive member (test flow of performing client IndexedDB migration)
 - [ ] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
 
