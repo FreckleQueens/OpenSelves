@@ -2,8 +2,8 @@
 	"name": "openselves-common",
 	"packageManager": "yarn@4.13.0",
 	"scripts": {
-		"build": "yarn drizzle-kit generate && yarn tsc",
-		"lint": "yarn drizzle-kit check && eslint \"{src,apps,libs,test}/**/*.ts\"",
+		"build": "yarn tsc",
+		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
 		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
 	},
 	"main": "./dist/index.js",
@@ -21,7 +21,6 @@
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
 		"@types/node": "^25.5.0",
 		"argon2": "^0.44.0",
-		"drizzle-kit": "1.0.0-beta.19",
 		"eslint": "^10.1.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-prettier": "^5.5.5",

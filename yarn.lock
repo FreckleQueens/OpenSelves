@@ -8870,21 +8870,21 @@ __metadata:
 
 "openselves-common@file:../common::locator=openselves-client%40workspace%3Aclient":
   version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=20c809&locator=openselves-client%40workspace%3Aclient"
+  resolution: "openselves-common@file:../common#../common::hash=03e970&locator=openselves-client%40workspace%3Aclient"
   dependencies:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/84f7c39a1f4437916b142abd094649c7339e1649fb7a0f97a775f0f20d63d206600fd7bcafe3f561a236d44623e4e7f025d8fbbdc7decf433b1650319c336d44
+  checksum: 10c0/ddaf794236798e11711b442b0ce92ceedb60503141e360ffd8c5f8e99b4060f76d8615b4e33b3411584d3df1fc6494e1bddcfc0fc4f868640802ccb0c001d28f
   languageName: node
   linkType: hard
 
 "openselves-common@file:../common::locator=openselves-server%40workspace%3Aserver":
   version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=20c809&locator=openselves-server%40workspace%3Aserver"
+  resolution: "openselves-common@file:../common#../common::hash=03e970&locator=openselves-server%40workspace%3Aserver"
   dependencies:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/84f7c39a1f4437916b142abd094649c7339e1649fb7a0f97a775f0f20d63d206600fd7bcafe3f561a236d44623e4e7f025d8fbbdc7decf433b1650319c336d44
+  checksum: 10c0/ddaf794236798e11711b442b0ce92ceedb60503141e360ffd8c5f8e99b4060f76d8615b4e33b3411584d3df1fc6494e1bddcfc0fc4f868640802ccb0c001d28f
   languageName: node
   linkType: hard
 
@@ -8898,7 +8898,6 @@ __metadata:
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@types/node": "npm:^25.5.0"
     argon2: "npm:^0.44.0"
-    drizzle-kit: "npm:1.0.0-beta.19"
     drizzle-orm: "npm:1.0.0-beta.19"
     eslint: "npm:^10.1.0"
     eslint-config-prettier: "npm:^10.1.8"
