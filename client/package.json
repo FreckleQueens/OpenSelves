@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "yarn prisma generate && vite build && yarn cap sync",
+		"build": "vite build && yarn cap sync",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -22,7 +22,6 @@
 		"@eslint/js": "^9.39.2",
 		"@iconify/svelte": "^5.2.1",
 		"@playwright/test": "^1.58.2",
-		"@prisma-idb/idb-client-generator": "^0.34.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
@@ -36,7 +35,6 @@
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
-		"prisma": "^7.5.0",
 		"sass-embedded": "^1.98.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
@@ -51,10 +49,10 @@
 		"@capacitor/cli": "^8.2.0",
 		"@capacitor/core": "^8.2.0",
 		"@paralleldrive/cuid2": "^3.3.0",
-		"@prisma/client": "^7.5.0",
 		"@tailwindcss/vite": "^4.2.1",
 		"idb": "^8.0.3",
 		"konsta": "^5.0.7",
+		"openselves-common": "../common",
 		"tailwindcss": "^4.2.1",
 		"zod": "^4.3.6"
 	}

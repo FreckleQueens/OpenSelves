@@ -3,13 +3,12 @@ import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 
-import { ConfigData } from "../config.data";
-import { PrismaService } from "../prisma.service";
-import { AuthController } from "./auth.controller";
-import { AuthGuard } from "./auth.guard";
-import { SessionService } from "./session/session.service";
-import { UserController } from "./user/user.controller";
-import { UserService } from "./user/user.service";
+import { type ConfigData } from "../config.data.js";
+import { AuthController } from "./auth.controller.js";
+import { AuthGuard } from "./auth.guard.js";
+import { SessionService } from "./session/session.service.js";
+import { UserController } from "./user/user.controller.js";
+import { UserService } from "./user/user.service.js";
 
 @Module({
 	imports: [
@@ -30,7 +29,6 @@ import { UserService } from "./user/user.service";
 		}),
 	],
 	providers: [
-		PrismaService,
 		{
 			provide: APP_GUARD,
 			useClass: AuthGuard,

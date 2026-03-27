@@ -4,6 +4,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	InternalServerErrorException,
 	NotFoundException,
 	Param,
 	Patch,
@@ -12,17 +13,17 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { DrizzleQueryError } from "drizzle-orm";
 import type { Request } from "express";
+import { type PartialBy } from "openselves-common";
+import { type User } from "openselves-common/db";
 
-import { ConfigData } from "../../config.data";
-import { User } from "../../generated/prisma/client";
-import { UserUpdateInput } from "../../generated/prisma/models/User";
-import { Public } from "../decorators/public.decorator";
-import { CreateUserDto } from "./data/create-user.dto";
-import { FindOneParams } from "./data/find-one.params";
-import { UpdateUserDto } from "./data/update-user.dto";
-import { UserService } from "./user.service";
+import { type ConfigData } from "../../config.data.js";
+import { Public } from "../decorators/public.decorator.js";
+import { CreateUserDto } from "./data/create-user.dto.js";
+import { FindOneParams } from "./data/find-one.params.js";
+import { UpdateUserDto } from "./data/update-user.dto.js";
+import { UserService } from "./user.service.js";
 
 @Controller("user")
 export class UserController {
@@ -37,7 +38,7 @@ export class UserController {
 			throw new UnauthorizedException();
 		}
 
-		const user = await this.userService.user({ id: params.id });
+		const user = await this.userService.getUser({ id: params.id });
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
@@ -66,7 +67,7 @@ export class UserController {
 				passwordHash: hashedPassword,
 			});
 		} catch (error) {
-			if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
 				throw new ConflictException(
 					{
 						message: "User with this email address already exists.",
@@ -84,18 +85,18 @@ export class UserController {
 		@Req() request: Request,
 		@Param() params: FindOneParams,
 		@Body() updateUserDto: UpdateUserDto,
-	): Promise<User> {
+	) {
 		if (request.accessTokenPayload.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
-		const userWhere = { id: params.id };
-		const user = await this.userService.user(userWhere, { withPasswordHash: true });
+		const userId = params.id;
+		const user = await this.userService.getUserWithPassword({ id: userId });
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
 
-		const patchData: UserUpdateInput = {};
+		const patchData: Partial<User> = {};
 
 		if (updateUserDto.email) {
 			patchData.email = updateUserDto.email;
@@ -111,8 +112,13 @@ export class UserController {
 
 			patchData.passwordHash = await this.userService.hashPassword(updateUserDto.newPassword);
 		}
-
-		return await this.userService.updateUser(userWhere, patchData);
+		const updatedUser = await this.userService.updateUser(userId, patchData);
+		if (!updatedUser) {
+			throw new InternalServerErrorException(
+				"User was updated but then couldn't be retrieved",
+			);
+		}
+		return this.getUserResponseForOwner(updatedUser);
 	}
 
 	@Delete(":id")
@@ -121,13 +127,13 @@ export class UserController {
 			throw new UnauthorizedException();
 		}
 
-		const user = await this.userService.deleteUser({ id: params.id });
+		const user = await this.userService.deleteUser(params.id);
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
 	}
 
-	private getUserResponseForOwner(user: User) {
+	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">) {
 		return {
 			id: user.id,
 			email: user.email,

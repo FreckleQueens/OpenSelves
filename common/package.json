@@ -1,7 +1,36 @@
 {
 	"name": "openselves-common",
 	"packageManager": "yarn@4.13.0",
+	"scripts": {
+		"build": "yarn drizzle-kit generate && yarn tsc",
+		"lint": "yarn drizzle-kit check && eslint \"{src,apps,libs,test}/**/*.ts\"",
+		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+	},
+	"main": "./dist/index.js",
+	"type": "module",
+	"exports": {
+		".": "./dist/index.js",
+		"./db": "./dist/db/index.js",
+		"./drizzle.config": "./drizzle.config.ts",
+		"./eslint.config.mjs": "./eslint.config.mjs",
+		"./tsconfig.json": "./tsconfig.json"
+	},
 	"devDependencies": {
-		"argon2": "^0.44.0"
+		"@eslint/eslintrc": "^3.3.5",
+		"@eslint/js": "^10.0.1",
+		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
+		"@types/node": "^25.5.0",
+		"argon2": "^0.44.0",
+		"drizzle-kit": "1.0.0-beta.19",
+		"eslint": "^10.1.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-prettier": "^5.5.5",
+		"prettier": "^3.8.1",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.57.2"
+	},
+	"dependencies": {
+		"@paralleldrive/cuid2": "^3.3.0",
+		"drizzle-orm": "1.0.0-beta.19"
 	}
 }

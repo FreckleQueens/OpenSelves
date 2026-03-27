@@ -1,8 +1,8 @@
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 
-import { AppModule, configureApp } from "./app.module";
-import { ConfigData } from "./config.data";
+import { AppModule, configureApp } from "./app.module.js";
+import { type ConfigData } from "./config.data.js";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);

@@ -7,9 +7,8 @@
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
+	import { type Member } from "openselves-common/db";
 	import { onMount } from "svelte";
-
-	import type { Member } from "../../generated/prisma/client/generated/browser";
 
 	let members: Member[] = $state([]);
 	let showArchivedMembers = $state(false);
@@ -24,9 +23,14 @@
 
 		const userId = storage.getKey();
 		const client = await IDB.getClient();
-		members = await client.member.findMany({
-			where: { userId: userId },
-			orderBy: { name: "asc" },
+		members = (await client.member.getByField("userId", userId)).sort((a, b) => {
+			if (a.name < b.name) {
+				return -1;
+			}
+			if (a.name > b.name) {
+				return 1;
+			}
+			return 0;
 		});
 	});
 

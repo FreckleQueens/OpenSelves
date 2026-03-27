@@ -3,6 +3,8 @@ import {
 	Controller,
 	HttpCode,
 	HttpStatus,
+	InternalServerErrorException,
+	NotFoundException,
 	Post,
 	Req,
 	Res,
@@ -11,11 +13,11 @@ import {
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
 
-import { ConfigData } from "../config.data";
-import { LoginDto } from "./data/login.dto";
-import { Public } from "./decorators/public.decorator";
-import { SessionService } from "./session/session.service";
-import { UserService } from "./user/user.service";
+import { type ConfigData } from "../config.data.js";
+import { LoginDto } from "./data/login.dto.js";
+import { Public } from "./decorators/public.decorator.js";
+import { SessionService } from "./session/session.service.js";
+import { UserService } from "./user/user.service.js";
 
 @Controller("auth")
 export class AuthController {
@@ -29,12 +31,9 @@ export class AuthController {
 	@Post("login")
 	@HttpCode(HttpStatus.OK)
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
-		const user = await this.userService.user(
-			{ email: loginDto.email },
-			{ withPasswordHash: true },
-		);
+		const user = await this.userService.getUserWithPassword({ email: loginDto.email });
 		if (user && (await this.userService.verifyPassword(user, loginDto.password))) {
-			const session = await this.sessionService.createSession(user);
+			const session = await this.sessionService.createSession(user.id);
 			const accessToken = await this.sessionService.makeAccessToken(user);
 			this.setAuthCookies(accessToken, session.token, response);
 			return {
@@ -54,7 +53,7 @@ export class AuthController {
 	) {
 		const refreshToken = this.getRefreshTokenFromRequest(request);
 
-		const session = await this.sessionService.session({ token: refreshToken });
+		const session = await this.sessionService.getSession({ token: refreshToken });
 		if (!session) {
 			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
 		}
@@ -63,8 +62,15 @@ export class AuthController {
 			throw new UnauthorizedException("Session expired");
 		}
 
+		if (session.user === null) {
+			throw new InternalServerErrorException("Session's user was not loaded with session");
+		}
+
 		const newSession = await this.sessionService.refreshSession(session.token);
-		const accessToken = await this.sessionService.makeAccessToken(newSession.user);
+		if (!newSession) {
+			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
+		}
+		const accessToken = await this.sessionService.makeAccessToken(session.user);
 		this.setAuthCookies(accessToken, newSession.token, response);
 		return {};
 	}
@@ -75,7 +81,10 @@ export class AuthController {
 	public async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
 		const refreshToken = this.getRefreshTokenFromRequest(request);
 		try {
-			await this.sessionService.revokeSession(refreshToken);
+			const revokedSession = await this.sessionService.revokeSession(refreshToken);
+			if (!revokedSession) {
+				throw new NotFoundException("Session to revoke not found");
+			}
 		} catch (e) {
 			throw new UnauthorizedException(e);
 		}

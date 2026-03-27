@@ -20,9 +20,9 @@
 		Toggle,
 		useTheme,
 	} from "konsta/svelte";
+	import type { Member } from "openselves-common/db";
 	import { onMount } from "svelte";
 
-	import type { Member } from "../../../../generated/prisma/client/generated/browser";
 	import type { PageProps } from "./$types";
 
 	const { params }: PageProps = $props();
@@ -44,7 +44,7 @@
 	onMount(async () => {
 		const idb = await IDB.getClient();
 		if (params.memberId) {
-			member = await idb.member.findUniqueOrThrow({ where: { id: params.memberId } });
+			member = await idb.member.getById(params.memberId);
 		}
 		originalMember = { ...member };
 		mounted = true;
@@ -54,6 +54,7 @@
 		INFO,
 		SETTINGS,
 	}
+
 	let activeTab = $state(Tab.INFO);
 	const tabs: Record<
 		Tab,
@@ -75,46 +76,22 @@
 		},
 	};
 
-	let form: HTMLFormElement;
 	async function formOnSubmit(e?: SubmitEvent) {
 		e?.preventDefault();
-		const formData: Record<string, string> = {};
-		for (const [key, value] of new FormData(form).entries()) {
-			formData[key] = value;
-		}
-
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
 		const idb = await IDB.getClient();
-		if (!member.id) {
-			member = await idb.member.create({
-				data: {
-					userId,
-					name: formData["name"],
-					description: formData["description"],
-					pronouns: formData["pronouns"],
-					isArchived: !!formData["isArchived"],
-					archivedReason: formData["archivedReason"],
-				},
-			});
-		} else {
-			member = await idb.member.update({
-				where: { id: member.id },
-				data: {
-					name: formData["name"],
-					description: formData["description"],
-					pronouns: formData["pronouns"],
-					isArchived: !!formData["isArchived"],
-					archivedReason: formData["archivedReason"],
-				},
-			});
-		}
+		member = await idb.member.save({
+			...member,
+			userId,
+		});
 
 		await goto(resolve("/members"));
 	}
 
 	let showSaveConfirmDialog = $state(false);
 	const hasMemberChanged = () => JSON.stringify(member) !== JSON.stringify(originalMember);
+
 	async function backLinkOnClick(e: Event) {
 		e.preventDefault();
 		if (hasMemberChanged()) {
@@ -125,14 +102,16 @@
 	}
 
 	let showDiscardChangesDialog = $state(false);
+
 	function discardChanges() {
 		history.back();
 	}
 
 	let openDeleteMemberDialog = $state(false);
+
 	async function deleteMember() {
 		const idb = await IDB.getClient();
-		await idb.member.delete({ where: { id: member.id } });
+		await idb.member.delete(member.id);
 		await goto(resolve("/members"));
 	}
 </script>
@@ -236,7 +215,7 @@
 		</Segmented>
 	{/snippet}
 
-	<form bind:this={form} onsubmit={formOnSubmit}>
+	<form onsubmit={formOnSubmit}>
 		<div class:hidden={activeTab !== Tab.INFO}>
 			<List>
 				<ListInput name="name" label="Name" floatingLabel required bind:value={member.name}>
@@ -327,8 +306,11 @@
 				</BlockTitle>
 				<Block>
 					<Button
-						onClick={() => (openDeleteMemberDialog = true)}
+						onClick={() => {
+							openDeleteMemberDialog = true;
+						}}
 						class="k-color-brand-red"
+						type="button"
 					>
 						<Icon
 							icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}

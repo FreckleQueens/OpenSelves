@@ -1,9 +1,8 @@
-import Joi, { ArraySchema, ObjectSchema } from "joi";
+import Joi, { type ArraySchema, type ObjectSchema } from "joi";
 
 export interface ConfigData {
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
-	SHADOW_DATABASE_URL: string;
 	TEST_DB_URL: string;
 
 	ALLOWED_ORIGINS: string[];
@@ -34,7 +33,6 @@ const extendedJoi = Joi.extend((joi) => ({
 export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	LISTEN_PORT: Joi.number(),
 	DATABASE_URL: Joi.string().uri().required(),
-	SHADOW_DATABASE_URL: Joi.string().uri().required(),
 	TEST_DB_URL: Joi.string().uri().not(Joi.ref("DATABASE_URL")).messages({
 		"any.invalid": "TEST_DB_URL cannot be the same as DATABASE_URL",
 	}),

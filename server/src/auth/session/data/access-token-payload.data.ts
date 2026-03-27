@@ -1,5 +1,5 @@
-import { User } from "../../../generated/prisma/client";
+import { type User } from "openselves-common/db";
 
 export class AccessTokenPayload {
-	public readonly user: Omit<User, "passwordHash">;
+	constructor(public readonly user: Omit<User, "passwordHash">) {}
 }

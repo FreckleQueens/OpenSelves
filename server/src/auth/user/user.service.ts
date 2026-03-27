@@ -1,49 +1,54 @@
 import * as argon2 from "argon2";
 import { Injectable } from "@nestjs/common";
+import { type RelationsFilterColumns, eq } from "drizzle-orm";
+import type { DBQueryConfigWith, RelationsRecord } from "drizzle-orm/relations";
+import { type User, type UserCreate, type relations, users } from "openselves-common/db";
 
-import { User } from "../../generated/prisma/client";
-import {
-	UserCreateInput,
-	UserUpdateInput,
-	UserWhereUniqueInput,
-} from "../../generated/prisma/models/User";
-import { PrismaService } from "../../prisma.service";
+import { InjectDb } from "../db/db.service.js";
+import type { DB } from "../db/drizzle.js";
 
 @Injectable()
 export class UserService {
-	constructor(private readonly prismaService: PrismaService) {}
+	constructor(@InjectDb() private readonly db: DB) {}
 
-	async user(
-		where: UserWhereUniqueInput,
-		options: { withPasswordHash: boolean; withRelations?: Array<"refreshTokens"> } = {
-			withPasswordHash: false,
-		},
-	) {
-		const include = {};
-		if (options.withRelations) {
-			for (const relation of options.withRelations) {
-				include[relation] = true;
-			}
+	async getUser(
+		where: RelationsFilterColumns<typeof users._.columns>,
+		options: {
+			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
+		} = {},
+	): Promise<Omit<User, "passwordHash"> | undefined> {
+		const userWithPassword = await this.getUserWithPassword(where, options);
+		if (!userWithPassword) {
+			return undefined;
 		}
-		return this.prismaService.user.findUnique({
-			where,
-			include,
-			omit: { passwordHash: !options.withPasswordHash },
+
+		const { passwordHash, ...userWithoutPassword } = userWithPassword;
+		return userWithoutPassword;
+	}
+
+	async getUserWithPassword(
+		where: RelationsFilterColumns<typeof users._.columns>,
+		options: {
+			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
+		} = {},
+	): Promise<User | undefined> {
+		return this.db.query.users.findFirst({
+			where: where,
+			with: options?.with,
 		});
 	}
 
-	async createUser(data: UserCreateInput): Promise<User> {
-		return this.prismaService.user.create({
-			data,
-		});
+	async createUser(data: UserCreate): Promise<User> {
+		const rawResult = await this.db.insert(users).values(data).returning();
+		return rawResult[0];
 	}
 
-	async updateUser(where: UserWhereUniqueInput, data: UserUpdateInput): Promise<User> {
-		return this.prismaService.user.update({ where, data });
+	async updateUser(userId: User["id"], data: Partial<UserCreate>): Promise<User | undefined> {
+		return (await this.db.update(users).set(data).where(eq(users.id, userId)).returning())[0];
 	}
 
-	async deleteUser(where: UserWhereUniqueInput) {
-		return this.prismaService.user.delete({ where });
+	async deleteUser(userId: User["id"]): Promise<User | undefined> {
+		return (await this.db.delete(users).where(eq(users.id, userId)).returning())[0];
 	}
 
 	public async hashPassword(password: string) {
@@ -51,9 +56,6 @@ export class UserService {
 	}
 
 	public async verifyPassword(user: User, password: string) {
-		if (!user.passwordHash) {
-			throw new Error("user param doesn't have passwordHash field");
-		}
 		return await argon2.verify(user.passwordHash, password);
 	}
 }

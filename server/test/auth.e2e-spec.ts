@@ -2,15 +2,16 @@ import { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
+import { eq } from "drizzle-orm";
+import { TOKEN_EXPIRED_ERROR } from "openselves-common";
+import { User, sessions, users } from "openselves-common/db";
 import request, { Response } from "supertest";
-import { App } from "supertest/types";
+import { App } from "supertest/types.js";
 
-import { TOKEN_EXPIRED_ERROR } from "../../common/api.constants";
-import { AppModule, configureApp } from "../src/app.module";
-import { ConfigData } from "../src/config.data";
-import { User } from "../src/generated/prisma/client";
-import { PrismaService } from "../src/prisma.service";
-import { waitFor } from "./utils";
+import { AppModule, configureApp } from "../src/app.module.js";
+import { DBClass, DbService } from "../src/auth/db/db.service.js";
+import { ConfigData } from "../src/config.data.js";
+import { waitFor } from "./utils.js";
 
 const expectCookies = request.cookies;
 
@@ -67,14 +68,15 @@ describe("AppController (e2e)", () => {
 
 		// time is (refresh token duration + 1 second) ago
 		const time = new Date(Date.now() - refreshTokenDuration * 1000 - 1000);
-		await app.get(PrismaService).session.update({
-			data: { createdAt: time, updatedAt: time },
-			where: { token: refreshToken },
-		});
+		await app
+			.get(DBClass)
+			.update(sessions)
+			.set({ createdAt: time, updatedAt: time })
+			.where(eq(sessions.token, refreshToken));
 	}
 
 	beforeAll(async () => {
-		PrismaService.dbUrlConfigKey = "TEST_DB_URL";
+		DbService.dbUrlConfigKey = "TEST_DB_URL";
 
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
@@ -93,7 +95,7 @@ describe("AppController (e2e)", () => {
 	});
 
 	beforeEach(async () => {
-		await app.get(PrismaService).user.deleteMany({});
+		await app.get(DBClass).delete(users);
 		user = (
 			await request(server)
 				.post("/user")
@@ -323,13 +325,30 @@ describe("AppController (e2e)", () => {
 			});
 
 			test("POST 401 revoked token", async () => {
+				// Access token works
 				await request(server)
+					.get(`/user/${user.id}`)
+					.set("Cookie", cookies)
+					.expect(200)
+					.expect("Content-Type", /json/);
+
+				const response = await request(server)
 					.post("/auth/logout")
 					.set("Cookie", cookies)
 					.expect(200)
 					.expect("Content-Type", /json/);
+				const newCookies = convertResponseCookiesToRequestCookies(response);
+
+				// Access token removed from cookies
 				await request(server)
-					.post("/auth/logout")
+					.get(`/user/${user.id}`)
+					.set("Cookie", newCookies)
+					.expect(401)
+					.expect("Content-Type", /json/);
+
+				// Refresh token revoked
+				await request(server)
+					.post("/auth/refresh")
 					.set("Cookie", cookies)
 					.expect(401)
 					.expect("Content-Type", /json/);

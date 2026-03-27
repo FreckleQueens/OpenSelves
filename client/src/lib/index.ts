@@ -2,8 +2,7 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { Storage } from "$lib/storage";
-
-import { TOKEN_EXPIRED_ERROR } from "../../../common/api.constants";
+import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
 export const SERVER_URL = "http://127.0.0.1:3000";
 
@@ -46,19 +45,22 @@ export async function call(
 	}
 
 	const fetchInit: RequestInit = {
-		method: options?.method,
+		method: options?.method || "GET",
 		headers: headers,
 		credentials: "include",
-		body: options?.data ? JSON.stringify(options?.data) : undefined,
+		body: options?.data ? JSON.stringify(options?.data) : null,
 	};
 
 	const tryFetch = async () => await fetch(`${SERVER_URL}${path}`, fetchInit);
 	let response: Response | undefined = undefined;
-	let responseBody = undefined;
+	let responseBody: Record<string, unknown> | undefined = undefined;
 
 	for (let attempt = 0; attempt < 3; attempt++) {
 		response = await tryFetch();
 		responseBody = await response.json();
+		if (!responseBody) {
+			continue;
+		}
 
 		if (response.ok) {
 			break;

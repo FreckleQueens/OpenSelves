@@ -1,7 +1,7 @@
-import { AccessTokenPayload } from "../session/data/access-token-payload.data";
+import { AccessTokenPayload } from "../session/data/access-token-payload.data.js";
 
 declare global {
-	declare namespace Express {
+	namespace Express {
 		export interface Request {
 			accessTokenPayload: AccessTokenPayload;
 		}

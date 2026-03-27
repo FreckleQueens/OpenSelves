@@ -1,4 +1,4 @@
 {
-	"main": "dist/server/src/main.js",
+	"main": "dist/main.js",
 	"output": "dist/openselves-server"
 }

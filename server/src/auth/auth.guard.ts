@@ -1,10 +1,15 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+	type CanActivate,
+	type ExecutionContext,
+	Injectable,
+	UnauthorizedException,
+} from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
-import { Request } from "express";
+import { type Request } from "express";
+import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
-import { TOKEN_EXPIRED_ERROR } from "../../../common/api.constants";
-import { Public } from "./decorators/public.decorator";
+import { Public } from "./decorators/public.decorator.js";
 
 @Injectable()
 export class AuthGuard implements CanActivate {

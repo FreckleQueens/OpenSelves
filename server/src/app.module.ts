@@ -1,9 +1,10 @@
-import { INestApplication, Module, ValidationPipe } from "@nestjs/common";
+import { type INestApplication, Module, ValidationPipe } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 
-import { AuthModule } from "./auth/auth.module";
-import { ConfigData, validationSchema } from "./config.data";
+import { AuthModule } from "./auth/auth.module.js";
+import { DbModule } from "./auth/db/db.module.js";
+import { type ConfigData, validationSchema } from "./config.data.js";
 
 @Module({
 	imports: [
@@ -13,6 +14,7 @@ import { ConfigData, validationSchema } from "./config.data";
 			cache: true,
 			validationSchema: validationSchema,
 		}),
+		DbModule,
 	],
 })
 export class AppModule {}

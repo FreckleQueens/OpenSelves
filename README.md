@@ -49,11 +49,14 @@ or ETA
   - [ ] server sync
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
+- [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
 - [ ] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0
 - [ ] linting (git hooks)
+- [ ] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
+-> max-width=9/16 * 100vh? (56.25vh)
 - [ ] contribution CI (test and build on every commit and PRs)
 - [ ] localization
 

@@ -3,7 +3,6 @@
 	import { resolve } from "$app/paths";
 	import { CallResult, MenuItem, call, handleLogout } from "$lib";
 	import AppPage from "$lib/AppPage.svelte";
-	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import { Block, BlockTitle, Button, Preloader, useTheme } from "konsta/svelte";
@@ -40,22 +39,6 @@
 				id: `${response.id}`,
 				email: `${response.email}`,
 			};
-
-			const idb = await IDB.getClient();
-			await idb.user.upsert(
-				{
-					where: { id: `${response.id}` },
-					update: { email: `${response.email}` },
-					create: {
-						id: `${response.id}`,
-						email: `${response.email}`,
-						passwordHash: "",
-					},
-				},
-				{
-					addToOutbox: false,
-				},
-			);
 		}
 	});
 
