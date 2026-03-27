@@ -48,10 +48,10 @@ or ETA
   - [x] delete member
 - [ ] sync engine
   - [x] logs (Log) table (table, id, type (create,update,delete), data, executedAt, pushedAt)
-  - [ ] client: add Log when operation with pushedAt=null
-    - [ ] create
-    - [ ] update
-    - [ ] delete
+  - [x] client: add Log when operation with pushedAt=null
+    - [x] create
+    - [x] update
+    - [x] delete
   - [ ] server: /push endpoint
     - [ ] create
       - [ ] basic
@@ -60,14 +60,13 @@ or ETA
       - [ ] basic (add records unedited and always apply changes to model)
       - [ ] validation
       - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
-      - [ ] history purging
     - [ ] delete
       - [ ] basic
       - [ ] validation
-  - [ ] client: flush logs table to /push (records where pushedAt is null)
+  - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [ ] /pull endpoint
     - [ ] basic (return all records)
-    - [ ] cursor (return all records after client-provided history record id)
+    - [ ] cursor (return all records after client-provided pushedAt date)
     - [ ] pagination (return records by batch)
     - [ ] return create operations for all records of all models when client provides no record id
   - [ ] client: pull once push is complete
@@ -107,6 +106,14 @@ or ETA
 ### 0.6.0
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
+
+### 0.7.0
+- [ ] Sync engine optimizations
+  - [ ] client
+    - [ ] drop prior unsynced create and update operations when deleting a record
+    - [ ] purge logs that don't have an effect anymore (where pushedAt is not null)
+  - [ ] server
+    - [ ] purge logs that don't have an effect anymore
 
 ### 1.0.0
 - [ ] email verification
