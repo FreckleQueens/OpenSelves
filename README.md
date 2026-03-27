@@ -47,7 +47,7 @@ or ETA
   - [x] edit member
   - [x] delete member
 - [ ] sync engine
-  - [ ] logs (Log) table (table, id, type (create,update,delete), data, executedAt, pushedAt)
+  - [x] logs (Log) table (table, id, type (create,update,delete), data, executedAt, pushedAt)
   - [ ] client: add Log when operation with pushedAt=null
     - [ ] create
     - [ ] update
