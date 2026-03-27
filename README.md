@@ -40,13 +40,37 @@ or ETA
 - [x] make tests db separate from dev db
 - [x] populate dev db with test data
 - [x] private registration gated by unsecure clear-text password in config
-- [ ] system mapping
+- [x] system mapping
   - [x] client offline mode with prisma-idb
   - [x] add member (created_at, updated_at, name, pronouns, description)
   - [x] show member
   - [x] edit member
   - [x] delete member
-  - [ ] server sync
+- [ ] sync engine
+  - [ ] logs (Log) table (table, id, type (create,update,delete), data, executedAt, pushedAt)
+  - [ ] client: add Log when operation with pushedAt=null
+    - [ ] create
+    - [ ] update
+    - [ ] delete
+  - [ ] server: /push endpoint
+    - [ ] create
+      - [ ] basic
+      - [ ] validation
+    - [ ] update
+      - [ ] basic (add records unedited and always apply changes to model)
+      - [ ] validation
+      - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
+      - [ ] history purging
+    - [ ] delete
+      - [ ] basic
+      - [ ] validation
+  - [ ] client: flush logs table to /push (records where pushedAt is null)
+  - [ ] /pull endpoint
+    - [ ] basic (return all records)
+    - [ ] cursor (return all records after client-provided history record id)
+    - [ ] pagination (return records by batch)
+    - [ ] return create operations for all records of all models when client provides no record id
+  - [ ] client: pull once push is complete
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction

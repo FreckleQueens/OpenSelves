@@ -1,16 +1,16 @@
-import { INestApplication } from "@nestjs/common";
+import type { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
 import { eq } from "drizzle-orm";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
-import { User, sessions, users } from "openselves-common/db";
-import request, { Response } from "supertest";
-import { App } from "supertest/types.js";
+import { type User, sessions, users } from "openselves-common/db";
+import request, { type Response } from "supertest";
+import type { App } from "supertest/types.js";
 
 import { AppModule, configureApp } from "../src/app.module.js";
 import { DBClass, DbService } from "../src/auth/db/db.service.js";
-import { ConfigData } from "../src/config.data.js";
+import type { ConfigData } from "../src/config.data.js";
 import { waitFor } from "./utils.js";
 
 const expectCookies = request.cookies;
