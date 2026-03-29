@@ -3,8 +3,9 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 
 import { AuthModule } from "./auth/auth.module.js";
-import { DbModule } from "./auth/db/db.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
+import { DbModule } from "./db/db.module.js";
+import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
 	imports: [
@@ -15,6 +16,7 @@ import { type ConfigData, validationSchema } from "./config.data.js";
 			validationSchema: validationSchema,
 		}),
 		DbModule,
+		SyncModule,
 	],
 })
 export class AppModule {}
@@ -24,6 +26,11 @@ export function configureApp(app: INestApplication) {
 	app.useGlobalPipes(
 		new ValidationPipe({
 			transform: true,
+			transformOptions: {
+				enableImplicitConversion: true,
+			},
+			whitelist: true,
+			validateCustomDecorators: true,
 		}),
 	);
 	app.enableCors({

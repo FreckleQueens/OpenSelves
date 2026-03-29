@@ -7,8 +7,8 @@ import { type PartialBy } from "openselves-common";
 import { type Session, type User, sessions } from "openselves-common/db";
 
 import { type ConfigData } from "../../config.data.js";
-import { InjectDb } from "../db/db.service.js";
-import type { DB } from "../db/drizzle.js";
+import { InjectDb } from "../../db/db.service.js";
+import type { DB } from "../../db/drizzle.js";
 import { AccessTokenPayload } from "./data/access-token-payload.data.js";
 
 @Injectable()

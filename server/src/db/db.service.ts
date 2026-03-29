@@ -2,7 +2,7 @@ import { Inject, Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
-import { type ConfigData } from "../../config.data.js";
+import { type ConfigData } from "../config.data.js";
 import { type DB, getDrizzle } from "./drizzle.js";
 
 export const DBClass = PostgresJsDatabase;

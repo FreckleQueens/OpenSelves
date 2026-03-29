@@ -54,7 +54,7 @@ or ETA
     - [x] delete
   - [ ] server: /push endpoint
     - [ ] create
-      - [ ] basic
+      - [x] basic
       - [ ] validation
     - [ ] update
       - [ ] basic (add records unedited and always apply changes to model)
@@ -97,6 +97,7 @@ or ETA
 - [ ] show current fronts
 
 ### 0.5.0
+- [ ] add version checks on /push and /pull endpoints
 - [ ] member profile picture
 - [ ] password recovery
 - [ ] change password

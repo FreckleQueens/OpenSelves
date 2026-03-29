@@ -4,8 +4,8 @@ import { type RelationsFilterColumns, eq } from "drizzle-orm";
 import type { DBQueryConfigWith, RelationsRecord } from "drizzle-orm/relations";
 import { type User, type UserCreate, type relations, users } from "openselves-common/db";
 
-import { InjectDb } from "../db/db.service.js";
-import type { DB } from "../db/drizzle.js";
+import { InjectDb } from "../../db/db.service.js";
+import type { DB } from "../../db/drizzle.js";
 
 @Injectable()
 export class UserService {
