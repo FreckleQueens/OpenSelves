@@ -8870,21 +8870,21 @@ __metadata:
 
 "openselves-common@file:../common::locator=openselves-client%40workspace%3Aclient":
   version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=03e970&locator=openselves-client%40workspace%3Aclient"
+  resolution: "openselves-common@file:../common#../common::hash=b9e5cc&locator=openselves-client%40workspace%3Aclient"
   dependencies:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/ddaf794236798e11711b442b0ce92ceedb60503141e360ffd8c5f8e99b4060f76d8615b4e33b3411584d3df1fc6494e1bddcfc0fc4f868640802ccb0c001d28f
+  checksum: 10c0/7f2487d10650f5cb940e1c1f024a0a5656cbd8ad8edae5f332333949f8bd8f2e31fa097df58552b920328de41d40c1bde389f448d41995a644af7a6df02d146d
   languageName: node
   linkType: hard
 
 "openselves-common@file:../common::locator=openselves-server%40workspace%3Aserver":
   version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=03e970&locator=openselves-server%40workspace%3Aserver"
+  resolution: "openselves-common@file:../common#../common::hash=b9e5cc&locator=openselves-server%40workspace%3Aserver"
   dependencies:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/ddaf794236798e11711b442b0ce92ceedb60503141e360ffd8c5f8e99b4060f76d8615b4e33b3411584d3df1fc6494e1bddcfc0fc4f868640802ccb0c001d28f
+  checksum: 10c0/7f2487d10650f5cb940e1c1f024a0a5656cbd8ad8edae5f332333949f8bd8f2e31fa097df58552b920328de41d40c1bde389f448d41995a644af7a6df02d146d
   languageName: node
   linkType: hard
 

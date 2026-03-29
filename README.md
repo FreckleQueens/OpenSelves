@@ -55,7 +55,7 @@ or ETA
   - [ ] server: /push endpoint
     - [ ] create
       - [x] basic
-      - [ ] validation
+      - [x] validation
     - [ ] update
       - [ ] basic (add records unedited and always apply changes to model)
       - [ ] validation

@@ -93,15 +93,17 @@ describe(pushEndpoint, () => {
 
 		describe("create operation", () => {
 			describe("PUT create Member", () => {
+				let inputLog: Record<string, unknown>;
 				let outputLog: Record<string, unknown>;
 
 				test("200", async () => {
 					const { member, createLog, date } = makeMemberWithLog(new Date());
+					inputLog = { ...createLog };
 
 					const response = await request(env.server)
 						.put(pushEndpoint)
 						.send({
-							logs: [createLog],
+							logs: [inputLog],
 						})
 						.set("Cookie", env.users.cookies)
 						.expect(200)
@@ -148,11 +150,55 @@ describe(pushEndpoint, () => {
 					expect(pulledLog).toBeDefined();
 					expect(pulledLog).toEqual(outputLog);
 				});
+
+				test("send create operation twice returns existing log 200", async () => {
+					const response = await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [inputLog],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+						.expect("Content-Type", /json/);
+					const returnedLogs = response.body.logs as Array<unknown>;
+					const returnedLog = returnedLogs.find(
+						(log) =>
+							log &&
+							typeof log === "object" &&
+							"id" in log &&
+							log.id === outputLog.id,
+					);
+					expect(returnedLog).toEqual(outputLog);
+				});
+
+				test("create member with same id fails 409", async () => {
+					const { createLog } = makeMemberWithLog(new Date());
+					const { createLog: createLog2 } = makeMemberWithLog(new Date());
+					createLog2.memberId = createLog.memberId;
+					const member = createLog2.data as Member;
+					member.id = createLog.data?.["id"];
+
+					await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [createLog],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+						.expect("Content-Type", /json/);
+
+					await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [createLog2],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(409)
+						.expect("Content-Type", /json/);
+				});
 			});
 		});
 
-		// TODO: respond properly when push the same log twice (should not perform the operation, should respond with success and the transformed log)
-		// TODO: create member with existing id fails
 		// TODO: delete member that doesn't exist is successful but has no server effect
 		// TODO: update member that was deleted returns a delete operation
 		// TODO: logs.memberId != JSON.parse(logs.data).id => 400
