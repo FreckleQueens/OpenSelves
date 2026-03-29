@@ -20,10 +20,11 @@ type CreateUsersEnv = {
 	server: App;
 };
 export type TestEnvUsers = {
-	user: User;
 	userPassword: string;
+	user: User;
 	cookies: string;
 	user2: User;
+	cookies2: string;
 };
 export type TestEnv = {
 	app: INestApplication<App>;
@@ -37,33 +38,29 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 			.where(inArray(users.id, [existingUsers.user.id, existingUsers.user2.id]));
 	}
 	const userPassword = "12345678";
-	const user = (
-		await request(env.server)
-			.post("/user")
-			.send({
-				email: createId() + "@example.com",
-				password: userPassword,
-				registrationPassword: env.registrationPassword,
-			})
-			.expect(201)
-	).body;
-	const response = await request(env.server)
-		.post("/auth/login")
-		.send({ email: user.email, password: userPassword })
-		.expect(200);
-	const cookies = convertResponseCookiesToRequestCookies(response);
+	async function createAndLoginUser() {
+		const user = (
+			await request(env.server)
+				.post("/user")
+				.send({
+					email: createId() + "@example.com",
+					password: userPassword,
+					registrationPassword: env.registrationPassword,
+				})
+				.expect(201)
+		).body;
+		const response = await request(env.server)
+			.post("/auth/login")
+			.send({ email: user.email, password: userPassword })
+			.expect(200);
+		const cookies = convertResponseCookiesToRequestCookies(response);
+		return { user, cookies };
+	}
 
-	const user2 = (
-		await request(env.server)
-			.post("/user")
-			.send({
-				email: createId() + "@example.com",
-				password: userPassword,
-				registrationPassword: env.registrationPassword,
-			})
-			.expect(201)
-	).body;
-	return { user, userPassword, cookies, user2 };
+	const { user, cookies } = await createAndLoginUser();
+	const { user: user2, cookies: cookies2 } = await createAndLoginUser();
+
+	return { userPassword, user, cookies, user2, cookies2 };
 }
 export function setupTestSuite(
 	envCallback: (env: TestEnv) => void,

@@ -9,10 +9,9 @@ const pullEndpoint = "/sync/pull";
 describe(pushEndpoint, () => {
 	let env: TestEnv;
 
-	function makeMemberWithLog(userId: string, date: Date) {
-		const member: Member = {
+	function makeMemberWithLog(date: Date) {
+		const member: Omit<Member, "userId"> = {
 			id: createId(),
-			userId: userId,
 			name: "Alice",
 			pronouns: "she/her",
 			description: "a member of our& system",
@@ -51,33 +50,45 @@ describe(pushEndpoint, () => {
 
 	describe("PUT", () => {
 		test("empty request body 400", async () => {
-			const response = await request(env.server)
+			await request(env.server)
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
 				.send({})
 				.expect(400);
-			console.log(response.body);
 		});
 		test("empty logs array 400", async () => {
-			const response = await request(env.server)
+			await request(env.server)
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
 				.send({ logs: [] })
 				.expect(400);
-			console.log(response.body);
 		});
 		test("log with non-null pushedAt 400", async () => {
-			const { createLog, date } = makeMemberWithLog(env.users.user.id, new Date());
+			const { createLog, date } = makeMemberWithLog(new Date());
 			const createLogWithPushedAt: Log = {
 				...createLog,
 				pushedAt: date,
 			};
-			const response = await request(env.server)
+			await request(env.server)
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
 				.send({ logs: [createLogWithPushedAt] })
 				.expect(400);
-			console.log(response.body);
+		});
+		test("log data with userId 400", async () => {
+			const { createLog } = makeMemberWithLog(new Date());
+			await request(env.server)
+				.put(pushEndpoint)
+				.set("Cookie", env.users.cookies)
+				.send({
+					logs: [
+						{
+							...createLog,
+							data: { ...(createLog.data as Member), userId: env.users.user2.id },
+						},
+					],
+				})
+				.expect(400);
 		});
 
 		describe("create operation", () => {
@@ -85,10 +96,7 @@ describe(pushEndpoint, () => {
 				let outputLog: Record<string, unknown>;
 
 				test("200", async () => {
-					const { member, createLog, date } = makeMemberWithLog(
-						env.users.user.id,
-						new Date(),
-					);
+					const { member, createLog, date } = makeMemberWithLog(new Date());
 
 					const response = await request(env.server)
 						.put(pushEndpoint)
@@ -98,7 +106,6 @@ describe(pushEndpoint, () => {
 						.set("Cookie", env.users.cookies)
 						.expect(200)
 						.expect("Content-Type", /json/);
-					console.log(response.body);
 					expect(response.body.logs).toBeInstanceOf(Array);
 					expect(response.body.logs.length).toBe(1);
 					outputLog = response.body.logs[0];
@@ -144,9 +151,6 @@ describe(pushEndpoint, () => {
 			});
 		});
 
-		// TODO: validate log
-		// TODO: validate member (in its own test suite)
-		// TODO: user cannot do operations on member of user2
 		// TODO: respond properly when push the same log twice (should not perform the operation, should respond with success and the transformed log)
 		// TODO: create member with existing id fails
 		// TODO: delete member that doesn't exist is successful but has no server effect

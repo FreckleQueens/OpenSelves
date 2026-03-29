@@ -3,20 +3,23 @@ import { type Log, type Member, logs, members } from "openselves-common/db";
 
 import { InjectDb } from "../db/db.service.js";
 import type { DB } from "../db/drizzle.js";
-import type { PushLogDto } from "./data/push.dto.js";
+import { PushLogDto } from "./data/push.dto.js";
 
 @Injectable()
 export class SyncService {
 	constructor(@InjectDb() private readonly db: DB) {}
 
-	public async reduceAndSaveLogs(logDtos: PushLogDto[]) {
+	public async reduceAndSaveLogs(logDtos: PushLogDto[], userId: string) {
 		const pushedAt = new Date();
 		const logsToSave: Log[] = [];
 		const membersToSave: Member[] = [];
 
 		for (const log of logDtos) {
 			if (log.operationType === "create") {
-				membersToSave.push(log.data);
+				membersToSave.push({
+					...log.data,
+					userId,
+				});
 			}
 			logsToSave.push({ ...log, pushedAt });
 		}

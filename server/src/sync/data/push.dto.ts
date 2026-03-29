@@ -13,12 +13,12 @@ import type { Log, Member } from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
-export class PushMemberDto implements Member {
+export class PushMemberDto implements Omit<Member, "userId"> {
 	@IsCuid2()
 	public readonly id!: string;
 
-	@IsCuid2()
-	public readonly userId!: string;
+	@IsIn([undefined])
+	public readonly userId!: undefined;
 
 	@IsString()
 	public readonly name!: string;
@@ -60,7 +60,7 @@ export class PushLogDto implements Omit<Log, "pushedAt"> {
 	public readonly executedAt!: Date;
 
 	@IsIn([undefined])
-	readonly pushedAt!: undefined;
+	public readonly pushedAt!: undefined;
 }
 
 export class PushDto {

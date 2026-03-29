@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Put } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post, Put, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { type Log, logs } from "openselves-common/db";
 
 import { InjectDb } from "../db/db.service.js";
@@ -14,8 +15,11 @@ export class SyncController {
 	) {}
 
 	@Put("push")
-	public async push(@Body() pushDto: PushDto) {
-		const outputLogs: Log[] = await this.syncService.reduceAndSaveLogs(pushDto.logs);
+	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
+		const outputLogs: Log[] = await this.syncService.reduceAndSaveLogs(
+			pushDto.logs,
+			request.accessTokenPayload.user.id,
+		);
 		return {
 			logs: outputLogs,
 		};
