@@ -1,2 +1,0 @@
-CREATE UNIQUE INDEX "unique_create_delete" ON "logs" ("memberId","operationType") WHERE "operationType" in ('create', 'delete');--> statement-breakpoint
-CREATE INDEX "memberId_index" ON "logs" ("memberId");

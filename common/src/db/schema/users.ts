@@ -1,8 +1,8 @@
 import { pgTable, text } from "drizzle-orm/pg-core";
-import { id, timestamps } from "./utils.js";
+import { idPrimaryKey, timestamps } from "./utils.js";
 
 export const users = pgTable("users", {
-	...id,
+	...idPrimaryKey,
 	email: text().notNull().unique(),
 	passwordHash: text().notNull(),
 	...timestamps,

@@ -26,8 +26,8 @@ export class SyncController {
 	@Put("push")
 	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
 		const outputLogs: Log[] = await this.syncService.reduceAndSaveLogs(
-			pushDto.logs,
 			request.accessTokenPayload.user.id,
+			pushDto.logs,
 		);
 		return {
 			logs: this.formatOutputLogs(outputLogs),

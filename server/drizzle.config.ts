@@ -13,5 +13,6 @@ export const baseServerConfig: Config = defineConfig({
 	dbCredentials: {
 		url: process.env.DATABASE_URL,
 	},
+	verbose: true,
 });
 export default baseServerConfig;

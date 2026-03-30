@@ -1,11 +1,27 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7e22fc3a-ed97-4027-8a8b-510ccdbce0ae",
+  "id": "6daf7eb0-a4e9-4ff9-b1cb-e41f74bad4a9",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
+    {
+      "values": [
+        "create",
+        "update",
+        "delete"
+      ],
+      "name": "logOperationType",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "logs",
+      "entityType": "tables",
+      "schema": "public"
+    },
     {
       "isRlsEnabled": false,
       "name": "members",
@@ -32,7 +48,98 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "name": "userId",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
       "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "memberId",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "logOperationType",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "operationType",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "json",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "timestamp(3)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "executedAt",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "timestamp(3)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "pushedAt",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "userId",
       "entityType": "columns",
       "schema": "public",
       "table": "members"
@@ -45,7 +152,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "userId",
+      "name": "id",
       "entityType": "columns",
       "schema": "public",
       "table": "members"
@@ -259,6 +366,77 @@
       "table": "users"
     },
     {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "userId",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "memberId",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "operationType",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"operationType\" in ('create', 'delete')",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "unique_create_delete",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "userId"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "logs_userId_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "userId",
+        "memberId"
+      ],
+      "schemaTo": "public",
+      "tableTo": "members",
+      "columnsTo": [
+        "userId",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "logs_userId_memberId_members_userId_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "userId"
@@ -294,13 +472,25 @@
     },
     {
       "columns": [
+        "userId",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "logs_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "logs"
+    },
+    {
+      "columns": [
+        "userId",
         "id"
       ],
       "nameExplicit": false,
       "name": "members_pkey",
+      "entityType": "pks",
       "schema": "public",
-      "table": "members",
-      "entityType": "pks"
+      "table": "members"
     },
     {
       "columns": [
@@ -321,17 +511,6 @@
       "schema": "public",
       "table": "users",
       "entityType": "pks"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "id"
-      ],
-      "nullsNotDistinct": false,
-      "name": "members_id_key",
-      "schema": "public",
-      "table": "members",
-      "entityType": "uniques"
     },
     {
       "nameExplicit": false,
@@ -365,6 +544,13 @@
       "schema": "public",
       "table": "users",
       "entityType": "uniques"
+    },
+    {
+      "value": "(\"operationType\" = 'delete' or (\"memberId\" is not null))",
+      "name": "delete_or_has_ref_id_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "logs"
     }
   ],
   "renames": []

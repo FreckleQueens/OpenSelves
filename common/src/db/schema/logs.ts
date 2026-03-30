@@ -1,9 +1,10 @@
 import {
 	check,
-	index,
+	foreignKey,
 	json,
 	pgEnum,
 	pgTable,
+	primaryKey,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -11,25 +12,35 @@ import {
 import { id } from "./utils.js";
 import { members } from "./members.js";
 import { eq, inArray, isNotNull, or, SQL } from "drizzle-orm";
+import { users } from "./users.js";
 
 export const logOperationType = pgEnum("logOperationType", ["create", "update", "delete"]);
 export const logs = pgTable(
 	"logs",
 	{
+		userId: text()
+			.notNull()
+			.references(() => users.id, {
+				onDelete: "cascade",
+			}),
 		...id,
-		memberId: text().references(() => members.id, {
-			onDelete: "cascade",
-		}),
+		memberId: text(),
 		operationType: logOperationType().notNull(),
 		data: json(),
 		executedAt: timestamp({ precision: 3 }).notNull(),
 		pushedAt: timestamp({ precision: 3 }).notNull().defaultNow(),
 	},
 	(table) => [
+		primaryKey({
+			columns: [table.userId, table.id],
+		}),
+		foreignKey({
+			columns: [table.userId, table.memberId],
+			foreignColumns: [members.userId, members.id],
+		}).onDelete("cascade"),
 		uniqueIndex("unique_create_delete")
-			.on(table.memberId, table.operationType)
+			.on(table.userId, table.memberId, table.operationType)
 			.where(inArray(table.operationType, ["create", "delete"])),
-		index("memberId_index").on(table.memberId),
 		check(
 			"delete_or_has_ref_id_check",
 			or(eq(table.operationType, "delete"), isNotNull(table.memberId)) as SQL,

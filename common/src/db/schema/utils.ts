@@ -1,8 +1,12 @@
 import { createId } from "@paralleldrive/cuid2";
 import { text, timestamp } from "drizzle-orm/pg-core";
 
+const idColumn = () => text().notNull().$defaultFn(createId);
 export const id = {
-	id: text().notNull().unique().primaryKey().$defaultFn(createId),
+	id: idColumn(),
+};
+export const idPrimaryKey = {
+	id: idColumn().unique().primaryKey(),
 };
 export const timestamps = {
 	createdAt: timestamp().notNull().defaultNow(),

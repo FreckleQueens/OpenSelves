@@ -4,11 +4,7 @@ import { models } from "./schema/index.js";
 export const relations = defineRelations(models, (r) => ({
 	users: {
 		sessions: r.many.sessions(),
-		memberLogs: r.many.logs({
-			from: r.users.id.through(r.members.userId),
-			to: r.logs.id.through(r.members.id),
-			where: {},
-		}),
+		logs: r.many.logs(),
 		members: r.many.members(),
 	},
 	sessions: {
@@ -18,6 +14,10 @@ export const relations = defineRelations(models, (r) => ({
 		}),
 	},
 	logs: {
+		user: r.one.users({
+			from: r.logs.userId,
+			to: r.users.id,
+		}),
 		member: r.one.members({
 			from: r.logs.memberId,
 			to: r.members.id,
