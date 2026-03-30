@@ -1,7 +1,10 @@
 import { IDB, type ModelBase } from "$lib/idb/idb";
+import { createId } from "@paralleldrive/cuid2";
 import type { Column } from "drizzle-orm";
 import type { PartialBy } from "openselves-common";
 import type { Log } from "openselves-common/db";
+
+export type OmitServerFields<Model> = Omit<Model, "userId" | "createdAt" | "updatedAt">;
 
 export abstract class IDBModel<
 	Model extends ModelBase & Record<PrimaryKey, PrimaryKeyValue>,
@@ -65,6 +68,7 @@ export abstract class IDBModel<
 			const logIdKey = this.getLogIdKey();
 			if (logIdKey) {
 				await transaction.put("logs", {
+					id: createId(),
 					[logIdKey]: record[this.primaryKey],
 					operationType: operationType,
 					data: JSON.stringify(record),
@@ -85,6 +89,7 @@ export abstract class IDBModel<
 			const logIdKey = this.getLogIdKey();
 			if (logIdKey) {
 				await transaction.put("logs", {
+					id: createId(),
 					[logIdKey]: recordId,
 					operationType: "delete",
 					data: null,
@@ -98,7 +103,7 @@ export abstract class IDBModel<
 	}
 
 	protected abstract generateUniquePrimaryKey(): PrimaryKeyValue;
-	protected abstract getDrizzleModel(): Record<keyof Model, unknown>;
+	protected abstract getDrizzleModel(): Record<keyof OmitServerFields<Model>, unknown>;
 	protected abstract getLogIdKey(): (keyof Log & string & "memberId") | null;
 
 	private matchesModel(record: ModelBase): record is Model {
@@ -121,7 +126,7 @@ export abstract class IDBModel<
 				continue;
 			}
 
-			if (typeof record[key] !== column.dataType) {
+			if (record[key] !== null && typeof record[key] !== column.dataType) {
 				console.log(key, record[key], column);
 				return false;
 			}

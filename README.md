@@ -63,6 +63,7 @@ or ETA
     - [x] delete
       - [x] basic
       - [x] validation
+    - [ ] refactor service method
   - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [ ] /pull endpoint
     - [ ] basic (return all records)
