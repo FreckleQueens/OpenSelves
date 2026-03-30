@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { id } from "./utils.js";
 import { members } from "./members.js";
-import { eq, inArray, isNotNull, or, SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, not, or, SQL } from "drizzle-orm";
 import { users } from "./users.js";
 
 export const logOperationType = pgEnum("logOperationType", ["create", "update", "delete"]);
@@ -27,6 +27,7 @@ export const logs = pgTable(
 		memberId: text(),
 		operationType: logOperationType().notNull(),
 		data: json(),
+		deletedId: text(),
 		executedAt: timestamp({ precision: 3 }).notNull(),
 		pushedAt: timestamp({ precision: 3 }).notNull().defaultNow(),
 	},
@@ -44,6 +45,13 @@ export const logs = pgTable(
 		check(
 			"delete_or_has_ref_id_check",
 			or(eq(table.operationType, "delete"), isNotNull(table.memberId)) as SQL,
+		),
+		check(
+			"deletedId_check",
+			or(
+				and(eq(table.operationType, "delete"), isNotNull(table.deletedId)),
+				and(not(eq(table.operationType, "delete")), isNull(table.deletedId)),
+			) as SQL,
 		),
 	],
 );

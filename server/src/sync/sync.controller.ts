@@ -1,13 +1,4 @@
-import {
-	Body,
-	Controller,
-	HttpCode,
-	HttpStatus,
-	InternalServerErrorException,
-	Post,
-	Put,
-	Req,
-} from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post, Put, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { type Log, logs } from "openselves-common/db";
 
@@ -45,20 +36,9 @@ export class SyncController {
 	private formatOutputLogs(rawLogs: Log[]) {
 		return rawLogs.map((log) => {
 			if (log.operationType === "delete") {
-				const data = log.data;
-				if (
-					!data ||
-					typeof data != "object" ||
-					!("id" in data) ||
-					typeof data.id != "string"
-				) {
-					throw new InternalServerErrorException();
-				}
-				return {
-					...log,
-					memberId: data.id,
-					data: undefined,
-				};
+				const { deletedId, ...newLog } = log;
+				newLog.memberId = (deletedId as string).split(".")[1];
+				return newLog;
 			}
 			return log;
 		});

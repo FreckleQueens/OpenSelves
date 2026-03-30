@@ -62,7 +62,7 @@ or ETA
       - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
     - [x] delete
       - [x] basic
-      - [ ] validation
+      - [x] validation
   - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [ ] /pull endpoint
     - [ ] basic (return all records)

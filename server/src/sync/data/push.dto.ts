@@ -43,7 +43,7 @@ export class PushMemberDto implements Omit<Member, "userId"> {
 	public readonly updatedAt!: Date;
 }
 
-export class PushLogDto implements Omit<Log, "pushedAt"> {
+export class PushLogDto implements Omit<Omit<Omit<Log, "userId">, "pushedAt">, "deletedId"> {
 	@IsCuid2()
 	public readonly id!: string;
 

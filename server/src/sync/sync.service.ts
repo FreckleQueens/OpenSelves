@@ -8,7 +8,8 @@ import { PushLogDto, PushMemberDto } from "./data/push.dto.js";
 
 type LogToSave = Omit<Omit<Omit<PushLogDto, "pushedAt">, "memberId">, "data"> & {
 	memberId: PushLogDto["memberId"] | null;
-	data: PushLogDto["data"] | { id: string; userId: string };
+	data: PushLogDto["data"] | null;
+	deletedId: string | null;
 };
 
 @Injectable()
@@ -28,9 +29,9 @@ export class SyncService {
 		const logsToSave: LogToSave[] = logDtos
 			.filter((log) => !existingLogs.find((existingLog) => log.id === existingLog.id))
 			.map((log) => {
-				const newLog: LogToSave = { ...log };
+				const newLog: LogToSave = { ...log, deletedId: null };
 				if (log.operationType === "delete") {
-					newLog.data = { id: log.memberId, userId };
+					newLog.deletedId = `members.${log.memberId}`;
 					newLog.memberId = null;
 				}
 				return newLog;
@@ -42,11 +43,17 @@ export class SyncService {
 				...(log.data as PushMemberDto), // Inferred by filter
 				userId,
 			}));
-		const membersToDeleteIds: string[] = logsToSave
+		const recordsToDelete: { table: string; id: string }[] = logsToSave
 			.filter((log) => log.operationType === "delete")
-			.map((log) => log.data.id);
+			.map((log) => {
+				const [table, id] = (log.deletedId as string).split(".");
+				return { table, id };
+			});
+		const membersToDeleteIds = recordsToDelete
+			.filter((entry) => entry.table === "members")
+			.map((entry) => entry.id);
 
-		const outputLogs: Log[] = existingLogs;
+		let outputLogs: Log[] = existingLogs;
 		if (logsToSave.length > 0) {
 			try {
 				await this.db.transaction(async (tx) => {
@@ -63,8 +70,36 @@ export class SyncService {
 								),
 							)
 							.returning();
-						if (deletedMembers.length !== membersToDeleteIds.length) {
-							throw new NotFoundException("Some members were not found");
+						if (deletedMembers.length !== recordsToDelete.length) {
+							const alreadyDeletedMemberIds = membersToDeleteIds.filter(
+								(id) => !deletedMembers.find((member) => member.id === id),
+							);
+							const existingDeletionLogs = await tx
+								.select()
+								.from(logs)
+								.where(
+									and(
+										eq(logs.userId, userId),
+										inArray(
+											logs.deletedId,
+											alreadyDeletedMemberIds.map((id) => `members.${id}`),
+										),
+									),
+								);
+							if (existingDeletionLogs.length !== alreadyDeletedMemberIds.length) {
+								throw new NotFoundException("Some members were not found");
+							} else {
+								outputLogs = outputLogs.filter(
+									(log) =>
+										!(
+											log.operationType === "delete" &&
+											alreadyDeletedMemberIds.includes(
+												log.deletedId as string,
+											)
+										),
+								);
+								outputLogs.push(...existingDeletionLogs);
+							}
 						}
 					}
 					const values = logsToSave.map((log) => ({ ...log, userId, pushedAt }));

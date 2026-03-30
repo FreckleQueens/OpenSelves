@@ -1,0 +1,2 @@
+ALTER TABLE "logs" ADD COLUMN "deletedId" text;--> statement-breakpoint
+ALTER TABLE "logs" ADD CONSTRAINT "deletedId_check" CHECK ((("operationType" = 'delete' and ("deletedId" is not null)) or (not "operationType" = 'delete' and ("deletedId" is null))));

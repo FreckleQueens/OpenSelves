@@ -6,6 +6,8 @@ import { type TestEnv, setupTestSuite } from "./utils.js";
 
 const pushEndpoint = "/sync/push";
 const pullEndpoint = "/sync/pull";
+type CreateLogWithPushedAt = Omit<Omit<Log, "userId">, "deletedId">;
+type CreateLog = Omit<CreateLogWithPushedAt, "pushedAt">;
 describe(pushEndpoint, () => {
 	let env: TestEnv;
 
@@ -20,7 +22,7 @@ describe(pushEndpoint, () => {
 			createdAt: date,
 			updatedAt: date,
 		};
-		const createLog: Omit<Log, "pushedAt"> = {
+		const createLog: CreateLog = {
 			id: createId(),
 			memberId: member.id,
 			operationType: "create",
@@ -65,7 +67,7 @@ describe(pushEndpoint, () => {
 		});
 		test("log with non-null pushedAt 400", async () => {
 			const { createLog, date } = makeMemberWithLog(new Date());
-			const createLogWithPushedAt: Log = {
+			const createLogWithPushedAt: CreateLogWithPushedAt = {
 				...createLog,
 				pushedAt: date,
 			};
@@ -201,7 +203,7 @@ describe(pushEndpoint, () => {
 			});
 
 			describe("PUT delete Member", () => {
-				test("200", async () => {
+				async function createAndDeleteMember() {
 					const { member, createLog } = makeMemberWithLog(new Date());
 
 					await request(env.server)
@@ -212,6 +214,7 @@ describe(pushEndpoint, () => {
 						.set("Cookie", env.users.cookies)
 						.expect(200)
 						.expect("Content-Type", /json/);
+
 					const { data, ...deleteLog } = createLog;
 					deleteLog.id = createId();
 					deleteLog.operationType = "delete";
@@ -224,6 +227,11 @@ describe(pushEndpoint, () => {
 						.set("Cookie", env.users.cookies)
 						.expect(200)
 						.expect("Content-Type", /json/);
+					return { member, deleteLog, response };
+				}
+
+				test("200", async () => {
+					const { member, deleteLog, response } = await createAndDeleteMember();
 					expect(response.body.logs).toBeInstanceOf(Array);
 					expect(response.body.logs.length).toBe(1);
 					const outputLog = response.body.logs[0];
@@ -237,6 +245,23 @@ describe(pushEndpoint, () => {
 
 					checkForPushedAt(outputLog);
 					await checkLogIsServed(outputLog);
+				});
+
+				test("delete member from 2 different clients returns stored log 200", async () => {
+					const { deleteLog, response } = await createAndDeleteMember();
+					const outputLog = response.body.logs[0];
+
+					deleteLog.id = createId();
+					const response2 = await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [deleteLog],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+						.expect("Content-Type", /json/);
+					expect(response2.body.logs[0].id).not.toBe(deleteLog.id);
+					expect(response2.body.logs[0]).toEqual(outputLog);
 				});
 
 				test("delete member of another user fails 404", async () => {
@@ -305,7 +330,6 @@ describe(pushEndpoint, () => {
 			});
 		});
 
-		// TODO: delete member that doesn't exist is successful but has no server effect
 		// TODO: update member that was deleted returns a delete operation
 		// TODO: logs.memberId != JSON.parse(logs.data).id => 400
 		// TODO: multiple logs at once
