@@ -1,0 +1,2 @@
+ALTER TABLE "logs" ALTER COLUMN "memberId" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "logs" ADD CONSTRAINT "delete_or_has_ref_id_check" CHECK (("operationType" = 'delete' or ("memberId" is not null)));

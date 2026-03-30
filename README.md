@@ -60,8 +60,8 @@ or ETA
       - [ ] basic (add records unedited and always apply changes to model)
       - [ ] validation
       - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
-    - [ ] delete
-      - [ ] basic
+    - [x] delete
+      - [x] basic
       - [ ] validation
   - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [ ] /pull endpoint

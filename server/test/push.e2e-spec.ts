@@ -92,6 +92,32 @@ describe(pushEndpoint, () => {
 		});
 
 		describe("create operation", () => {
+			function checkForPushedAt(log: Record<string, unknown>) {
+				expect(log.pushedAt).toBeDefined();
+				expect(typeof log.pushedAt).toBe("string");
+				expect(typeof Date.parse(log.pushedAt as string)).toBe("number");
+				const pushedAt = new Date(log.pushedAt as string);
+				expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
+			}
+
+			async function checkLogIsServed(logToCheck: Record<string, unknown>) {
+				const response = await request(env.server)
+					.post(pullEndpoint)
+					.send({})
+					.set("Cookie", env.users.cookies)
+					.expect(200)
+					.expect("Content-Type", /json/);
+				expect(response.body.logs).toBeInstanceOf(Array);
+				expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+				const pulledLogs = response.body.logs as Array<unknown>;
+				const pulledLog = pulledLogs.find(
+					(log) =>
+						log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
+				);
+				expect(pulledLog).toBeDefined();
+				expect(pulledLog).toEqual(logToCheck);
+			}
+
 			describe("PUT create Member", () => {
 				let inputLog: Record<string, unknown>;
 				let outputLog: Record<string, unknown>;
@@ -123,32 +149,9 @@ describe(pushEndpoint, () => {
 						},
 						executedAt: date.toISOString(),
 					});
-					expect(outputLog.pushedAt).toBeDefined();
-					expect(typeof outputLog.pushedAt).toBe("string");
-					expect(typeof Date.parse(outputLog.pushedAt as string)).toBe("number");
-					const pushedAt = new Date(outputLog.pushedAt as string);
-					expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
-				});
 
-				test(`Member is served via ${pullEndpoint}`, async () => {
-					const response = await request(env.server)
-						.post(pullEndpoint)
-						.send({})
-						.set("Cookie", env.users.cookies)
-						.expect(200)
-						.expect("Content-Type", /json/);
-					expect(response.body.logs).toBeInstanceOf(Array);
-					expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
-					const pulledLogs = response.body.logs as Array<unknown>;
-					const pulledLog = pulledLogs.find(
-						(log) =>
-							log &&
-							typeof log === "object" &&
-							"id" in log &&
-							log.id === outputLog.id,
-					);
-					expect(pulledLog).toBeDefined();
-					expect(pulledLog).toEqual(outputLog);
+					checkForPushedAt(outputLog);
+					await checkLogIsServed(outputLog);
 				});
 
 				test("send create operation twice returns existing log 200", async () => {
@@ -195,6 +198,50 @@ describe(pushEndpoint, () => {
 						.set("Cookie", env.users.cookies)
 						.expect(409)
 						.expect("Content-Type", /json/);
+				});
+			});
+
+			describe("PUT delete Member", () => {
+				let inputLog: Record<string, unknown>;
+				let outputLog: Record<string, unknown>;
+
+				test("200", async () => {
+					const { member, createLog } = makeMemberWithLog(new Date());
+					inputLog = { ...createLog };
+
+					await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [inputLog],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+						.expect("Content-Type", /json/);
+					const { data, ...deleteLog } = createLog;
+					deleteLog.id = createId();
+					deleteLog.operationType = "delete";
+					deleteLog.executedAt = new Date();
+					const response = await request(env.server)
+						.put(pushEndpoint)
+						.send({
+							logs: [deleteLog],
+						})
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+						.expect("Content-Type", /json/);
+					expect(response.body.logs).toBeInstanceOf(Array);
+					expect(response.body.logs.length).toBe(1);
+					outputLog = response.body.logs[0];
+					expect(typeof outputLog).toBe("object");
+					expect(outputLog).toMatchObject({
+						id: deleteLog.id,
+						memberId: member.id,
+						operationType: "delete",
+						executedAt: deleteLog.executedAt.toISOString(),
+					});
+
+					checkForPushedAt(outputLog);
+					await checkLogIsServed(outputLog);
 				});
 			});
 		});

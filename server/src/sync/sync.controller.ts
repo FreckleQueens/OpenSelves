@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Put, Req } from "@nestjs/common";
+import {
+	Body,
+	Controller,
+	HttpCode,
+	HttpStatus,
+	InternalServerErrorException,
+	Post,
+	Put,
+	Req,
+} from "@nestjs/common";
 import type { Request } from "express";
 import { type Log, logs } from "openselves-common/db";
 
@@ -21,7 +30,7 @@ export class SyncController {
 			request.accessTokenPayload.user.id,
 		);
 		return {
-			logs: outputLogs,
+			logs: this.formatOutputLogs(outputLogs),
 		};
 	}
 
@@ -29,7 +38,29 @@ export class SyncController {
 	@HttpCode(HttpStatus.OK)
 	public async pull() {
 		return {
-			logs: await this.db.select().from(logs),
+			logs: this.formatOutputLogs(await this.db.select().from(logs)),
 		};
+	}
+
+	private formatOutputLogs(rawLogs: Log[]) {
+		return rawLogs.map((log) => {
+			if (log.operationType === "delete") {
+				const data = log.data;
+				if (
+					!data ||
+					typeof data != "object" ||
+					!("id" in data) ||
+					typeof data.id != "string"
+				) {
+					throw new InternalServerErrorException();
+				}
+				return {
+					...log,
+					memberId: data.id,
+					data: undefined,
+				};
+			}
+			return log;
+		});
 	}
 }
