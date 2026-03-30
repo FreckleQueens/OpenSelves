@@ -5,6 +5,7 @@ import {
 	IsBoolean,
 	IsDate,
 	IsIn,
+	IsNumber,
 	IsOptional,
 	IsString,
 	ValidateIf,
@@ -49,6 +50,20 @@ export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields
 }
 
 export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBaseFields<Member>> {
+	@IsString()
+	@IsNumber()
+	@IsIn([undefined])
+	@ValidateIf((object) => {
+		const obj = object as unknown;
+		if (!obj || typeof obj !== "object") return true;
+		return !["name", "pronouns", "description", "isArchived", "archivedReason"].find(
+			(field) => {
+				return typeof obj[field] !== "undefined";
+			},
+		);
+	})
+	public readonly _atLeastOneFieldIsRequired!: undefined;
+
 	@IsOptional()
 	@IsString()
 	public readonly name?: string;

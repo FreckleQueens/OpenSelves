@@ -382,9 +382,39 @@ describe(pushEndpoint, () => {
 				expect(dbRecord).toBeDefined();
 				expect(dbRecord).toMatchObject(updateLog.data);
 			});
+
+			test("empty update data 400", async () => {
+				const { createLog } = makeMemberWithLog(new Date());
+
+				await request(env.server)
+					.put(pushEndpoint)
+					.send({
+						logs: [createLog],
+					})
+					.set("Cookie", env.users.cookies)
+					.expect(200)
+					.expect("Content-Type", /json/);
+
+				const date = new Date();
+				const updateLog = {
+					id: createId(),
+					memberId: createLog.memberId,
+					operationType: "update",
+					data: {},
+					executedAt: date,
+				};
+				const response = await request(env.server)
+					.put(pushEndpoint)
+					.send({
+						logs: [updateLog],
+					})
+					.set("Cookie", env.users.cookies)
+					.expect(400)
+					.expect("Content-Type", /json/);
+				expect(response.body.logs).not.toBeDefined();
+			});
 		});
 
-		// TODO: empty update record data 400
 		// TODO: update member that was deleted returns a delete operation
 		// TODO: multiple logs at once
 	});
