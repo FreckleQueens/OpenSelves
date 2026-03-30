@@ -1,15 +1,24 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { DrizzleQueryError, and, eq, inArray } from "drizzle-orm";
-import { type Log, type Member, logs, members } from "openselves-common/db";
+import {
+	BadRequestException,
+	ConflictException,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
+import { DrizzleQueryError, SQL, and, eq, inArray, sql } from "drizzle-orm";
+import { type Log, type Member, type MemberCreate, logs, members } from "openselves-common/db";
 
 import { InjectDb } from "../db/db.service.js";
 import type { DB } from "../db/drizzle.js";
-import { PushLogDto, PushMemberDto } from "./data/push.dto.js";
+import {
+	type CreateOperation,
+	type DeleteOperation,
+	type OperationType,
+	PushLogDto,
+	type UpdateOperation,
+} from "./data/push.dto.js";
 
-type LogToSave = Omit<Omit<Omit<PushLogDto, "pushedAt">, "memberId">, "data"> & {
-	memberId: PushLogDto["memberId"] | null;
-	data: PushLogDto["data"] | null;
-	deletedId: string | null;
+type LogToSave<Op extends OperationType = OperationType> = Omit<PushLogDto<Op>, "pushedAt"> & {
+	deletedId: Op["deletedId"];
 };
 
 @Injectable()
@@ -29,24 +38,61 @@ export class SyncService {
 		const logsToSave: LogToSave[] = logDtos
 			.filter((log) => !existingLogs.find((existingLog) => log.id === existingLog.id))
 			.map((log) => {
-				const newLog: LogToSave = { ...log, deletedId: null };
-				if (log.operationType === "delete") {
-					newLog.deletedId = `members.${log.memberId}`;
-					newLog.memberId = null;
+				if (log.operationType === "create") {
+					const logDto = log as PushLogDto<CreateOperation>;
+					const logToSave: LogToSave<CreateOperation> = {
+						...logDto,
+						deletedId: null,
+					};
+					return logToSave;
 				}
-				return newLog;
+				if (log.operationType === "update") {
+					const logDto = log as PushLogDto<UpdateOperation>;
+					const logToSave: LogToSave<UpdateOperation> = {
+						...logDto,
+						deletedId: null,
+					};
+					return logToSave;
+				}
+				if (log.operationType === "delete") {
+					const logDto = log as PushLogDto<DeleteOperation>;
+					const logToSave: LogToSave<DeleteOperation> = {
+						...logDto,
+						memberId: null,
+						deletedId: "members." + logDto.memberId,
+					};
+					return logToSave;
+				}
+				throw new BadRequestException(`Unknown log type`);
 			});
 
-		const membersToCreate: Member[] = logsToSave
+		const membersToCreate: MemberCreate[] = logsToSave
 			.filter((log) => log.operationType === "create")
-			.map((log) => ({
-				...(log.data as PushMemberDto), // Inferred by filter
-				userId,
-			}));
+			.map((log: LogToSave) => {
+				const inferredLog = log as LogToSave<CreateOperation>;
+				return {
+					...inferredLog.data,
+					userId,
+					id: inferredLog.memberId,
+				};
+			});
+		const membersToUpdate: {
+			id: Member["id"];
+			data: Partial<Omit<MemberCreate, "userId" | "id" | "createdAt" | "updatedAt">>;
+		}[] = logsToSave
+			.filter((log) => log.operationType === "update")
+			.map((log: LogToSave) => {
+				const inferredLog = log as LogToSave<UpdateOperation>;
+				return {
+					id: inferredLog.memberId,
+					data: { ...inferredLog.data },
+				};
+			});
 		const recordsToDelete: { table: string; id: string }[] = logsToSave
 			.filter((log) => log.operationType === "delete")
 			.map((log) => {
-				const [table, id] = (log.deletedId as string).split(".");
+				const inferredLog = log as LogToSave<DeleteOperation>;
+				const [table, id] = inferredLog.deletedId.split(".");
 				return { table, id };
 			});
 		const membersToDeleteIds = recordsToDelete
@@ -59,6 +105,49 @@ export class SyncService {
 				await this.db.transaction(async (tx) => {
 					if (membersToCreate.length > 0) {
 						await tx.insert(members).values(membersToCreate);
+					}
+					if (membersToUpdate.length > 0) {
+						const fields: Record<string, SQL[]> = {};
+						for (const { id, data } of membersToUpdate) {
+							for (const field of Object.keys(data)) {
+								if (data[field] !== undefined) {
+									if (!fields[field]) {
+										fields[field] = [];
+									}
+									fields[field].push(
+										sql`when ${members.id} = ${id} then ${data[field]}`,
+									);
+								}
+							}
+						}
+
+						const updatedMembers = await tx
+							.update(members)
+							.set(
+								Object.fromEntries(
+									Object.entries(fields).map(([field, sqlChunks]) => [
+										field,
+										sql.join(
+											[sql`(case`, ...sqlChunks, sql`end)`],
+											sql.raw(" "),
+										),
+									]),
+								),
+							)
+							.where(
+								and(
+									eq(members.userId, userId),
+									inArray(
+										members.id,
+										membersToUpdate.map((data) => data.id),
+									),
+								),
+							)
+							.returning();
+
+						if (updatedMembers.length !== membersToUpdate.length) {
+							throw new NotFoundException("Some members were not found");
+						}
 					}
 					if (membersToDeleteIds.length > 0) {
 						const deletedMembers = await tx
@@ -94,7 +183,7 @@ export class SyncService {
 										!(
 											log.operationType === "delete" &&
 											alreadyDeletedMemberIds.includes(
-												log.deletedId as string,
+												(log as LogToSave<DeleteOperation>).deletedId,
 											)
 										),
 								);

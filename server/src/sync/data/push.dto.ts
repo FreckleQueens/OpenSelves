@@ -5,6 +5,7 @@ import {
 	IsBoolean,
 	IsDate,
 	IsIn,
+	IsOptional,
 	IsString,
 	ValidateIf,
 	ValidateNested,
@@ -13,13 +14,23 @@ import type { Log, Member } from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
-export class PushMemberDto implements Omit<Member, "userId"> {
-	@IsCuid2()
-	public readonly id!: string;
+type OmitBaseFields<K> = Omit<K, "id" | "userId" | "createdAt" | "updatedAt">;
+
+class PushRecordDto {
+	@IsIn([undefined])
+	public readonly id!: undefined;
 
 	@IsIn([undefined])
 	public readonly userId!: undefined;
 
+	@IsIn([undefined])
+	public readonly createdAt!: undefined;
+
+	@IsIn([undefined])
+	public readonly updatedAt!: undefined;
+}
+
+export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields<Member> {
 	@IsString()
 	public readonly name!: string;
 
@@ -35,26 +46,86 @@ export class PushMemberDto implements Omit<Member, "userId"> {
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason!: string | null;
-
-	@IsDate()
-	public readonly createdAt!: Date;
-
-	@IsDate()
-	public readonly updatedAt!: Date;
 }
 
-export class PushLogDto implements Omit<Omit<Omit<Log, "userId">, "pushedAt">, "deletedId"> {
+export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBaseFields<Member>> {
+	@IsOptional()
+	@IsString()
+	public readonly name?: string;
+
+	@IsOptional()
+	@IsString()
+	public readonly pronouns?: string;
+
+	@IsOptional()
+	@IsString()
+	public readonly description?: string;
+
+	@IsOptional()
+	@IsBoolean()
+	public readonly isArchived?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@ValidateIf((object, value) => value !== null)
+	public readonly archivedReason?: string | null;
+}
+
+export type CreateOperation = {
+	type: "create";
+	data: PushCreateMemberDto;
+	memberId: string;
+	deletedId: null;
+};
+export type UpdateOperation = {
+	type: "update";
+	data: PushUpdateMemberDto;
+	memberId: string;
+	deletedId: null;
+};
+export type DeleteOperation = {
+	type: "delete";
+	data: undefined;
+	memberId: null;
+	deletedId: string;
+};
+export type OperationType = CreateOperation | UpdateOperation | DeleteOperation;
+
+export class PushLogDto<Op extends OperationType = OperationType> implements Omit<
+	Log,
+	"userId" | "pushedAt" | "deletedId" | "data"
+> {
 	@IsCuid2()
 	public readonly id!: string;
 
 	@IsCuid2()
-	public readonly memberId!: string;
+	public readonly memberId!: Op["memberId"];
 
 	@IsIn(["create", "update", "delete"])
-	public readonly operationType!: "create" | "update" | "delete";
+	public readonly operationType!: Op["type"];
 
+	@ValidateIf((object) => {
+		const obj = object as unknown;
+		return !!(
+			obj &&
+			typeof obj === "object" &&
+			"operationType" in obj &&
+			obj.operationType !== "delete"
+		);
+	})
 	@ValidateNested()
-	public readonly data!: PushMemberDto;
+	@Type((helper) => {
+		switch (helper?.object.operationType) {
+			case "create":
+				return PushCreateMemberDto;
+			case "update":
+				return PushUpdateMemberDto;
+			case "delete":
+			default:
+				return Object;
+		}
+	})
+	public readonly data!: Op["data"];
 
 	@IsDate()
 	public readonly executedAt!: Date;
