@@ -58,7 +58,7 @@ or ETA
       - [x] validation
     - [ ] update
       - [x] basic (add records unedited and always apply changes to model)
-      - [ ] validation
+      - [x] validation
       - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
     - [x] delete
       - [x] basic

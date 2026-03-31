@@ -33,6 +33,46 @@ describe(pushEndpoint, () => {
 		return { member, createLog, date };
 	}
 
+	async function createMember() {
+		const { createLog } = makeMemberWithLog(new Date());
+		const response = await request(env.server)
+			.put(pushEndpoint)
+			.send({
+				logs: [createLog],
+			})
+			.set("Cookie", env.users.cookies)
+			.expect(200)
+			.expect("Content-Type", /json/);
+		const outputLog = response.body.logs[0];
+		await checkLogIsServed(outputLog);
+		return { createLog, outputLog };
+	}
+
+	function checkForPushedAt(log: Record<string, unknown>) {
+		expect(log.pushedAt).toBeDefined();
+		expect(typeof log.pushedAt).toBe("string");
+		expect(typeof Date.parse(log.pushedAt as string)).toBe("number");
+		const pushedAt = new Date(log.pushedAt as string);
+		expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
+	}
+
+	async function checkLogIsServed(logToCheck: Record<string, unknown>) {
+		const response = await request(env.server)
+			.post(pullEndpoint)
+			.send({})
+			.set("Cookie", env.users.cookies)
+			.expect(200)
+			.expect("Content-Type", /json/);
+		expect(response.body.logs).toBeInstanceOf(Array);
+		expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+		const pulledLogs = response.body.logs as Array<unknown>;
+		const pulledLog = pulledLogs.find(
+			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
+		);
+		expect(pulledLog).toBeDefined();
+		expect(pulledLog).toEqual(logToCheck);
+	}
+
 	setupTestSuite((testEnv) => (env = testEnv));
 
 	test("GET 404", async () => {
@@ -93,31 +133,6 @@ describe(pushEndpoint, () => {
 				})
 				.expect(400);
 		});
-
-		function checkForPushedAt(log: Record<string, unknown>) {
-			expect(log.pushedAt).toBeDefined();
-			expect(typeof log.pushedAt).toBe("string");
-			expect(typeof Date.parse(log.pushedAt as string)).toBe("number");
-			const pushedAt = new Date(log.pushedAt as string);
-			expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
-		}
-
-		async function checkLogIsServed(logToCheck: Record<string, unknown>) {
-			const response = await request(env.server)
-				.post(pullEndpoint)
-				.send({})
-				.set("Cookie", env.users.cookies)
-				.expect(200)
-				.expect("Content-Type", /json/);
-			expect(response.body.logs).toBeInstanceOf(Array);
-			expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
-			const pulledLogs = response.body.logs as Array<unknown>;
-			const pulledLog = pulledLogs.find(
-				(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
-			);
-			expect(pulledLog).toBeDefined();
-			expect(pulledLog).toEqual(logToCheck);
-		}
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
@@ -258,17 +273,7 @@ describe(pushEndpoint, () => {
 			});
 
 			test("delete member of another user fails 404", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
-				const outputLog = response.body.logs[0];
-				await checkLogIsServed(outputLog);
+				const { createLog, outputLog } = await createMember();
 
 				const deleteLog = {
 					id: createId(),
@@ -412,6 +417,33 @@ describe(pushEndpoint, () => {
 					.expect(400)
 					.expect("Content-Type", /json/);
 				expect(response.body.logs).not.toBeDefined();
+			});
+
+			test("update member of another user fails 404", async () => {
+				const { createLog, outputLog } = await createMember();
+
+				const updateLog = {
+					id: createId(),
+					memberId: createLog.memberId,
+					operationType: "update",
+					data: {
+						name: "a new name",
+					},
+					executedAt: new Date(),
+				};
+				const response2 = await request(env.server)
+					.put(pushEndpoint)
+					.send({
+						logs: [updateLog],
+					})
+					.set("Cookie", env.users.cookies2)
+					.expect(404)
+					.expect("Content-Type", /json/);
+				expect(response2.body.logs).toBe(undefined);
+
+				// Check member was not deleted
+				expect(outputLog.data.name).not.toBe(updateLog.data.name);
+				await checkLogIsServed(outputLog);
 			});
 		});
 
