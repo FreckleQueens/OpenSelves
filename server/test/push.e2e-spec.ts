@@ -465,7 +465,7 @@ describe(pushEndpoint, () => {
 			);
 		});
 
-		test("PUT reconstruct data correctly when receiving out-of-order sync from previously offline client 200", async () => {
+		async function setupLogMatrix() {
 			const member = await createMember();
 			const client1Logs: ClientLog[] = [
 				{
@@ -515,10 +515,13 @@ describe(pushEndpoint, () => {
 					executedAt: new Date(4),
 				},
 			];
+			return { member, client1Logs, client2Logs };
+		}
 
-			await putLogs(client1Logs);
-			await putLogs(client2Logs);
-
+		async function verifyLogMatrixResult(member: {
+			member: Omit<MemberCreate, "userId" | "id">;
+			createLog: ClientLog;
+		}) {
 			const dbRecord = await env.db.query.members.findFirst({
 				where: {
 					userId: env.users.user.id,
@@ -533,6 +536,25 @@ describe(pushEndpoint, () => {
 				isArchived: true,
 				archivedReason: "4",
 			});
+		}
+
+		test("PUT reconstruct data correctly when receiving out-of-order sync from previously offline client 200", async () => {
+			{
+				const { member, client1Logs, client2Logs } = await setupLogMatrix();
+
+				await putLogs(client1Logs);
+				await putLogs(client2Logs);
+
+				await verifyLogMatrixResult(member);
+			}
+			{
+				const { member, client1Logs, client2Logs } = await setupLogMatrix();
+
+				await putLogs(client2Logs);
+				await putLogs(client1Logs);
+
+				await verifyLogMatrixResult(member);
+			}
 		});
 
 		// TODO@pull: /pull only returns create logs on initial sync (no timestamp provided)
