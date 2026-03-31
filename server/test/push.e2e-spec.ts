@@ -16,7 +16,7 @@ describe(pushEndpoint, () => {
 	let env: TestEnv;
 
 	function makeMemberWithLog(date: Date) {
-		const member: Omit<MemberCreate, "userId"> = {
+		const member: Omit<MemberCreate, "userId" | "id"> = {
 			name: "Alice",
 			pronouns: "she/her",
 			description: "a member of our& system",
@@ -33,19 +33,33 @@ describe(pushEndpoint, () => {
 		return { member, createLog, date };
 	}
 
-	async function createMember() {
-		const { createLog } = makeMemberWithLog(new Date());
-		const response = await request(env.server)
+	async function putLog(log, expect: number = 200, cookies: string = env.users.cookies) {
+		return await request(env.server)
 			.put(pushEndpoint)
 			.send({
-				logs: [createLog],
+				logs: [log],
 			})
-			.set("Cookie", env.users.cookies)
-			.expect(200)
+			.set("Cookie", cookies)
+			.expect(expect)
 			.expect("Content-Type", /json/);
+	}
+
+	async function createMember() {
+		const { member, createLog } = makeMemberWithLog(new Date());
+		const response = await putLog(createLog);
 		const outputLog = response.body.logs[0];
 		await checkLogIsServed(outputLog);
-		return { createLog, outputLog };
+		return { member, createLog, outputLog };
+	}
+	async function createAndDeleteMember() {
+		const { member, createLog } = await createMember();
+
+		const { data, ...deleteLog } = createLog;
+		deleteLog.id = createId();
+		deleteLog.operationType = "delete";
+		deleteLog.executedAt = new Date();
+		const response = await putLog(deleteLog);
+		return { member, deleteLog, response };
 	}
 
 	function checkForPushedAt(log: Record<string, unknown>) {
@@ -112,40 +126,24 @@ describe(pushEndpoint, () => {
 				...createLog,
 				pushedAt: date,
 			};
-			await request(env.server)
-				.put(pushEndpoint)
-				.set("Cookie", env.users.cookies)
-				.send({ logs: [createLogWithPushedAt] })
-				.expect(400);
+			await putLog(createLogWithPushedAt, 400);
 		});
 		test("log data with userId 400", async () => {
 			const { createLog } = makeMemberWithLog(new Date());
-			await request(env.server)
-				.put(pushEndpoint)
-				.set("Cookie", env.users.cookies)
-				.send({
-					logs: [
-						{
-							...createLog,
-							data: { ...(createLog.data as Member), userId: env.users.user2.id },
-						},
-					],
-				})
-				.expect(400);
+			await putLog(
+				{
+					...createLog,
+					data: { ...(createLog.data as Member), userId: env.users.user2.id },
+				},
+				400,
+			);
 		});
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
 				const { member, createLog, date } = makeMemberWithLog(new Date());
 
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				const response = await putLog(createLog);
 				expect(response.body.logs).toBeInstanceOf(Array);
 				expect(response.body.logs.length).toBe(1);
 				const outputLog = response.body.logs[0];
@@ -164,24 +162,10 @@ describe(pushEndpoint, () => {
 
 			test("send create operation twice returns existing log 200", async () => {
 				const { createLog } = makeMemberWithLog(new Date());
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				const response = await putLog(createLog);
 				const outputLog = response.body.logs[0];
 
-				const response2 = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				const response2 = await putLog(createLog);
 				expect(response2.body.logs[0]).toEqual(outputLog);
 			});
 
@@ -190,54 +174,13 @@ describe(pushEndpoint, () => {
 				const { createLog: createLog2 } = makeMemberWithLog(new Date());
 				createLog2.memberId = createLog.memberId;
 
-				await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				await putLog(createLog);
 
-				await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog2],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(409)
-					.expect("Content-Type", /json/);
+				await putLog(createLog2, 409);
 			});
 		});
 
 		describe("PUT delete Member", () => {
-			async function createAndDeleteMember() {
-				const { member, createLog } = makeMemberWithLog(new Date());
-
-				await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
-
-				const { data, ...deleteLog } = createLog;
-				deleteLog.id = createId();
-				deleteLog.operationType = "delete";
-				deleteLog.executedAt = new Date();
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [deleteLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
-				return { member, deleteLog, response };
-			}
-
 			test("200", async () => {
 				const { deleteLog, response } = await createAndDeleteMember();
 				expect(response.body.logs).toBeInstanceOf(Array);
@@ -260,14 +203,7 @@ describe(pushEndpoint, () => {
 				const outputLog = response.body.logs[0];
 
 				deleteLog.id = createId();
-				const response2 = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [deleteLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				const response2 = await putLog(deleteLog);
 				expect(response2.body.logs[0].id).not.toBe(deleteLog.id);
 				expect(response2.body.logs[0]).toEqual(outputLog);
 			});
@@ -282,14 +218,7 @@ describe(pushEndpoint, () => {
 					data: undefined,
 					executedAt: new Date(),
 				};
-				const response2 = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [deleteLog],
-					})
-					.set("Cookie", env.users.cookies2)
-					.expect(404)
-					.expect("Content-Type", /json/);
+				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
 				expect(response2.body.logs).toBe(undefined);
 
 				// Check member was not deleted
@@ -297,16 +226,7 @@ describe(pushEndpoint, () => {
 			});
 
 			test("retrieve log from another user fails 404", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
-				await checkLogIsServed(response.body.logs[0]);
+				const { createLog } = await createMember();
 
 				const deleteLog = {
 					id: createLog.id,
@@ -315,14 +235,7 @@ describe(pushEndpoint, () => {
 					data: undefined,
 					executedAt: new Date(),
 				};
-				const response2 = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [deleteLog],
-					})
-					.set("Cookie", env.users.cookies2)
-					.expect(404)
-					.expect("Content-Type", /json/);
+				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
 				expect(response2.body.logs).toBe(undefined);
 			});
 		});
@@ -331,14 +244,7 @@ describe(pushEndpoint, () => {
 			test("200", async () => {
 				const { createLog } = makeMemberWithLog(new Date());
 
-				await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				await putLog(createLog);
 
 				const date = new Date();
 				const updateLog = {
@@ -353,14 +259,7 @@ describe(pushEndpoint, () => {
 					},
 					executedAt: date,
 				};
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [updateLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				const response = await putLog(updateLog);
 				expect(response.body.logs).toBeInstanceOf(Array);
 				expect(response.body.logs.length).toBe(1);
 				const outputLog = response.body.logs[0];
@@ -391,14 +290,7 @@ describe(pushEndpoint, () => {
 			test("empty update data 400", async () => {
 				const { createLog } = makeMemberWithLog(new Date());
 
-				await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [createLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				await putLog(createLog);
 
 				const date = new Date();
 				const updateLog = {
@@ -408,14 +300,7 @@ describe(pushEndpoint, () => {
 					data: {},
 					executedAt: date,
 				};
-				const response = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [updateLog],
-					})
-					.set("Cookie", env.users.cookies)
-					.expect(400)
-					.expect("Content-Type", /json/);
+				const response = await putLog(updateLog, 400);
 				expect(response.body.logs).not.toBeDefined();
 			});
 
@@ -431,23 +316,39 @@ describe(pushEndpoint, () => {
 					},
 					executedAt: new Date(),
 				};
-				const response2 = await request(env.server)
-					.put(pushEndpoint)
-					.send({
-						logs: [updateLog],
-					})
-					.set("Cookie", env.users.cookies2)
-					.expect(404)
-					.expect("Content-Type", /json/);
+				const response2 = await putLog(updateLog, 404, env.users.cookies2);
+
 				expect(response2.body.logs).toBe(undefined);
 
 				// Check member was not deleted
 				expect(outputLog.data.name).not.toBe(updateLog.data.name);
 				await checkLogIsServed(outputLog);
 			});
+
+			test("update member that was deleted returns delete operation 200", async () => {
+				const { deleteLog } = await createAndDeleteMember();
+				const updateLog = {
+					id: createId(),
+					memberId: deleteLog.memberId,
+					operationType: "update",
+					data: {
+						name: "a new name",
+					},
+					executedAt: new Date(),
+				};
+
+				const response = await putLog(updateLog);
+				expect(response.body.logs).toBeInstanceOf(Array);
+				expect(response.body.logs.length).toBe(1);
+				const outputLog = response.body.logs[0];
+				expect(outputLog).toMatchObject({
+					memberId: updateLog.memberId,
+					operationType: "delete",
+				});
+				expect(outputLog.id).not.toBe(updateLog.id);
+			});
 		});
 
-		// TODO: update member that was deleted returns a delete operation
 		// TODO: multiple logs at once
 	});
 });

@@ -2,6 +2,7 @@ import {
 	BadRequestException,
 	ConflictException,
 	Injectable,
+	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
 import { DrizzleQueryError, SQL, and, eq, inArray, sql } from "drizzle-orm";
@@ -13,7 +14,7 @@ import {
 	type MemberCreate,
 	logs,
 	members,
-	type models,
+	models,
 	type relations,
 } from "openselves-common/db";
 
@@ -27,17 +28,47 @@ import {
 	type UpdateOperation,
 } from "./data/push.dto.js";
 
+type SyncedModels<T extends TableMap = TableMap> = Record<
+	T["table"],
+	{
+		name: T["table"];
+		table: (typeof models)[T["table"]];
+		modelIdLogKey: keyof (typeof models)["logs"] & T["modelIdLogKey"];
+	}
+>;
+const syncedModels: SyncedModels = {
+	members: {
+		name: "members",
+		table: members,
+		modelIdLogKey: "memberId",
+	},
+};
+
 type LogToSave<Op extends OperationType = OperationType> = Omit<PushLogDto<Op>, "pushedAt"> & {
 	deletedId: Op["deletedId"];
 };
 type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof models, typeof relations>;
 
-type MembersToCreate = MemberCreate[];
-type MembersToUpdate = {
-	id: Member["id"];
-	data: Partial<Omit<MemberCreate, "userId" | "id" | "createdAt" | "updatedAt">>;
-}[];
-type RecordsToDelete = { table: string; id: string }[];
+type TableMap = {
+	table: "members";
+	data: Omit<MemberCreate, "userId">;
+	deleteId: Member["id"];
+	modelIdLogKey: "memberId";
+};
+type UpdateData<Type> = Partial<Omit<Type, "userId" | "id" | "createdAt" | "updatedAt">>;
+
+type RecordsToCreate<T extends TableMap = TableMap> = {
+	[P in T["table"]]?: T["data"][];
+};
+type RecordsToUpdate<T extends TableMap = TableMap> = {
+	[P in T["table"]]?: {
+		id: Member["id"];
+		data: UpdateData<T["data"]>;
+	}[];
+};
+type RecordsToDelete<T extends TableMap = TableMap> = {
+	[P in T["table"]]?: T["deleteId"][];
+};
 
 @Injectable()
 export class SyncService {
@@ -49,43 +80,36 @@ export class SyncService {
 		let outputLogs: Log[] = [];
 		try {
 			await this.db.transaction(async (tx) => {
-				const existingLogs: Log[] = await tx.query.logs.findMany({
+				const alreadyPushedLogs: Log[] = await tx.query.logs.findMany({
 					where: {
 						userId: userId,
 						id: { in: logDtos.map((log) => log.id) },
 					},
 				});
-				outputLogs = existingLogs;
+				outputLogs = alreadyPushedLogs;
 
 				const {
 					logsToSave,
-					membersToCreate,
-					membersToUpdate,
+					recordsToCreate,
+					recordsToUpdate,
 					recordsToDelete,
-					membersToDeleteIds,
-				} = this.computeOperations(logDtos, userId, existingLogs);
+					outputLogs: computedOutputLogs,
+				} = await this.computeOperations(tx, userId, logDtos, alreadyPushedLogs);
+				outputLogs.push(...computedOutputLogs);
 
 				if (logsToSave.length === 0) {
 					return;
 				}
 
-				if (membersToCreate.length > 0) {
-					await tx.insert(members).values(membersToCreate);
-				}
-				if (membersToUpdate.length > 0) {
-					await this.tryUpdateMembers(tx, userId, membersToUpdate);
-				}
-				if (membersToDeleteIds.length > 0) {
-					outputLogs = await this.tryDeleteMembers(
-						tx,
-						userId,
-						membersToDeleteIds,
-						recordsToDelete,
-						outputLogs,
-					);
-				}
-				const values = logsToSave.map((log) => ({ ...log, userId, pushedAt }));
-				outputLogs.push(...(await tx.insert(logs).values(values).returning()));
+				await this.tryCreateRecords(tx, userId, recordsToCreate);
+				await this.tryUpdateRecords(tx, userId, recordsToUpdate);
+				outputLogs = await this.tryDeleteRecords(tx, userId, recordsToDelete, outputLogs);
+
+				const savedLogs = await tx
+					.insert(logs)
+					.values(logsToSave.map((log) => ({ ...log, userId, pushedAt })))
+					.returning();
+				outputLogs.push(...savedLogs);
 			});
 		} catch (error) {
 			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
@@ -103,9 +127,16 @@ export class SyncService {
 		return outputLogs;
 	}
 
-	private computeOperations(logDtos: PushLogDto[], userId: string, existingLogs: Log[]) {
-		const logsToSave: LogToSave[] = logDtos
-			.filter((log) => !existingLogs.find((existingLog) => log.id === existingLog.id))
+	private async computeOperations(
+		tx: Transaction,
+		userId: string,
+		logDtos: PushLogDto[],
+		alreadyPushedLogs: Log[],
+	) {
+		const outputLogs: Log[] = [];
+
+		let logsToSave: LogToSave[] = logDtos
+			.filter((log) => !alreadyPushedLogs.find((existingLog) => log.id === existingLog.id))
 			.map((log) => {
 				if (log.operationType === "create") {
 					const logDto = log as PushLogDto<CreateOperation>;
@@ -135,130 +166,215 @@ export class SyncService {
 				throw new BadRequestException(`Unknown log type`);
 			});
 
-		const membersToCreate: MembersToCreate = logsToSave
-			.filter((log) => log.operationType === "create")
-			.map((log: LogToSave) => {
-				const inferredLog = log as LogToSave<CreateOperation>;
-				return {
-					...inferredLog.data,
-					userId,
-					id: inferredLog.memberId,
-				};
-			});
-		const membersToUpdate: MembersToUpdate = logsToSave
-			.filter((log) => log.operationType === "update")
-			.map((log: LogToSave) => {
-				const inferredLog = log as LogToSave<UpdateOperation>;
-				return {
-					id: inferredLog.memberId,
-					data: { ...inferredLog.data },
-				};
-			});
-		const recordsToDelete: RecordsToDelete = logsToSave
-			.filter((log) => log.operationType === "delete")
-			.map((log) => {
-				const inferredLog = log as LogToSave<DeleteOperation>;
-				const [table, id] = inferredLog.deletedId.split(".");
-				return { table, id };
-			});
-		const membersToDeleteIds = recordsToDelete
-			.filter((entry) => entry.table === "members")
-			.map((entry) => entry.id);
-		return {
-			logsToSave,
-			membersToCreate,
-			membersToUpdate,
-			recordsToDelete,
-			membersToDeleteIds,
-		};
-	}
-
-	private async tryUpdateMembers(
-		tx: Transaction,
-		userId: string,
-		membersToUpdate: MembersToUpdate,
-	) {
-		const fields: Record<string, SQL[]> = {};
-		for (const { id, data } of membersToUpdate) {
-			for (const field of Object.keys(data)) {
-				if (data[field] !== undefined) {
-					if (!fields[field]) {
-						fields[field] = [];
+		for (const model of Object.values(syncedModels)) {
+			const recordIdsToUpdateOrDelete = logsToSave
+				.filter(
+					(log) =>
+						["update", "delete"].includes(log.operationType) &&
+						(log[model.modelIdLogKey] || log.deletedId?.split(".")[0] === model.name),
+				)
+				.map((log) => {
+					const id = log[model.modelIdLogKey] || log.deletedId?.split(".")[1];
+					if (!id) {
+						throw new InternalServerErrorException("Log contained not record id");
 					}
-					fields[field].push(sql`when ${members.id} = ${id} then ${data[field]}`);
-				}
+					return id;
+				});
+			if (recordIdsToUpdateOrDelete.length > 0) {
+				const alreadyDeletedRecordsLogs: Log[] = await tx.query.logs.findMany({
+					where: {
+						userId,
+						deletedId: {
+							in: recordIdsToUpdateOrDelete.map((id) => `${model.name}.${id}`),
+						},
+					},
+				});
+				const alreadyDeletedRecordIds = alreadyDeletedRecordsLogs.map((log) =>
+					log[model.modelIdLogKey]
+						? `${model.name}.${log[model.modelIdLogKey]}`
+						: log.deletedId,
+				);
+				logsToSave = logsToSave.filter((log) => {
+					const id = log[model.modelIdLogKey]
+						? `${model.name}.${log[model.modelIdLogKey]}`
+						: log.deletedId;
+					return !alreadyDeletedRecordIds.find((deletedId) => deletedId === id);
+				});
+				outputLogs.push(...alreadyDeletedRecordsLogs);
 			}
 		}
 
-		const updatedMembers = await tx
-			.update(members)
-			.set(
-				Object.fromEntries(
-					Object.entries(fields).map(([field, sqlChunks]) => [
-						field,
-						sql.join([sql`(case`, ...sqlChunks, sql`end)`], sql.raw(" ")),
-					]),
-				),
-			)
-			.where(
-				and(
-					eq(members.userId, userId),
-					inArray(
-						members.id,
-						membersToUpdate.map((data) => data.id),
-					),
-				),
-			)
-			.returning();
+		const recordsToCreate: RecordsToCreate = {};
+		for (const log of logsToSave.filter((log) => log.operationType === "create")) {
+			const inferredLog = log as LogToSave<CreateOperation>;
+			if (inferredLog.memberId) {
+				if (!recordsToCreate.members) {
+					recordsToCreate.members = [];
+				}
+				recordsToCreate.members.push({
+					...inferredLog.data,
+					id: inferredLog.memberId,
+				});
+			} else {
+				throw new InternalServerErrorException("Tried to create non-synced record");
+			}
+		}
 
-		if (updatedMembers.length !== membersToUpdate.length) {
-			throw new NotFoundException("Some members were not found");
+		const recordsToUpdate: RecordsToUpdate = {};
+		for (const log of logsToSave.filter((log) => log.operationType === "update")) {
+			const inferredLog = log as LogToSave<UpdateOperation>;
+			if (inferredLog.memberId) {
+				if (!recordsToUpdate.members) {
+					recordsToUpdate.members = [];
+				}
+				recordsToUpdate.members.push({
+					id: inferredLog.memberId,
+					data: { ...inferredLog.data },
+				});
+			} else {
+				throw new InternalServerErrorException("Tried to update non-synced record");
+			}
+		}
+
+		const recordsToDelete: RecordsToDelete = {};
+		for (const log of logsToSave.filter((log) => log.operationType === "delete")) {
+			const inferredLog = log as LogToSave<DeleteOperation>;
+			const [tableName, id] = inferredLog.deletedId.split(".");
+			const model = Object.values(syncedModels).find((model) => model.name === tableName);
+			if (!model) {
+				throw new InternalServerErrorException("Tried to delete non-synced record");
+			}
+			let data = recordsToDelete[model.name];
+			if (!data) {
+				data = recordsToDelete[model.name] = [];
+			}
+			data.push(id);
+		}
+
+		return {
+			logsToSave,
+			recordsToCreate,
+			recordsToUpdate,
+			recordsToDelete,
+			outputLogs,
+		};
+	}
+
+	private async tryCreateRecords(
+		tx: Transaction,
+		userId: string,
+		recordsToCreate: RecordsToCreate,
+	) {
+		for (const model of Object.values(syncedModels)) {
+			const valuesToInsert = recordsToCreate[model.name];
+			if (valuesToInsert && valuesToInsert.length > 0) {
+				await tx
+					.insert(model.table)
+					.values(valuesToInsert.map((val) => ({ ...val, userId })));
+			}
 		}
 	}
 
-	private async tryDeleteMembers(
+	private async tryUpdateRecords(
 		tx: Transaction,
 		userId: string,
-		membersToDeleteIds: string[],
-		recordsToDelete: {
-			table: string;
-			id: string;
-		}[],
+		recordsToUpdate: RecordsToUpdate,
+	) {
+		for (const model of Object.values(syncedModels)) {
+			const updateData = recordsToUpdate[model.name];
+			if (updateData && updateData.length > 0) {
+				const fields: Record<string, SQL[]> = {};
+				for (const { id, data } of updateData) {
+					for (const field of Object.keys(data)) {
+						if (data[field] !== undefined) {
+							if (!fields[field]) {
+								fields[field] = [];
+							}
+							fields[field].push(
+								sql`when ${model.table.id} = ${id} then ${data[field]}`,
+							);
+						}
+					}
+				}
+
+				const updatedRecords = await tx
+					.update(model.table)
+					.set(
+						Object.fromEntries(
+							Object.entries(fields).map(([field, sqlChunks]) => [
+								field,
+								sql.join([sql`(case`, ...sqlChunks, sql`end)`], sql.raw(" ")),
+							]),
+						),
+					)
+					.where(
+						and(
+							eq(model.table.userId, userId),
+							inArray(
+								model.table.id,
+								updateData.map((data) => data.id),
+							),
+						),
+					)
+					.returning();
+
+				if (updatedRecords.length !== updateData.length) {
+					throw new NotFoundException(`Some ${model.name} were not found`);
+				}
+			}
+		}
+	}
+
+	private async tryDeleteRecords(
+		tx: Transaction,
+		userId: string,
+		recordsToDelete: RecordsToDelete,
 		outputLogs: Log[],
 	) {
-		const deletedMembers = await tx
-			.delete(members)
-			.where(and(eq(members.userId, userId), inArray(members.id, membersToDeleteIds)))
-			.returning();
-		if (deletedMembers.length !== recordsToDelete.length) {
-			const alreadyDeletedMemberIds = membersToDeleteIds.filter(
-				(id) => !deletedMembers.find((member) => member.id === id),
-			);
-			const existingDeletionLogs = await tx
-				.select()
-				.from(logs)
-				.where(
-					and(
-						eq(logs.userId, userId),
-						inArray(
-							logs.deletedId,
-							alreadyDeletedMemberIds.map((id) => `members.${id}`),
+		for (const model of Object.values(syncedModels)) {
+			const recordsToDeleteIds = recordsToDelete[model.name];
+			if (recordsToDeleteIds && recordsToDeleteIds.length > 0) {
+				const deletedRecords = await tx
+					.delete(model.table)
+					.where(
+						and(
+							eq(model.table.userId, userId),
+							inArray(model.table.id, recordsToDeleteIds),
 						),
-					),
-				);
-			if (existingDeletionLogs.length !== alreadyDeletedMemberIds.length) {
-				throw new NotFoundException("Some members were not found");
-			} else {
-				outputLogs = outputLogs.filter(
-					(log) =>
-						!(
-							log.operationType === "delete" &&
-							alreadyDeletedMemberIds.includes(
-								(log as LogToSave<DeleteOperation>).deletedId,
-							)
-						),
-				);
-				outputLogs.push(...existingDeletionLogs);
+					)
+					.returning();
+
+				if (deletedRecords.length !== recordsToDeleteIds.length) {
+					const alreadyDeletedRecordIds = recordsToDeleteIds.filter(
+						(id) => !deletedRecords.find((record) => record.id === id),
+					);
+					const existingDeletionLogs = await tx
+						.select()
+						.from(logs)
+						.where(
+							and(
+								eq(logs.userId, userId),
+								inArray(
+									logs.deletedId,
+									alreadyDeletedRecordIds.map((id) => `${model.name}.${id}`),
+								),
+							),
+						);
+					if (existingDeletionLogs.length !== alreadyDeletedRecordIds.length) {
+						throw new NotFoundException(`Some ${model.name} were not found`);
+					} else {
+						outputLogs = outputLogs.filter(
+							(log) =>
+								!(
+									log.operationType === "delete" &&
+									alreadyDeletedRecordIds.includes(
+										(log as LogToSave<DeleteOperation>).deletedId,
+									)
+								),
+						);
+						outputLogs.push(...existingDeletionLogs);
+					}
+				}
 			}
 		}
 		return outputLogs;
