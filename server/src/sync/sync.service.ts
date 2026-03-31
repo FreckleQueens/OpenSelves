@@ -74,10 +74,9 @@ type RecordsToDelete<T extends TableMap = TableMap> = {
 export class SyncService {
 	constructor(@InjectDb() private readonly db: DB) {}
 
-	public async reduceAndSaveLogs(userId: string, logDtos: PushLogDto[]): Promise<Log[]> {
+	public async reduceAndSaveLogs(userId: string, logDtos: PushLogDto[]): Promise<void> {
 		const pushedAt = new Date();
 
-		let outputLogs: Log[] = [];
 		try {
 			await this.db.transaction(async (tx) => {
 				const alreadyPushedLogs: Log[] = await tx.query.logs.findMany({
@@ -86,16 +85,9 @@ export class SyncService {
 						id: { in: logDtos.map((log) => log.id) },
 					},
 				});
-				outputLogs = alreadyPushedLogs;
 
-				const {
-					logsToSave,
-					recordsToCreate,
-					recordsToUpdate,
-					recordsToDelete,
-					outputLogs: computedOutputLogs,
-				} = await this.computeOperations(tx, userId, logDtos, alreadyPushedLogs);
-				outputLogs.push(...computedOutputLogs);
+				const { logsToSave, recordsToCreate, recordsToUpdate, recordsToDelete } =
+					await this.computeOperations(tx, userId, logDtos, alreadyPushedLogs);
 
 				if (logsToSave.length === 0) {
 					return;
@@ -103,13 +95,16 @@ export class SyncService {
 
 				await this.tryCreateRecords(tx, userId, recordsToCreate);
 				await this.tryUpdateRecords(tx, userId, recordsToUpdate);
-				outputLogs = await this.tryDeleteRecords(tx, userId, recordsToDelete, outputLogs);
+				await this.tryDeleteRecords(tx, userId, recordsToDelete);
 
 				const savedLogs = await tx
 					.insert(logs)
 					.values(logsToSave.map((log) => ({ ...log, userId, pushedAt })))
 					.returning();
-				outputLogs.push(...savedLogs);
+
+				if (savedLogs.length !== logsToSave.length) {
+					throw new InternalServerErrorException("Not all logs were saved");
+				}
 			});
 		} catch (error) {
 			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
@@ -123,8 +118,6 @@ export class SyncService {
 			}
 			throw error;
 		}
-
-		return outputLogs;
 	}
 
 	private async computeOperations(
@@ -329,7 +322,6 @@ export class SyncService {
 		tx: Transaction,
 		userId: string,
 		recordsToDelete: RecordsToDelete,
-		outputLogs: Log[],
 	) {
 		for (const model of Object.values(syncedModels)) {
 			const recordsToDeleteIds = recordsToDelete[model.name];
@@ -362,21 +354,9 @@ export class SyncService {
 						);
 					if (existingDeletionLogs.length !== alreadyDeletedRecordIds.length) {
 						throw new NotFoundException(`Some ${model.name} were not found`);
-					} else {
-						outputLogs = outputLogs.filter(
-							(log) =>
-								!(
-									log.operationType === "delete" &&
-									alreadyDeletedRecordIds.includes(
-										(log as LogToSave<DeleteOperation>).deletedId,
-									)
-								),
-						);
-						outputLogs.push(...existingDeletionLogs);
 					}
 				}
 			}
 		}
-		return outputLogs;
 	}
 }
