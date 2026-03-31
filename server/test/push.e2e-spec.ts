@@ -393,7 +393,28 @@ describe(pushEndpoint, () => {
 			}
 		});
 
-		// TODO: server refuses unsorted data (by executedAt) 400
+		test("PUT out of order logs 400", async () => {
+			const members = [
+				makeMemberWithLog(new Date(1)),
+				makeMemberWithLog(new Date(2)),
+				makeMemberWithLog(new Date(4)),
+			];
+
+			const outOfOrderLogs: ClientLog[] = [
+				members[1].createLog,
+				members[2].createLog,
+				members[0].createLog,
+			];
+			await putLogs(outOfOrderLogs, 400);
+
+			const orderedLogs: ClientLog[] = [
+				members[0].createLog,
+				members[1].createLog,
+				members[2].createLog,
+			];
+			await putLogs(orderedLogs, 200);
+		});
+
 		// TODO: sending create or update logs at the same time as a delete log for the same record fails 400 (i.e. create, update, update, delete)
 		// TODO: strip update logs compared to more recent update logs
 

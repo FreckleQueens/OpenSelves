@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Put, Req } from "@nestjs/common";
+import {
+	BadRequestException,
+	Body,
+	Controller,
+	HttpCode,
+	HttpStatus,
+	Post,
+	Put,
+	Req,
+} from "@nestjs/common";
 import type { Request } from "express";
 import { type Log, logs } from "openselves-common/db";
 
@@ -16,6 +25,14 @@ export class SyncController {
 
 	@Put("push")
 	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
+		let lastDate: Date | undefined = undefined;
+		for (const log of pushDto.logs) {
+			if (lastDate && log.executedAt.getTime() < lastDate.getTime()) {
+				throw new BadRequestException("logs must be sorted by executedAt");
+			}
+			lastDate = log.executedAt;
+		}
+
 		await this.syncService.reduceAndSaveLogs(request.accessTokenPayload.user.id, pushDto.logs);
 		return {};
 	}
