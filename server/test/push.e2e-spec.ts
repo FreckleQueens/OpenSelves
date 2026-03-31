@@ -33,12 +33,16 @@ describe(pushEndpoint, () => {
 		return { member, createLog, date };
 	}
 
-	async function putLog(log: unknown, expect: number = 200, cookies: string = env.users.cookies) {
+	async function putLog(
+		log: ClientLog,
+		expect: number = 200,
+		cookies: string = env.users.cookies,
+	) {
 		return putLogs([log], expect, cookies);
 	}
 
 	async function putLogs(
-		logs: unknown[],
+		logs: ClientLog[],
 		expect: number = 200,
 		cookies: string = env.users.cookies,
 	) {
@@ -62,10 +66,13 @@ describe(pushEndpoint, () => {
 	async function createAndDeleteMember() {
 		const { member, createLog } = await createMember();
 
-		const { data, ...deleteLog } = createLog;
-		deleteLog.id = createId();
-		deleteLog.operationType = "delete";
-		deleteLog.executedAt = new Date();
+		const deleteLog: ClientLog = {
+			...createLog,
+			id: createId(),
+			operationType: "delete",
+			data: null,
+			executedAt: new Date(),
+		};
 		const response = await putLog(deleteLog);
 		return { member, deleteLog, response };
 	}
@@ -198,7 +205,7 @@ describe(pushEndpoint, () => {
 			test("delete member of another user fails 404", async () => {
 				const { createLog } = await createMember();
 
-				const deleteLog = {
+				const deleteLog: ClientLog = {
 					id: createId(),
 					memberId: createLog.memberId,
 					operationType: "delete",
@@ -215,7 +222,7 @@ describe(pushEndpoint, () => {
 			test("retrieve log from another user fails 404", async () => {
 				const { createLog } = await createMember();
 
-				const deleteLog = {
+				const deleteLog: ClientLog = {
 					id: createLog.id,
 					memberId: createId(),
 					operationType: "delete",
@@ -234,7 +241,7 @@ describe(pushEndpoint, () => {
 				await putLog(createLog);
 
 				const date = new Date();
-				const updateLog = {
+				const updateLog: ClientLog = {
 					id: createId(),
 					memberId: createLog.memberId,
 					operationType: "update",
@@ -259,7 +266,7 @@ describe(pushEndpoint, () => {
 
 				// TODO@pull: check for create logs on /sync/pull instead
 				expect(dbRecord).toBeDefined();
-				expect(dbRecord).toMatchObject(updateLog.data);
+				expect(dbRecord).toMatchObject(updateLog.data as Record<string, unknown>);
 			});
 
 			test("empty update data 400", async () => {
@@ -268,7 +275,7 @@ describe(pushEndpoint, () => {
 				await putLog(createLog);
 
 				const date = new Date();
-				const updateLog = {
+				const updateLog: ClientLog = {
 					id: createId(),
 					memberId: createLog.memberId,
 					operationType: "update",
@@ -282,7 +289,7 @@ describe(pushEndpoint, () => {
 			test("update member of another user fails 404", async () => {
 				const { createLog } = await createMember();
 
-				const updateLog = {
+				const updateLog: ClientLog = {
 					id: createId(),
 					memberId: createLog.memberId,
 					operationType: "update",
@@ -296,15 +303,16 @@ describe(pushEndpoint, () => {
 				expect(response2.body.logs).toBe(undefined);
 
 				// Check member was not deleted
-				const createName = (createLog as Record<string, unknown>)["data"]?.["name"];
+				expect(createLog.data).toBeDefined();
+				const createName = (createLog.data as Record<string, unknown>)["name"];
 				expect(createName).toBeDefined();
-				expect(createName).not.toBe(updateLog.data.name);
+				expect(createName).not.toBe((updateLog.data as Record<string, unknown>).name);
 				await checkLogIsServed(createLog);
 			});
 
 			test("update member that was already deleted succeeds 200", async () => {
 				const { deleteLog } = await createAndDeleteMember();
-				const updateLog = {
+				const updateLog: ClientLog = {
 					id: createId(),
 					memberId: deleteLog.memberId,
 					operationType: "update",
@@ -415,7 +423,48 @@ describe(pushEndpoint, () => {
 			await putLogs(orderedLogs, 200);
 		});
 
-		// TODO: sending create or update logs at the same time as a delete log for the same record fails 400 (i.e. create, update, update, delete)
+		test("PUT create and delete in one request fails 400", async () => {
+			const member = makeMemberWithLog(new Date());
+
+			await putLogs(
+				[
+					member.createLog,
+					{
+						...member.createLog,
+						id: createId(),
+						operationType: "delete",
+						data: undefined,
+					},
+				],
+				400,
+			);
+		});
+
+		test("PUT update and delete in one request fails 400", async () => {
+			const member = makeMemberWithLog(new Date());
+
+			await putLog(member.createLog);
+			await putLogs(
+				[
+					{
+						...member.createLog,
+						id: createId(),
+						operationType: "update",
+						data: {
+							name: "a new name",
+						},
+					},
+					{
+						...member.createLog,
+						id: createId(),
+						operationType: "delete",
+						data: undefined,
+					},
+				],
+				400,
+			);
+		});
+
 		// TODO: strip update logs compared to more recent update logs
 
 		// TODO@pull: /pull only returns create logs on initial sync (no timestamp provided)

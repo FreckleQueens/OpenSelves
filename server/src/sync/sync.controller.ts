@@ -26,11 +26,21 @@ export class SyncController {
 	@Put("push")
 	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
 		let lastDate: Date | undefined = undefined;
+		const idTracker: string[] = [];
 		for (const log of pushDto.logs) {
 			if (lastDate && log.executedAt.getTime() < lastDate.getTime()) {
 				throw new BadRequestException("logs must be sorted by executedAt");
 			}
 			lastDate = log.executedAt;
+
+			if (log.memberId) {
+				if (log.operationType === "delete" && idTracker.includes(log.memberId)) {
+					throw new BadRequestException(
+						"Cannot delete record AND perform other operations in the same request",
+					);
+				}
+				idTracker.push(log.memberId);
+			}
 		}
 
 		await this.syncService.reduceAndSaveLogs(request.accessTokenPayload.user.id, pushDto.logs);
