@@ -296,7 +296,14 @@ export class SyncService {
 						Object.fromEntries(
 							Object.entries(fields).map(([field, sqlChunks]) => [
 								field,
-								sql.join([sql`(case`, ...sqlChunks, sql`end)`], sql.raw(" ")),
+								sql.join(
+									[
+										sql`(case`,
+										...sqlChunks,
+										sql`else ${model.table[field]} end)`,
+									],
+									sql.raw(" "),
+								),
 							]),
 						),
 					)

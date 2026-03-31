@@ -7,10 +7,10 @@ import { type TestEnv, setupTestSuite } from "./utils.js";
 const pushEndpoint = "/sync/push";
 const pullEndpoint = "/sync/pull";
 
-type CreateLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId"> & {
+type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId"> & {
 	memberId: string;
 };
-type CreateLog = Omit<CreateLogWithPushedAt, "pushedAt">;
+type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt">;
 
 describe(pushEndpoint, () => {
 	let env: TestEnv;
@@ -23,7 +23,7 @@ describe(pushEndpoint, () => {
 			isArchived: false,
 			archivedReason: null,
 		};
-		const createLog: CreateLog = {
+		const createLog: ClientLog = {
 			id: createId(),
 			memberId: createId(),
 			operationType: "create",
@@ -33,11 +33,19 @@ describe(pushEndpoint, () => {
 		return { member, createLog, date };
 	}
 
-	async function putLog(log, expect: number = 200, cookies: string = env.users.cookies) {
+	async function putLog(log: unknown, expect: number = 200, cookies: string = env.users.cookies) {
+		return putLogs([log], expect, cookies);
+	}
+
+	async function putLogs(
+		logs: unknown[],
+		expect: number = 200,
+		cookies: string = env.users.cookies,
+	) {
 		return await request(env.server)
 			.put(pushEndpoint)
 			.send({
-				logs: [log],
+				logs: logs,
 			})
 			.set("Cookie", cookies)
 			.expect(expect)
@@ -132,7 +140,7 @@ describe(pushEndpoint, () => {
 		});
 		test("log with non-null pushedAt 400", async () => {
 			const { createLog, date } = makeMemberWithLog(new Date());
-			const createLogWithPushedAt: CreateLogWithPushedAt = {
+			const createLogWithPushedAt: ClientLogWithPushedAt = {
 				...createLog,
 				pushedAt: date,
 			};
@@ -310,7 +318,82 @@ describe(pushEndpoint, () => {
 			});
 		});
 
-		// TODO: multiple logs at once
+		test("PUT create, update and delete members all at once 200", async () => {
+			const memberToDelete = makeMemberWithLog(new Date(0));
+			await putLog(memberToDelete.createLog);
+			const members = [
+				makeMemberWithLog(new Date(1)),
+				makeMemberWithLog(new Date(2)),
+				makeMemberWithLog(new Date(4)),
+			];
+			const logs: ClientLog[] = [
+				members[0].createLog,
+				members[1].createLog,
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: members[1].createLog.memberId,
+					data: {
+						description: "a new description",
+					},
+					executedAt: new Date(3),
+				},
+				members[2].createLog,
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: members[0].createLog.memberId,
+					data: {
+						pronouns: "iel/ellui",
+					},
+					executedAt: new Date(5),
+				},
+				{
+					id: createId(),
+					operationType: "delete",
+					memberId: memberToDelete.createLog.memberId,
+					data: undefined,
+					executedAt: new Date(6),
+				},
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: members[2].createLog.memberId,
+					data: {
+						pronouns: "they/them",
+						isArchived: true,
+						archivedReason: "a reason",
+					},
+					executedAt: new Date(7),
+				},
+			];
+
+			await putLogs(logs);
+
+			const dbRecords = await env.db.query.members.findMany({
+				where: {
+					userId: env.users.user.id,
+					id: {
+						in: [memberToDelete.createLog.memberId, ...logs.map((log) => log.memberId)],
+					},
+				},
+			});
+			expect(dbRecords.length).toBe(3);
+			for (const record of dbRecords) {
+				const member = members.find((member) => member.createLog.memberId === record.id);
+				expect(member).toBeDefined();
+
+				let expectedData = Object.assign({}, member?.createLog.data);
+				for (const log of logs) {
+					if (log.memberId === member?.createLog.memberId) {
+						expectedData = Object.assign(expectedData, log.data);
+					}
+				}
+				expect(record).toMatchObject(expectedData);
+			}
+		});
+
+		// TODO: server refuses unsorted data (by executedAt) 400
 		// TODO: sending create or update logs at the same time as a delete log for the same record fails 400 (i.e. create, update, update, delete)
 		// TODO: strip update logs compared to more recent update logs
 
