@@ -52,14 +52,14 @@ or ETA
     - [x] create
     - [x] update
     - [x] delete
-  - [ ] server: /push endpoint
+  - [x] server: /push endpoint
     - [x] create
       - [x] basic
       - [x] validation
-    - [ ] update
+    - [x] update
       - [x] basic (add records unedited and always apply changes to model)
       - [x] validation
-      - [ ] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
+      - [x] reduced from existing history (remove fields modified more recently, keep the rest, save and apply to model)
     - [x] delete
       - [x] basic
       - [x] validation

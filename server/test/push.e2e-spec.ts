@@ -465,7 +465,75 @@ describe(pushEndpoint, () => {
 			);
 		});
 
-		// TODO: strip update logs compared to more recent update logs
+		test("PUT reconstruct data correctly when receiving out-of-order sync from previously offline client 200", async () => {
+			const member = await createMember();
+			const client1Logs: ClientLog[] = [
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: member.createLog.memberId,
+					data: {
+						name: "1",
+						pronouns: "1",
+						description: "1",
+						isArchived: true,
+						archivedReason: "1",
+					},
+					executedAt: new Date(1),
+				},
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: member.createLog.memberId,
+					data: {
+						description: "3",
+						archivedReason: "3",
+					},
+					executedAt: new Date(3),
+				},
+			];
+
+			const client2Logs: ClientLog[] = [
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: member.createLog.memberId,
+					data: {
+						pronouns: "2",
+						description: "2",
+						archivedReason: "2",
+					},
+					executedAt: new Date(2),
+				},
+				{
+					id: createId(),
+					operationType: "update",
+					memberId: member.createLog.memberId,
+					data: {
+						archivedReason: "4",
+					},
+					executedAt: new Date(4),
+				},
+			];
+
+			await putLogs(client1Logs);
+			await putLogs(client2Logs);
+
+			const dbRecord = await env.db.query.members.findFirst({
+				where: {
+					userId: env.users.user.id,
+					id: member.createLog.memberId,
+				},
+			});
+			expect(dbRecord).toBeDefined();
+			expect(dbRecord).toMatchObject({
+				name: "1",
+				pronouns: "2",
+				description: "3",
+				isArchived: true,
+				archivedReason: "4",
+			});
+		});
 
 		// TODO@pull: /pull only returns create logs on initial sync (no timestamp provided)
 	});

@@ -158,8 +158,25 @@ export class SyncService {
 				}
 				throw new BadRequestException(`Unknown log type`);
 			});
+		const recordsToUpdateIds = [
+			...new Set(
+				logsToSave
+					.filter((log) => log.operationType === "update")
+					.map((log) => log.memberId as string),
+			),
+		];
+		const existingUpdateLogs: Log[] = await tx.query.logs.findMany({
+			where: {
+				userId,
+				operationType: "update",
+				memberId: {
+					in: recordsToUpdateIds,
+				},
+			},
+		});
 
 		for (const model of Object.values(syncedModels)) {
+			// Skip update and delete logs for already deleted records
 			const recordIdsToUpdateOrDelete = logsToSave
 				.filter(
 					(log) =>
@@ -195,7 +212,64 @@ export class SyncService {
 				});
 				outputLogs.push(...alreadyDeletedRecordsLogs);
 			}
+
+			// Resolve update logs conflicts
+			const mergedHistory: {
+				logToSave?: LogToSave<UpdateOperation>;
+				dbLog?: Log;
+				recordId: string;
+				data: Record<string, unknown>;
+				executedAt: Date;
+			}[] = [
+				...logsToSave
+					.filter((log) => log.operationType === "update")
+					.map((log) => {
+						const inferredLog = log as LogToSave<UpdateOperation>;
+						return {
+							logToSave: inferredLog,
+							recordId: inferredLog[model.modelIdLogKey],
+							data: inferredLog.data as unknown as Record<string, unknown>,
+							executedAt: log.executedAt,
+						};
+					}),
+				...existingUpdateLogs.map((log) => ({
+					dbLog: log,
+					recordId: log[model.modelIdLogKey] as string,
+					data: log.data as Record<string, unknown>,
+					executedAt: log.executedAt,
+				})),
+			].sort((step1, step2) => step2.executedAt.getTime() - step1.executedAt.getTime());
+			const dataTrackers: Record<
+				string,
+				{
+					data: Record<string, unknown>;
+				}
+			> = {};
+			for (const step of mergedHistory) {
+				let dataTracker = dataTrackers[step.recordId];
+				if (!dataTracker) {
+					dataTrackers[step.recordId] = dataTracker = {
+						data: {},
+					};
+				}
+				for (const key of Object.keys(step.data)) {
+					if (step.data[key] === undefined) {
+						delete step.data[key];
+					}
+				}
+				for (const key of Object.keys(dataTracker.data)) {
+					delete step.data[key];
+				}
+				dataTracker.data = Object.assign({ ...step.data }, dataTracker.data);
+			}
 		}
+
+		// Remove empty update logs
+		logsToSave = logsToSave.filter(
+			(log) =>
+				log.operationType !== "update" ||
+				Object.keys((log as LogToSave<UpdateOperation>).data).length > 0,
+		);
 
 		const recordsToCreate: RecordsToCreate = {};
 		for (const log of logsToSave.filter((log) => log.operationType === "create")) {
@@ -290,6 +364,7 @@ export class SyncService {
 					}
 				}
 
+				const recordToUpdateIds = [...new Set(updateData.map((data) => data.id))];
 				const updatedRecords = await tx
 					.update(model.table)
 					.set(
@@ -310,15 +385,12 @@ export class SyncService {
 					.where(
 						and(
 							eq(model.table.userId, userId),
-							inArray(
-								model.table.id,
-								updateData.map((data) => data.id),
-							),
+							inArray(model.table.id, recordToUpdateIds),
 						),
 					)
 					.returning();
 
-				if (updatedRecords.length !== updateData.length) {
+				if (updatedRecords.length !== recordToUpdateIds.length) {
 					throw new NotFoundException(`Some ${model.name} were not found`);
 				}
 			}
