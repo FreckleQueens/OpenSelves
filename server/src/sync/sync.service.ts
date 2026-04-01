@@ -5,6 +5,7 @@ import {
 	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
+import { createId } from "@paralleldrive/cuid2";
 import { DrizzleQueryError, SQL, and, eq, inArray, sql } from "drizzle-orm";
 import { PgAsyncTransaction } from "drizzle-orm/pg-core";
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
@@ -12,6 +13,7 @@ import {
 	type Log,
 	type Member,
 	type MemberCreate,
+	type User,
 	logs,
 	members,
 	models,
@@ -75,8 +77,6 @@ export class SyncService {
 	constructor(@InjectDb() private readonly db: DB) {}
 
 	public async reduceAndSaveLogs(userId: string, logDtos: PushLogDto[]): Promise<void> {
-		const pushedAt = new Date();
-
 		try {
 			await this.db.transaction(async (tx) => {
 				const alreadyPushedLogs: Log[] = await tx.query.logs.findMany({
@@ -99,7 +99,13 @@ export class SyncService {
 
 				const savedLogs = await tx
 					.insert(logs)
-					.values(logsToSave.map((log) => ({ ...log, userId, pushedAt })))
+					.values(
+						logsToSave.map((log) => ({
+							...log,
+							userId,
+							pushedAt: sql`CURRENT_TIMESTAMP`,
+						})),
+					)
 					.returning();
 
 				if (savedLogs.length !== logsToSave.length) {
@@ -437,5 +443,95 @@ export class SyncService {
 				}
 			}
 		}
+	}
+
+	public async generateInitialSync(userId: User["id"]): Promise<{
+		timestamp: number;
+		logs: Log[];
+	}> {
+		const user = await this.db.query.users.findFirst({
+			where: {
+				id: userId,
+			},
+			with: {
+				members: true,
+			},
+			extras: {
+				queryTime: sql`CURRENT_TIMESTAMP`,
+			},
+		});
+		if (!user) {
+			throw new InternalServerErrorException("User couldn't be retrieved from db");
+		}
+		if (typeof user.queryTime !== "string") {
+			throw new InternalServerErrorException(
+				"DB responded with invalid or missing queryTime",
+			);
+		}
+
+		const logs: Log[] = [];
+
+		const returnedTimestamp = new Date(user.queryTime);
+		logs.push(
+			...user.members.map((member) => {
+				const { id, userId, ...memberData } = member;
+				const log: Log = {
+					id: createId(),
+					userId: user.id,
+					memberId: member.id,
+					operationType: "create",
+					data: memberData,
+					deletedId: null,
+					executedAt: returnedTimestamp,
+					pushedAt: returnedTimestamp,
+				};
+				return log;
+			}),
+		);
+
+		return {
+			timestamp: returnedTimestamp.getTime(),
+			logs,
+		};
+	}
+
+	async getLogsFrom(
+		userId: User["id"],
+		timestamp: number,
+	): Promise<{
+		timestamp: number;
+		logs: Log[];
+	}> {
+		const logs = await this.db.query.logs.findMany({
+			where: {
+				userId,
+				pushedAt: {
+					gt: new Date(timestamp),
+				},
+			},
+			orderBy: {
+				pushedAt: "asc",
+			},
+			extras: {
+				queryTime: sql`CURRENT_TIMESTAMP`,
+			},
+		});
+		let returnedTimestamp = timestamp;
+		if (logs.length > 0) {
+			const queryTime = logs[logs.length - 1].queryTime;
+			if (typeof queryTime !== "string") {
+				throw new InternalServerErrorException(
+					"DB responded with invalid or missing queryTime",
+				);
+			}
+			returnedTimestamp = new Date(queryTime).getTime();
+		}
+		return {
+			timestamp: returnedTimestamp,
+			logs: logs.map((log) => {
+				const { queryTime, ...newLog } = log;
+				return newLog;
+			}),
+		};
 	}
 }

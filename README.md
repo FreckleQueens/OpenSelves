@@ -64,12 +64,10 @@ or ETA
       - [x] basic
       - [x] validation
     - [x] refactor service method
+  - [x] /pull endpoint
+    - [x] return create operations for all records of all models when client provides no timestamp
+    - [x] cursor (return all records after requested timestamp, return timestamp)
   - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
-  - [ ] /pull endpoint
-    - [ ] basic (return all records)
-    - [ ] cursor (return all records after client-provided pushedAt date)
-    - [ ] pagination (return records by batch)
-    - [ ] return create operations for all records of all models when client provides no record id
   - [ ] client: pull once push is complete
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
@@ -116,6 +114,8 @@ or ETA
     - [ ] purge logs that don't have an effect anymore (where pushedAt is not null)
   - [ ] server
     - [ ] purge logs that don't have an effect anymore
+    - [ ] /sync/pull batch (limit 500?, return last pushedAt timestamp)
+    - [ ] /sync/push batch (limit 50?)
 
 ### 1.0.0
 - [ ] email verification

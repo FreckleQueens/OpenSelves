@@ -9,12 +9,15 @@ import {
 	Req,
 } from "@nestjs/common";
 import type { Request } from "express";
-import { type Log, logs } from "openselves-common/db";
+import { type Log } from "openselves-common/db";
 
 import { InjectDb } from "../db/db.service.js";
 import type { DB } from "../db/drizzle.js";
+import { PullDto } from "./data/pull.dto.js";
 import { PushDto } from "./data/push.dto.js";
 import { SyncService } from "./sync.service.js";
+
+export type ClientLog = Omit<Log, "userId" | "deletedId">;
 
 @Controller("sync")
 export class SyncController {
@@ -49,20 +52,41 @@ export class SyncController {
 
 	@Post("pull")
 	@HttpCode(HttpStatus.OK)
-	public async pull() {
+	public async pull(@Body() pullDto: PullDto, @Req() request: Request) {
+		const userId = request.accessTokenPayload.user.id;
+
+		let timestamp: number = 0;
+		let logs: Log[] = [];
+		if (pullDto.timestamp === "init") {
+			const initialSync = await this.syncService.generateInitialSync(userId);
+			timestamp = initialSync.timestamp;
+			logs = initialSync.logs;
+		} else {
+			if (pullDto.timestamp < 0) {
+				throw new BadRequestException("Invalid timestamp");
+			}
+			if (pullDto.timestamp > Date.now()) {
+				throw new BadRequestException("timestamp is in the future");
+			}
+
+			const syncFrom = await this.syncService.getLogsFrom(userId, pullDto.timestamp);
+			timestamp = syncFrom.timestamp;
+			logs = syncFrom.logs;
+		}
+
 		return {
-			logs: this.formatOutputLogs(await this.db.select().from(logs)),
+			timestamp,
+			logs: this.formatOutputLogs(logs),
 		};
 	}
 
-	private formatOutputLogs(rawLogs: Log[]) {
+	private formatOutputLogs(rawLogs: Log[]): ClientLog[] {
 		return rawLogs.map((log) => {
+			const { userId, deletedId, ...newLog } = log;
 			if (log.operationType === "delete") {
-				const { deletedId, ...newLog } = log;
 				newLog.memberId = (deletedId as string).split(".")[1];
-				return newLog;
 			}
-			return log;
+			return newLog;
 		});
 	}
 }

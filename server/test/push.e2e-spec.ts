@@ -85,15 +85,22 @@ describe(pushEndpoint, () => {
 		expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
 	}
 
-	async function checkLogIsServed(logToCheck: Record<string, unknown>) {
+	async function getSyncFrom(timestamp: number | "init", cookies: string = env.users.cookies) {
 		const response = await request(env.server)
 			.post(pullEndpoint)
-			.send({})
-			.set("Cookie", env.users.cookies)
+			.send({
+				timestamp: timestamp,
+			})
+			.set("Cookie", cookies)
 			.expect(200)
 			.expect("Content-Type", /json/);
 		expect(response.body.logs).toBeInstanceOf(Array);
 		expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+		return response;
+	}
+
+	async function checkLogIsServed(logToCheck: Record<string, unknown>) {
+		const response = await getSyncFrom(0);
 		const pulledLogs = response.body.logs as Array<unknown>;
 		const pulledLog = pulledLogs.find(
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
@@ -257,16 +264,13 @@ describe(pushEndpoint, () => {
 
 				await checkLogIsServed(updateLog);
 
-				const dbRecord = await env.db.query.members.findFirst({
-					where: {
-						userId: env.users.user.id,
-						id: createLog.memberId,
-					},
-				});
-
-				// TODO@pull: check for create logs on /sync/pull instead
-				expect(dbRecord).toBeDefined();
-				expect(dbRecord).toMatchObject(updateLog.data as Record<string, unknown>);
+				const response = await getSyncFrom("init");
+				expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+				const memberLog = (response.body.logs as Array<Log>).find(
+					(log) => log.operationType === "create" && log.memberId === createLog.memberId,
+				);
+				expect(memberLog).toBeDefined();
+				expect(memberLog?.data).toMatchObject(updateLog.data as Record<string, unknown>);
 			});
 
 			test("empty update data 400", async () => {
@@ -556,7 +560,5 @@ describe(pushEndpoint, () => {
 				await verifyLogMatrixResult(member);
 			}
 		});
-
-		// TODO@pull: /pull only returns create logs on initial sync (no timestamp provided)
 	});
 });
