@@ -6,7 +6,7 @@
 	"license": "AGPL-3.0-only",
 	"type": "module",
 	"scripts": {
-		"build": "nest build",
+		"build": "nest build && cp package.json dist/package.json && cp ../yarn.lock dist/yarn.lock && sed -i '/\"openselves-common\": \"workspace:^\"/c\\\"openselves-common\": \"../../common\",' dist/package.json && cp drizzle.config.ts dist/drizzle.config.ts && cp -r drizzle dist/drizzle",
 		"format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
 		"start": "nest start",
 		"start:dev": "nest start --watch",

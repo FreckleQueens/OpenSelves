@@ -53,6 +53,9 @@ jobs:
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: notarealpassword
 
+      - name: Install server dependencies
+        run: cd server/dist && yarn install --no-immutable
+
       - name: Copy files to VPS
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_KEY }}
