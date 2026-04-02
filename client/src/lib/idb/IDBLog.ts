@@ -5,7 +5,8 @@ import type { PartialBy } from "openselves-common";
 import { type Log, logs } from "openselves-common/db";
 
 export type ClientLog = PartialBy<Log, "pushedAt">;
-export class IDBLog extends IDBModel<ClientLog, "id", string> {
+
+export class IDBLog extends IDBModel<ClientLog> {
 	public constructor(idb: IDB) {
 		super(idb, "logs", "id");
 	}
@@ -16,6 +17,7 @@ export class IDBLog extends IDBModel<ClientLog, "id", string> {
 
 	protected getDrizzleModel(): Record<keyof ClientLog, unknown> {
 		const clientLogs: Record<keyof ClientLog, unknown> = { ...logs };
+		delete clientLogs.deletedId;
 		clientLogs.pushedAt = { ...logs.pushedAt, notNull: false };
 		return clientLogs;
 	}

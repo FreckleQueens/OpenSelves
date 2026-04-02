@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import AppPage from "$lib/AppPage.svelte";
-	import { IDB } from "$lib/idb";
+	import { IDB, type OmitServerFields } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import {
@@ -27,18 +27,16 @@
 
 	const { params }: PageProps = $props();
 
-	let member: Member = $state({
+	type MemberData = OmitServerFields<Omit<Member, "userId">>;
+	let member: MemberData = $state({
 		id: "",
-		userId: "",
 		name: "",
 		pronouns: "",
 		description: "",
-		createdAt: new Date(),
-		updatedAt: new Date(),
 		isArchived: false,
 		archivedReason: null,
 	});
-	let originalMember: Member | null = $state(null);
+	let originalMember: MemberData | null = $state(null);
 
 	let mounted = $state(false);
 	onMount(async () => {
@@ -81,9 +79,8 @@
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
 		const idb = await IDB.getClient();
-		member = await idb.member.save({
+		member = await idb.member.save(userId, {
 			...member,
-			userId,
 		});
 
 		await goto(resolve("/members"));
@@ -110,8 +107,10 @@
 	let openDeleteMemberDialog = $state(false);
 
 	async function deleteMember() {
+		const storage = await Storage.getStorage();
+		const userId = storage.getKey();
 		const idb = await IDB.getClient();
-		await idb.member.delete(member.id);
+		await idb.member.delete(userId, [member.id]);
 		await goto(resolve("/members"));
 	}
 </script>

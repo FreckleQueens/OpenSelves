@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { syncWorkerState } from "$lib/idb/syncWorkerState.svelte";
 	import { MenuItem } from "$lib/index";
 	import Icon from "@iconify/svelte";
 	import {
@@ -64,6 +65,7 @@
 				/>
 			{/snippet}
 		</MenuListItem>
+		{syncWorkerState.error}
 	</MenuList>
 </Panel>
 

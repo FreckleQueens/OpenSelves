@@ -1,20 +1,17 @@
-import { IDB, type ModelBase } from "$lib/idb/idb";
+import { SyncWorker } from "$lib/idb/SyncWorker";
+import { IDB, IDBTransactionWrapper, type ModelBase, type OmitServerFields } from "$lib/idb/idb";
 import { createId } from "@paralleldrive/cuid2";
 import type { Column } from "drizzle-orm";
-import type { PartialBy } from "openselves-common";
 import type { Log } from "openselves-common/db";
 
-export type OmitServerFields<Model> = Omit<Model, "userId" | "createdAt" | "updatedAt">;
-
 export abstract class IDBModel<
-	Model extends ModelBase & Record<PrimaryKey, PrimaryKeyValue>,
-	PrimaryKey extends keyof Model & string,
-	PrimaryKeyValue extends Model[PrimaryKey] & string,
+	Model extends ModelBase<Model>,
+	ModelWithoutUserId extends Omit<ModelBase<Model>, "userId"> = Omit<ModelBase<Model>, "userId">,
 > {
 	protected constructor(
 		private readonly idb: IDB,
 		public readonly storeName: string,
-		public readonly primaryKey: PrimaryKey,
+		public readonly primaryKey: string,
 	) {}
 
 	public async getById(id: string): Promise<Model> {
@@ -28,8 +25,10 @@ export abstract class IDBModel<
 		return record;
 	}
 
-	public async getAll(): Promise<Model[]> {
-		const records = await this.idb.getAll(this.storeName);
+	public async getAll(userId: string): Promise<Model[]> {
+		const records = (await this.idb.getAll(this.storeName)).filter(
+			(record) => record.userId === userId,
+		);
 		if (!this.matchesModelArray(records)) {
 			throw new Error(`Stored data doesn't match model for ${this.storeName}`);
 		}
@@ -47,70 +46,127 @@ export abstract class IDBModel<
 		return records;
 	}
 
-	public async save(record: PartialBy<Model, PrimaryKey>): Promise<Model> {
-		let operationType: Log["operationType"] = "update";
-		if (!record[this.primaryKey]) {
-			operationType = "create";
-			record = {
-				...record,
-				[this.primaryKey]: this.generateUniquePrimaryKey(),
-			};
-		}
+	public async save(
+		userId: string,
+		record: Partial<ModelWithoutUserId>,
+		logOperation: boolean = true,
+	): Promise<Model> {
+		const operationType: Log["operationType"] = record.id ? "update" : "create";
 
-		if (!this.matchesModel(record)) {
+		const finalRecord = {
+			...record,
+			userId,
+			id: record.id || this.generateUniquePrimaryKey(),
+		};
+		if (!this.matchesModel(finalRecord)) {
 			throw new Error(
 				`Tried to save invalid record for ${this.storeName}: ${JSON.stringify(record)}`,
 			);
 		}
 
 		await this.idb.transaction(["logs", this.storeName], async (transaction) => {
-			// Log operation
-			const logIdKey = this.getLogIdKey();
-			if (logIdKey) {
-				await transaction.put("logs", {
-					id: createId(),
-					[logIdKey]: record[this.primaryKey],
-					operationType: operationType,
-					data: JSON.stringify(record),
-					executedAt: new Date(),
-				});
+			if (logOperation) {
+				// Get original record
+				let recordForLog: Partial<Model> = finalRecord;
+				if (record.id) {
+					const originalRecord = await transaction.get(this.storeName, finalRecord.id);
+					if (originalRecord) {
+						recordForLog = {};
+						for (const [key, val] of Object.entries(finalRecord)) {
+							if (val !== originalRecord[key]) {
+								recordForLog[key] = val;
+							}
+						}
+					}
+				}
+
+				// Log operation
+				await this.logOperation(
+					userId,
+					finalRecord[this.primaryKey],
+					recordForLog,
+					operationType,
+					transaction,
+				);
 			}
 
 			// Save record
-			await transaction.put(this.storeName, record);
+			await transaction.put(this.storeName, finalRecord);
 		});
 
-		return record;
+		if (logOperation) {
+			SyncWorker.getInstance().setDirty();
+		}
+
+		return finalRecord;
 	}
 
-	public async delete(recordId: PrimaryKeyValue): Promise<void> {
+	public async delete(
+		userId: string,
+		recordIds: string[],
+		logOperation: boolean = true,
+	): Promise<void> {
 		await this.idb.transaction(["logs", this.storeName], async (transaction) => {
-			// Log operation
-			const logIdKey = this.getLogIdKey();
-			if (logIdKey) {
-				await transaction.put("logs", {
-					id: createId(),
-					[logIdKey]: recordId,
-					operationType: "delete",
-					data: null,
-					executedAt: new Date(),
-				});
-			}
+			for (const recordId of recordIds) {
+				if (logOperation && this.storeName !== "logs") {
+					// Log operation
+					await this.logOperation(userId, recordId, null, "delete", transaction);
+				}
 
-			// Delete record
-			await transaction.delete(this.storeName, recordId);
+				// Delete record
+				await transaction.delete(this.storeName, recordId);
+			}
 		});
+
+		if (logOperation) {
+			SyncWorker.getInstance().setDirty();
+		}
 	}
 
-	protected abstract generateUniquePrimaryKey(): PrimaryKeyValue;
+	private async logOperation(
+		userId: string,
+		recordId: string,
+		recordData: Partial<Model> | null,
+		operationType: "create" | "update" | "delete",
+		transaction: IDBTransactionWrapper<string>,
+	) {
+		const logIdKey = this.getLogIdKey();
+		if (logIdKey) {
+			let recordDataForLog: Partial<Model> | null = null;
+			if (recordData) {
+				recordDataForLog = { ...recordData };
+				delete recordDataForLog.userId;
+				delete recordDataForLog.id;
+			}
+			const log = {
+				userId,
+				id: createId(),
+				[logIdKey]: recordId,
+				operationType: operationType,
+				data: recordDataForLog === null ? null : JSON.stringify(recordDataForLog),
+				executedAt: new Date(),
+				pushedAt: null,
+			};
+			console.log(log);
+			if (!this.idb.log.matchesModel(log)) {
+				throw new Error("Log data doesn't match model");
+			}
+			await transaction.put("logs", log);
+		}
+	}
+
+	protected abstract generateUniquePrimaryKey(): string;
 	protected abstract getDrizzleModel(): Record<keyof OmitServerFields<Model>, unknown>;
 	protected abstract getLogIdKey(): (keyof Log & string & "memberId") | null;
 
-	private matchesModel(record: ModelBase): record is Model {
+	private matchesModel<M>(record: Partial<ModelBase<M>>): record is Model {
+		const keys: string[] = [];
 		for (const [key, column] of Object.entries(this.getDrizzleModel())) {
 			if (!this.isColumn(column)) {
 				continue;
 			}
+
+			keys.push(key);
 
 			if (!(key in record)) {
 				console.log(key, record[key], column);
@@ -126,16 +182,46 @@ export abstract class IDBModel<
 				continue;
 			}
 
+			if (column.dataType === "string enum") {
+				if (typeof record[key] === "string" && column.enumValues?.includes(record[key])) {
+					continue;
+				} else {
+					console.log(key, record[key], column);
+					return false;
+				}
+			}
+
+			if (column.dataType === "object json") {
+				if (typeof record[key] === "string") {
+					try {
+						JSON.parse(record[key]);
+					} catch {
+						console.log(key, record[key], column);
+						return false;
+					}
+					continue;
+				} else {
+					console.log(key, record[key], column);
+					return false;
+				}
+			}
+
 			if (record[key] !== null && typeof record[key] !== column.dataType) {
 				console.log(key, record[key], column);
 				return false;
 			}
 		}
 
+		const extraKey = Object.keys(record).find((key) => !keys.includes(key));
+		if (extraKey) {
+			console.log(extraKey, "in", record);
+			return false;
+		}
+
 		return true;
 	}
 
-	private matchesModelArray(records: ModelBase[]): records is Model[] {
+	private matchesModelArray<M>(records: ModelBase<M>[]): records is Model[] {
 		for (const record of records) {
 			if (!this.matchesModel(record)) {
 				throw new Error(`Stored data doesn't match model for ${this.storeName}`);

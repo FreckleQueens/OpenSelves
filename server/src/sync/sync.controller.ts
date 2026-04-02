@@ -86,6 +86,10 @@ export class SyncController {
 			if (log.operationType === "delete") {
 				newLog.memberId = (deletedId as string).split(".")[1];
 			}
+			const data = { ...(newLog.data as Record<string, unknown>) };
+			delete data["createdAt"];
+			delete data["updatedAt"];
+			newLog.data = data;
 			return newLog;
 		});
 	}

@@ -67,8 +67,10 @@ or ETA
   - [x] /pull endpoint
     - [x] return create operations for all records of all models when client provides no timestamp
     - [x] cursor (return all records after requested timestamp, return timestamp)
-  - [ ] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
-  - [ ] client: pull once push is complete
+  - [x] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
+  - [x] client: pull once push is complete
+  - [ ] client: pull regularly
+  - [ ] client: refactor
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
@@ -112,6 +114,8 @@ or ETA
   - [ ] client
     - [ ] drop prior unsynced create and update operations when deleting a record
     - [ ] purge logs that don't have an effect anymore (where pushedAt is not null)
+    - [ ] leverage @capacitor/background-runner
+    - [ ] leverage Background Sync API when available
   - [ ] server
     - [ ] purge logs that don't have an effect anymore
     - [ ] /sync/pull batch (limit 500?, return last pushedAt timestamp)
