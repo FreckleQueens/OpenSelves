@@ -8851,7 +8851,7 @@ __metadata:
     globals: "npm:^17.3.0"
     idb: "npm:^8.0.3"
     konsta: "npm:^5.0.7"
-    openselves-common: ../common
+    openselves-common: "workspace:^"
     playwright: "npm:^1.58.2"
     prettier: "npm:^3.8.1"
     prettier-plugin-svelte: "npm:^3.4.1"
@@ -8868,27 +8868,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"openselves-common@file:../common::locator=openselves-client%40workspace%3Aclient":
-  version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=25a8db&locator=openselves-client%40workspace%3Aclient"
-  dependencies:
-    "@paralleldrive/cuid2": "npm:^3.3.0"
-    drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/db67a2ff654a4798335cc94b0612034efd617de83cbe244142261fccc376b6490b0a3a75b4be7c2ce1562f9fdd0ee73138533f3e09ef08977d30b38b7698be53
-  languageName: node
-  linkType: hard
-
-"openselves-common@file:../common::locator=openselves-server%40workspace%3Aserver":
-  version: 0.0.0
-  resolution: "openselves-common@file:../common#../common::hash=25a8db&locator=openselves-server%40workspace%3Aserver"
-  dependencies:
-    "@paralleldrive/cuid2": "npm:^3.3.0"
-    drizzle-orm: "npm:1.0.0-beta.19"
-  checksum: 10c0/db67a2ff654a4798335cc94b0612034efd617de83cbe244142261fccc376b6490b0a3a75b4be7c2ce1562f9fdd0ee73138533f3e09ef08977d30b38b7698be53
-  languageName: node
-  linkType: hard
-
-"openselves-common@workspace:common":
+"openselves-common@workspace:^, openselves-common@workspace:common":
   version: 0.0.0-use.local
   resolution: "openselves-common@workspace:common"
   dependencies:
@@ -8943,7 +8923,7 @@ __metadata:
     globals: "npm:^16.0.0"
     jest: "npm:^30.0.0"
     joi: "npm:^18.0.2"
-    openselves-common: ../common
+    openselves-common: "workspace:^"
     postgres: "npm:^3.4.8"
     prettier: "npm:^3.4.2"
     reflect-metadata: "npm:^0.2.2"

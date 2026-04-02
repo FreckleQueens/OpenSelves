@@ -1,6 +1,5 @@
 {
 	"name": "openselves-server",
-	"version": "0.0.1",
 	"description": "",
 	"author": "",
 	"private": true,
@@ -41,7 +40,7 @@
 		"cookie-parser": "^1.4.7",
 		"drizzle-orm": "1.0.0-beta.19",
 		"joi": "^18.0.2",
-		"openselves-common": "../common",
+		"openselves-common": "workspace:^",
 		"postgres": "^3.4.8",
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.1"

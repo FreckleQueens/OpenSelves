@@ -1,5 +1,6 @@
 {
 	"name": "openselves",
+	"version": "0.0.1",
 	"scripts": {
 		"dev": "concurrently --kill-others \"cd client && yarn dev\" \"cd server && yarn dev\"",
 		"ci:build": "cd common && yarn ci:build && cd ../client && ci:build && cd ../server && yarn ci:build",
