@@ -46,7 +46,7 @@ or ETA
   - [x] show member
   - [x] edit member
   - [x] delete member
-- [ ] sync engine
+- [x] sync engine
   - [x] logs (Log) table (table, id, type (create,update,delete), data, executedAt, pushedAt)
   - [x] client: add Log when operation with pushedAt=null
     - [x] create
@@ -70,13 +70,12 @@ or ETA
   - [x] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [x] client: pull once push is complete
   - [x] client: pull regularly
-  - [ ] client: refactor
   - [x] client: update member list when syncing
   - [x] client: optionally pause or resume syncing on navigation with AppPage prop (default is do nothing)
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
-- [ ] client: make server url openselves.org in production
+- [x] client: make server url openselves.org in production
 - [ ] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0

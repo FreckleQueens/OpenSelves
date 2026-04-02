@@ -1,11 +1,12 @@
 // place files you want to import through the `$lib` alias in this folder.
+import { dev } from "$app/environment";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { Storage } from "$lib/storage";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
-export const SERVER_URL = "http://127.0.0.1:3000";
+export const SERVER_URL = dev ? "http://127.0.0.1:3000" : "https://api.openselves.org";
 
 export type AuthFormData = {
 	name: string;
