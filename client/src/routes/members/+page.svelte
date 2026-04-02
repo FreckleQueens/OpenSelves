@@ -4,25 +4,27 @@
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/AppPage.svelte";
 	import { IDB } from "$lib/idb";
+	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
 	import { onDestroy, onMount } from "svelte";
-	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 
 	let members: Member[] = $state([]);
 	let showArchivedMembers = $state(false);
 	let shownMembers: Member[] = $derived(
-		members.filter((member) => showArchivedMembers || !member.isArchived).sort((a, b) => {
-			if (a.name < b.name) {
-				return -1;
-			}
-			if (a.name > b.name) {
-				return 1;
-			}
-			return 0;
-		}),
+		members
+			.filter((member) => showArchivedMembers || !member.isArchived)
+			.sort((a, b) => {
+				if (a.name < b.name) {
+					return -1;
+				}
+				if (a.name > b.name) {
+					return 1;
+				}
+				return 0;
+			}),
 	);
 	let showFilterDialog: boolean = $state(false);
 
@@ -33,9 +35,9 @@
 
 		const userId = storage.getKey();
 		const idb = await IDB.getClient();
-		membersSubscription = idb.member.subscribe(event => {
+		membersSubscription = idb.member.subscribe((event) => {
 			for (const member of event.savedRecords) {
-				const index = members.findIndex(localMember => localMember.id === member.id);
+				const index = members.findIndex((localMember) => localMember.id === member.id);
 				if (index >= 0) {
 					members[index] = member;
 				} else {
@@ -44,7 +46,7 @@
 			}
 
 			for (const id of event.deletedRecordIds) {
-				const index = members.findIndex(localMember => localMember.id === id);
+				const index = members.findIndex((localMember) => localMember.id === id);
 				if (index >= 0) {
 					members.splice(index, 1);
 				}
@@ -56,7 +58,7 @@
 	onDestroy(async () => {
 		const idb = await IDB.getClient();
 		idb.member.unsubscribe(membersSubscription);
-	})
+	});
 
 	async function addMemberButtonOnClick() {
 		await goto(resolve("/members/edit/"));

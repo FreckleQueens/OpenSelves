@@ -55,8 +55,8 @@ export class SyncController {
 	public async pull(@Body() pullDto: PullDto, @Req() request: Request) {
 		const userId = request.accessTokenPayload.user.id;
 
-		let timestamp: number = 0;
-		let logs: Log[] = [];
+		let timestamp: number;
+		let logs: Log[];
 		if (pullDto.timestamp === "init") {
 			const initialSync = await this.syncService.generateInitialSync(userId);
 			timestamp = initialSync.timestamp;

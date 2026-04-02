@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 	import { MenuItem } from "$lib/index";
 	import Icon from "@iconify/svelte";
 	import {
@@ -11,7 +12,6 @@
 		Preloader,
 		useTheme,
 	} from "konsta/svelte";
-	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 
 	let openMenu = $state(false);
 	let syncWorkerError: unknown = $derived(SyncWorker.getInstance().error);
@@ -52,7 +52,7 @@
 <div class="sync">
 	{#if syncWorkerError}
 		<Block class="text-brand-red">
-			Synchronization error:<br>
+			Synchronization error:<br />
 			{syncWorkerError}
 		</Block>
 	{/if}

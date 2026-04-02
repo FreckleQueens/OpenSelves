@@ -5,6 +5,7 @@
 	import AppPage from "$lib/AppPage.svelte";
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
+	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import {
@@ -18,7 +19,6 @@
 	} from "konsta/svelte";
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
-	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 
 	const forms: Record<string, AuthFormData> = $state({
 		login: {
