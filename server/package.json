@@ -24,7 +24,8 @@
 		"db:migrate:test": "yarn drizzle-kit migrate --config ./drizzle-test.config.ts",
 		"dev": "yarn build && yarn start:dev",
 		"dev:seed": "yarn build && node ./dist/auth/db/seed.js",
-		"package": "yarn build && node --build-sea sea-config.json"
+		"package": "yarn build && node --build-sea sea-config.json",
+		"ci:build": "yarn lint && yarn build"
 	},
 	"packageManager": "yarn@4.13.0",
 	"dependencies": {

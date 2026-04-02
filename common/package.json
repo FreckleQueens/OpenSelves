@@ -4,7 +4,8 @@
 	"scripts": {
 		"build": "yarn tsc",
 		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+		"ci:build": "yarn lint && yarn build && yarn install"
 	},
 	"main": "./dist/index.js",
 	"type": "module",
