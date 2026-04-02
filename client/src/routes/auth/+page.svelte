@@ -33,7 +33,7 @@
 				}
 				const storage = await Storage.getStorage();
 				await storage.setKey(`${result.userId}`);
-				SyncWorker.getInstance().setHasPushBacklog();
+				SyncWorker.getInstance().resume();
 				await goto(resolve("/"));
 			},
 		},
