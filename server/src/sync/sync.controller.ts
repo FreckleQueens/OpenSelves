@@ -17,7 +17,7 @@ import { PullDto } from "./data/pull.dto.js";
 import { PushDto } from "./data/push.dto.js";
 import { SyncService } from "./sync.service.js";
 
-export type ClientLog = Omit<Log, "userId" | "deletedId">;
+export type ClientLog = Omit<Log, "userId" | "deletedId" | "pushedAt">;
 
 @Controller("sync")
 export class SyncController {
@@ -82,14 +82,10 @@ export class SyncController {
 
 	private formatOutputLogs(rawLogs: Log[]): ClientLog[] {
 		return rawLogs.map((log) => {
-			const { userId, deletedId, ...newLog } = log;
+			const { userId, deletedId, pushedAt, ...newLog } = log;
 			if (log.operationType === "delete") {
 				newLog.memberId = (deletedId as string).split(".")[1];
 			}
-			const data = { ...(newLog.data as Record<string, unknown>) };
-			delete data["createdAt"];
-			delete data["updatedAt"];
-			newLog.data = data;
 			return newLog;
 		});
 	}

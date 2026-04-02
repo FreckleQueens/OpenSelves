@@ -69,8 +69,10 @@ or ETA
     - [x] cursor (return all records after requested timestamp, return timestamp)
   - [x] client: flush logs table to /push (records where pushedAt is null, set pushedAt on server confirmation)
   - [x] client: pull once push is complete
-  - [ ] client: pull regularly
+  - [x] client: pull regularly
   - [ ] client: refactor
+  - [ ] client: update member list when syncing
+  - [ ] client: optionally pause or resume syncing on navigation with AppPage prop (default is do nothing)
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
@@ -79,6 +81,9 @@ or ETA
 
 ### 0.2.0
 - [ ] linting (git hooks)
+- [ ] client: logger
+- [ ] client: graceful error handling
+- [ ] server: logger?
 - [ ] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
 -> max-width=9/16 * 100vh? (56.25vh)
 - [ ] contribution CI (test and build on every commit and PRs)

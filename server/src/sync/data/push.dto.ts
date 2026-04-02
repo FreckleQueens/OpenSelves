@@ -15,7 +15,7 @@ import type { Log, Member } from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
-type OmitBaseFields<K> = Omit<K, "id" | "userId" | "createdAt" | "updatedAt">;
+type OmitBaseFields<K> = Omit<K, "id" | "userId">;
 
 class PushRecordDto {
 	@IsIn([undefined])
@@ -23,12 +23,6 @@ class PushRecordDto {
 
 	@IsIn([undefined])
 	public readonly userId!: undefined;
-
-	@IsIn([undefined])
-	public readonly createdAt!: undefined;
-
-	@IsIn([undefined])
-	public readonly updatedAt!: undefined;
 }
 
 export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields<Member> {
@@ -47,6 +41,12 @@ export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason!: string | null;
+
+	@IsDate()
+	public readonly createdAt!: Date;
+
+	@IsDate()
+	public readonly updatedAt!: Date;
 }
 
 export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBaseFields<Member>> {
@@ -56,11 +56,17 @@ export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBa
 	@ValidateIf((object) => {
 		const obj = object as unknown;
 		if (!obj || typeof obj !== "object") return true;
-		return !["name", "pronouns", "description", "isArchived", "archivedReason"].find(
-			(field) => {
-				return typeof obj[field] !== "undefined";
-			},
-		);
+		return ![
+			"name",
+			"pronouns",
+			"description",
+			"isArchived",
+			"archivedReason",
+			"createdAt",
+			"updatedAt",
+		].find((field) => {
+			return typeof obj[field] !== "undefined";
+		});
 	})
 	public readonly _atLeastOneFieldIsRequired!: undefined;
 
@@ -84,6 +90,14 @@ export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBa
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason?: string | null;
+
+	@IsOptional()
+	@IsDate()
+	public readonly createdAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	public readonly updatedAt?: Date;
 }
 
 export type CreateOperation = {
@@ -114,7 +128,7 @@ export class PushLogDto<Op extends OperationType = OperationType> implements Omi
 	public readonly id!: string;
 
 	@IsCuid2()
-	public readonly memberId!: Op["memberId"];
+	public readonly memberId!: string;
 
 	@IsIn(["create", "update", "delete"])
 	public readonly operationType!: Op["type"];
@@ -144,6 +158,9 @@ export class PushLogDto<Op extends OperationType = OperationType> implements Omi
 
 	@IsDate()
 	public readonly executedAt!: Date;
+
+	@IsIn([undefined])
+	public readonly deletedId!: undefined;
 
 	@IsIn([undefined])
 	public readonly pushedAt!: undefined;

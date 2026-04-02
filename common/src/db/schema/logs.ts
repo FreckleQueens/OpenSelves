@@ -53,6 +53,10 @@ export const logs = pgTable(
 				and(not(eq(table.operationType, "delete")), isNull(table.deletedId)),
 			) as SQL,
 		),
+		check(
+			"delete_op_data_null_check",
+			or(not(eq(table.operationType, "delete")), isNull(table.data)) as SQL,
+		),
 	],
 );
 export type Log = typeof logs.$inferSelect;

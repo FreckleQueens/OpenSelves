@@ -28,18 +28,23 @@ async function main() {
 			},
 		])
 		.returning();
+	const date = new Date();
 	await db.insert(members).values([
 		{
 			userId: createdUsers[0].id,
 			name: "Alice",
 			pronouns: "she/her",
 			description: "A member of our& system",
+			createdAt: date,
+			updatedAt: date,
 		},
 		{
 			userId: createdUsers[0].id,
 			name: "Bob",
 			pronouns: "he/him",
 			description: "Another member of our& system",
+			createdAt: date,
+			updatedAt: date,
 		},
 	]);
 }

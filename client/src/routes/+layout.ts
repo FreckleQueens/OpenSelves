@@ -6,5 +6,5 @@ export const ssr = false;
 
 (async () => {
 	const storage = await Storage.getStorage();
-	SyncWorker.getInstance(!storage.isOffline() && navigator.onLine);
+	SyncWorker.initialize(!storage.isOffline() && navigator.onLine);
 })();

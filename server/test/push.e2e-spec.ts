@@ -22,6 +22,8 @@ describe(pushEndpoint, () => {
 			description: "a member of our& system",
 			isArchived: false,
 			archivedReason: null,
+			createdAt: date,
+			updatedAt: date,
 		};
 		const createLog: ClientLog = {
 			id: createId(),
@@ -77,14 +79,6 @@ describe(pushEndpoint, () => {
 		return { member, deleteLog, response };
 	}
 
-	function checkForPushedAt(log: Record<string, unknown>) {
-		expect(log.pushedAt).toBeDefined();
-		expect(typeof log.pushedAt).toBe("string");
-		expect(typeof Date.parse(log.pushedAt as string)).toBe("number");
-		const pushedAt = new Date(log.pushedAt as string);
-		expect((Date.now() - pushedAt.getTime()) / 1000).toBeCloseTo(0, 0);
-	}
-
 	async function getSyncFrom(timestamp: number | "init", cookies: string = env.users.cookies) {
 		const response = await request(env.server)
 			.post(pullEndpoint)
@@ -106,17 +100,22 @@ describe(pushEndpoint, () => {
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
 		);
 		expect(pulledLog).toBeDefined();
-		expect(pulledLog).toMatchObject(
+		expect(pulledLog).toStrictEqual(
 			Object.fromEntries(
 				Object.entries(logToCheck).map(([key, value]) => {
 					if (value instanceof Date) {
 						value = value.toISOString();
+					} else if (value && typeof value === "object") {
+						for (const key of Object.keys(value)) {
+							if (value[key] instanceof Date) {
+								value[key] = value[key].toISOString();
+							}
+						}
 					}
 					return [key, value];
 				}),
 			),
 		);
-		checkForPushedAt(pulledLog as Record<string, unknown>);
 	}
 
 	setupTestSuite((testEnv) => (env = testEnv));

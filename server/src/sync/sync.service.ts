@@ -46,7 +46,11 @@ const syncedModels: SyncedModels = {
 	},
 };
 
-type LogToSave<Op extends OperationType = OperationType> = Omit<PushLogDto<Op>, "pushedAt"> & {
+type LogToSave<Op extends OperationType = OperationType> = Omit<
+	PushLogDto<Op>,
+	"memberId" | "deletedId" | "pushedAt"
+> & {
+	memberId: Op["memberId"];
 	deletedId: Op["deletedId"];
 };
 type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof models, typeof relations>;
@@ -168,7 +172,7 @@ export class SyncService {
 			...new Set(
 				logsToSave
 					.filter((log) => log.operationType === "update")
-					.map((log) => log.memberId as string),
+					.map((log) => (log as LogToSave<UpdateOperation>).memberId),
 			),
 		];
 		const existingUpdateLogs: Log[] = await tx.query.logs.findMany({

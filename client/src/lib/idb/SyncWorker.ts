@@ -6,81 +6,93 @@ import { Storage } from "$lib/storage";
 export class SyncWorker {
 	private static instance: SyncWorker;
 
-	public static getInstance(defaultOnline: boolean = navigator.onLine): SyncWorker {
+	public static initialize(startOnline: boolean): void {
+		if (this.instance) {
+			throw new Error("SyncWorker already initialized");
+		}
+
+		this.instance = new SyncWorker(startOnline);
+	}
+
+	public static getInstance(): SyncWorker {
 		if (!this.instance) {
-			this.instance = new SyncWorker(defaultOnline);
+			throw new Error("SyncWorker not initialized");
 		}
 		return this.instance;
 	}
 
-	private dirty: boolean = true;
-	private pushTimeout: number | undefined = undefined;
-	private pushing: boolean = false;
+	private hasPushBacklog: boolean = true;
+	private syncTimeout: number | undefined = undefined;
+	private syncing: boolean = false;
 
 	protected constructor(private online: boolean) {
 		if (this.online) {
-			this.goOnline();
+			this.resume();
 		} else {
-			this.goOffline();
+			this.pause();
 		}
 	}
 
-	public setDirty() {
-		console.trace("dirty");
-		this.dirty = true;
+	public setHasPushBacklog() {
+		console.debug("push backlog notified, will try to push");
+		this.hasPushBacklog = true;
 		if (this.online) {
 			this.scheduleSync();
 		}
 	}
 
-	public goOnline() {
-		console.log("online");
+	public resume() {
+		console.debug("SyncWorker resumed");
 		this.online = true;
-		if (this.dirty) {
-			this.scheduleSync(500);
+		if (this.hasPushBacklog) {
+			this.scheduleSync(100);
 		}
 	}
 
-	public goOffline() {
-		console.log("offline");
+	public pause() {
+		console.debug("SyncWorker paused");
 		this.online = false;
 		this.unscheduleSync();
 	}
 
-	private scheduleSync(delay: number = 5000) {
-		this.unscheduleSync();
+	private scheduleSync(delay: number = 1000) {
+		if (this.syncing) {
+			return;
+		}
 
-		console.log("Schedule push in", delay);
-		this.pushTimeout = window.setTimeout(() => {
-			this.pushing = true;
-			this.dirty = false;
-			this.push()
+		this.unscheduleSync();
+		this.syncTimeout = window.setTimeout(() => {
+			this.syncing = true;
+			this.sync()
 				.catch((err) => {
 					syncWorkerState.error = err;
 					console.error(err);
-					this.dirty = true;
 				})
 				.finally(() => {
-					this.pushing = false;
-					if (this.dirty) {
-						this.scheduleSync();
-					} else {
-						return this.pull();
-					}
+					this.syncing = false;
+					this.scheduleSync(5000);
 				});
 		}, delay);
+
+		console.debug("Sync scheduled in", delay);
 	}
 
 	private unscheduleSync() {
-		console.log("Cancel push");
-		if (this.pushTimeout !== undefined) {
-			clearTimeout(this.pushTimeout);
-			this.pushTimeout = undefined;
+		if (this.syncTimeout !== undefined) {
+			clearTimeout(this.syncTimeout);
+			this.syncTimeout = undefined;
 		}
 	}
 
+	private async sync() {
+		console.debug("Sync start");
+		await this.push();
+		await this.pull();
+		console.debug("Sync end");
+	}
+
 	private async push() {
-		console.log("Do push");
+		console.debug("Push start");
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
 
@@ -89,13 +101,14 @@ export class SyncWorker {
 		const formattedLogs = pendingLogs
 			.map((log) => {
 				const newLog = { ...log };
-				delete newLog.pushedAt;
 				if (typeof newLog.data === "string") {
 					newLog.data = JSON.parse(newLog.data);
 				}
 				return newLog;
 			})
 			.sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
+
+		console.debug("Logs to push:", formattedLogs);
 
 		if (formattedLogs.length > 0) {
 			const response = await call("/sync/push", {
@@ -105,32 +118,33 @@ export class SyncWorker {
 				},
 			});
 			if (typeof response === "object") {
-				await idb.log.delete(
-					userId,
-					formattedLogs.map((log) => log.id),
-				);
+				await idb.log.delete(formattedLogs.map((log) => log.id));
 			}
 		}
-		console.log(formattedLogs);
+		if ((await idb.log.getAll(userId)).length === 0) {
+			this.hasPushBacklog = false;
+		}
+		console.debug("Push end");
 	}
 
 	private async pull() {
-		console.log("pull");
+		console.debug("Pull start");
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
-		const currentTimestamp = await storage.get("timestamp");
+		const currentTimestamp = Number(await storage.get("timestamp"));
 		const idb = await IDB.getClient();
+		const reqTimestamp =
+			currentTimestamp && Number.isFinite(currentTimestamp) ? currentTimestamp : "init";
+		console.debug("timestamp:", currentTimestamp, reqTimestamp);
 		const response = await call("/sync/pull", {
 			method: "POST",
 			data: {
-				timestamp:
-					currentTimestamp && Number.isFinite(currentTimestamp)
-						? Number(currentTimestamp)
-						: "init",
+				timestamp: reqTimestamp,
 			},
 		});
 
 		const logs = response["logs"];
+		console.debug("Logs to apply:", logs);
 		if (Array.isArray(logs)) {
 			for (const log of logs) {
 				const { memberId, operationType, data } = log as {
@@ -138,14 +152,13 @@ export class SyncWorker {
 					operationType: string;
 					data: Record<string, unknown>;
 				};
-				console.log(log);
 				switch (operationType) {
 					case "create":
 					case "update":
-						await idb.member.save(userId, { ...data, id: memberId }, false);
+						await idb.member.saveSynced(userId, { ...data, id: memberId }, false);
 						break;
 					case "delete":
-						await idb.member.delete(userId, [memberId], false);
+						await idb.member.deleteSynced(userId, [memberId], false);
 						break;
 					default:
 						throw new Error("unrecognized operation type: " + operationType);
@@ -158,6 +171,6 @@ export class SyncWorker {
 			await storage.set("timestamp", timestamp.toString());
 		}
 
-		this.scheduleSync(30000);
+		console.debug("Pull end");
 	}
 }

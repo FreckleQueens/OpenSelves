@@ -3,10 +3,13 @@ import { IDBMember } from "$lib/idb/IDBMember";
 
 const IDB_VERSION = 2;
 
-export type OmitServerFields<Model> = Omit<Model, "createdAt" | "updatedAt">;
-export type ModelBase<Model extends OmitServerFields<Model>> = {
-	id: string;
+export type ModelBase = {
 	userId: string;
+	id: string;
+};
+export type SyncedModelBase = ModelBase & {
+	createdAt: Date;
+	updatedAt: Date;
 };
 
 export class IDB {
@@ -118,29 +121,29 @@ export class IDB {
 		}
 	}
 
-	public async get<M>(
+	public async get(
 		storeName: string,
 		query: IDBValidKey | IDBKeyRange,
-	): Promise<ModelBase<M> | undefined> {
+	): Promise<ModelBase | undefined> {
 		return this.transaction(storeName, (transaction) => transaction.get(storeName, query));
 	}
 
-	public async getAll<M>(storeName: string): Promise<ModelBase<M>[]> {
+	public async getAll(storeName: string): Promise<ModelBase[]> {
 		return this.transaction(storeName, (transaction) => transaction.getAll(storeName));
 	}
 
-	public async getByIndex<M>(
+	public async getByIndex(
 		storeName: string,
 		index: string,
 		query: IDBValidKey | IDBKeyRange | null = null,
 		direction?: IDBCursorDirection,
-	): Promise<ModelBase<M>[]> {
+	): Promise<ModelBase[]> {
 		return this.transaction(storeName, (transaction) =>
 			transaction.getByIndex(storeName, index, query, direction),
 		);
 	}
 
-	public async put<M>(storeName: string, data: ModelBase<M>): Promise<IDBValidKey> {
+	public async put(storeName: string, data: ModelBase): Promise<IDBValidKey> {
 		return this.transaction(storeName, (transaction) => transaction.put(storeName, data));
 	}
 
@@ -152,27 +155,27 @@ export class IDB {
 export class IDBTransactionWrapper<StoreTypes extends string> {
 	constructor(private readonly nativeTransaction: IDBTransaction) {}
 
-	public async get<M>(
+	public async get(
 		storeName: StoreTypes,
 		query: IDBValidKey | IDBKeyRange,
-	): Promise<ModelBase<M> | undefined> {
+	): Promise<ModelBase | undefined> {
 		return this.wrapRequest(storeName, (store) => store.get(query));
 	}
 
-	public async getAll<M>(storeName: StoreTypes): Promise<ModelBase<M>[]> {
+	public async getAll(storeName: StoreTypes): Promise<ModelBase[]> {
 		return this.wrapRequest(storeName, (store) => store.getAll());
 	}
 
-	public async getByIndex<M>(
+	public async getByIndex(
 		storeName: StoreTypes,
 		index: string,
 		query: IDBValidKey | IDBKeyRange | null = null,
 		direction?: IDBCursorDirection,
-	): Promise<ModelBase<M>[]> {
+	): Promise<ModelBase[]> {
 		return new Promise((resolve, reject) => {
 			const store = this.nativeTransaction.objectStore(storeName);
 			const request = store.index(index).openCursor(query, direction);
-			const records: ModelBase<M>[] = [];
+			const records: ModelBase[] = [];
 			request.onerror = () => {
 				reject(request.error);
 			};
@@ -188,7 +191,7 @@ export class IDBTransactionWrapper<StoreTypes extends string> {
 		});
 	}
 
-	public async put<M>(storeName: StoreTypes, data: ModelBase<M>): Promise<IDBValidKey> {
+	public async put(storeName: StoreTypes, data: ModelBase): Promise<IDBValidKey> {
 		return this.wrapRequest(storeName, (store) => store.put(data));
 	}
 

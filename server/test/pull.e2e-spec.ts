@@ -13,6 +13,7 @@ describe("/sync/pull", () => {
 	setupTestSuite((testEnv) => (env = testEnv));
 
 	beforeAll(async () => {
+		const date = new Date();
 		members1 = await env.db
 			.insert(members)
 			.values([
@@ -21,12 +22,16 @@ describe("/sync/pull", () => {
 					name: "Alice",
 					pronouns: "she/her",
 					description: "a member of our& system",
+					createdAt: date,
+					updatedAt: date,
 				},
 				{
 					userId: env.users.user.id,
 					name: "Bob",
 					pronouns: "he/him",
 					description: "another member of our& system",
+					createdAt: date,
+					updatedAt: date,
 				},
 			])
 			.returning();
@@ -38,6 +43,8 @@ describe("/sync/pull", () => {
 					name: "Claire",
 					pronouns: "they/them",
 					description: "someone else somewhere else",
+					createdAt: date,
+					updatedAt: date,
 				},
 			])
 			.returning();
@@ -189,10 +196,6 @@ describe("/sync/pull", () => {
 				expect(Number.isFinite(executedAt)).toBe(true);
 				expect((executedAt - date.getTime()) / 1000).toBeCloseTo(0, 0);
 
-				const pushedAt = new Date(log.pushedAt).getTime();
-				expect(Number.isFinite(pushedAt)).toBe(true);
-				expect((pushedAt - date.getTime()) / 1000).toBeCloseTo(0, 0);
-
 				expect(log.userId).toBeUndefined();
 				expect(log.deletedId).toBeUndefined();
 			}
@@ -210,7 +213,6 @@ describe("/sync/pull", () => {
 				expect(log).toStrictEqual({
 					...expectedLog,
 					executedAt: executedAt.toISOString(),
-					pushedAt: pushedAt.toISOString(),
 				});
 			}
 		});
