@@ -1,5 +1,5 @@
 import { IDBModel } from "$lib/idb/IDBModel";
-import { SyncWorker } from "$lib/idb/SyncWorker";
+import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
 import { createId } from "@paralleldrive/cuid2";
 import { type ColumnType } from "drizzle-orm/column-builder";
@@ -11,7 +11,25 @@ export type DBColumn = {
 	enumValues: string[] | undefined;
 };
 
+export class IDBSyncedModelEvent<Model extends SyncedModelBase> {
+	constructor(
+		public readonly savedRecords: Model[],
+		public readonly deletedRecordIds: Model["id"][],
+	) {}
+}
+
 export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBModel<Model> {
+	private readonly subscriptions: Set<(event: IDBSyncedModelEvent<Model>) => void> = new Set();
+
+	public subscribe(callback: (event: IDBSyncedModelEvent<Model>) => void) {
+		this.subscriptions.add(callback);
+		return callback;
+	}
+
+	public unsubscribe(callback: (event: IDBSyncedModelEvent<Model>) => void) {
+		this.subscriptions.delete(callback);
+	}
+
 	public async saveSynced(
 		userId: string,
 		saveData: Partial<Omit<Model, "userId">>,
@@ -74,6 +92,10 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 			SyncWorker.getInstance().setHasPushBacklog();
 		}
 
+		for (const callback of this.subscriptions) {
+			callback(new IDBSyncedModelEvent<Model>([{ ...finalRecord }], []));
+		}
+
 		return finalRecord;
 	}
 
@@ -100,6 +122,10 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 
 		if (logOperation) {
 			SyncWorker.getInstance().setHasPushBacklog();
+		}
+
+		for (const callback of this.subscriptions) {
+			callback(new IDBSyncedModelEvent<Model>([], [...recordIds]));
 		}
 	}
 

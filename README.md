@@ -71,7 +71,7 @@ or ETA
   - [x] client: pull once push is complete
   - [x] client: pull regularly
   - [ ] client: refactor
-  - [ ] client: update member list when syncing
+  - [x] client: update member list when syncing
   - [ ] client: optionally pause or resume syncing on navigation with AppPage prop (default is do nothing)
 - [x] add icons to buttons, fields and links/navigation items
 - [x] archive member (test flow of performing client IndexedDB migration)

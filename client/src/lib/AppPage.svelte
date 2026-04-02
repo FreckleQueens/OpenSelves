@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { syncWorkerState } from "$lib/idb/syncWorkerState.svelte";
 	import { MenuItem } from "$lib/index";
 	import Icon from "@iconify/svelte";
 	import {
+		Block,
 		Link,
 		MenuList,
 		MenuListItem,
@@ -11,8 +11,10 @@
 		Preloader,
 		useTheme,
 	} from "konsta/svelte";
+	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 
 	let openMenu = $state(false);
+	let syncWorkerError: unknown = $derived(SyncWorker.getInstance().error);
 
 	let {
 		children,
@@ -47,6 +49,15 @@
 	{/snippet}
 </Navbar>
 
+<div class="sync">
+	{#if syncWorkerError}
+		<Block class="text-brand-red">
+			Synchronization error:<br>
+			{syncWorkerError}
+		</Block>
+	{/if}
+</div>
+
 <Panel side="left" opened={openMenu} onBackdropClick={() => (openMenu = false)}>
 	<MenuList>
 		<MenuListItem title="Home" active={activeMenuItem === MenuItem.HOME} href="/main">
@@ -65,7 +76,6 @@
 				/>
 			{/snippet}
 		</MenuListItem>
-		{syncWorkerState.error}
 	</MenuList>
 </Panel>
 

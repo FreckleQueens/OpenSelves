@@ -1,6 +1,5 @@
 import { call } from "$lib";
 import { IDB } from "$lib/idb/idb";
-import { syncWorkerState } from "$lib/idb/syncWorkerState.svelte";
 import { Storage } from "$lib/storage";
 
 export class SyncWorker {
@@ -21,9 +20,9 @@ export class SyncWorker {
 		return this.instance;
 	}
 
-	private hasPushBacklog: boolean = true;
 	private syncTimeout: number | undefined = undefined;
 	private syncing: boolean = false;
+	public error: unknown = $state(null);
 
 	protected constructor(private online: boolean) {
 		if (this.online) {
@@ -35,7 +34,6 @@ export class SyncWorker {
 
 	public setHasPushBacklog() {
 		console.debug("push backlog notified, will try to push");
-		this.hasPushBacklog = true;
 		if (this.online) {
 			this.scheduleSync();
 		}
@@ -44,9 +42,7 @@ export class SyncWorker {
 	public resume() {
 		console.debug("SyncWorker resumed");
 		this.online = true;
-		if (this.hasPushBacklog) {
-			this.scheduleSync(100);
-		}
+		this.scheduleSync(100);
 	}
 
 	public pause() {
@@ -65,7 +61,7 @@ export class SyncWorker {
 			this.syncing = true;
 			this.sync()
 				.catch((err) => {
-					syncWorkerState.error = err;
+					this.error = err;
 					console.error(err);
 				})
 				.finally(() => {
@@ -120,9 +116,6 @@ export class SyncWorker {
 			if (typeof response === "object") {
 				await idb.log.delete(formattedLogs.map((log) => log.id));
 			}
-		}
-		if ((await idb.log.getAll(userId)).length === 0) {
-			this.hasPushBacklog = false;
 		}
 		console.debug("Push end");
 	}

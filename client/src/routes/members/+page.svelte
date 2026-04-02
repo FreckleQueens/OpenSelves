@@ -8,22 +8,13 @@
 	import Icon from "@iconify/svelte";
 	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
-	import { onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
+	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 
 	let members: Member[] = $state([]);
 	let showArchivedMembers = $state(false);
 	let shownMembers: Member[] = $derived(
-		members.filter((member) => showArchivedMembers || !member.isArchived),
-	);
-	let showFilterDialog: boolean = $state(false);
-
-	onMount(async () => {
-		const storage = await Storage.getStorage();
-		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
-
-		const userId = storage.getKey();
-		const client = await IDB.getClient();
-		members = (await client.member.getByField("userId", userId)).sort((a, b) => {
+		members.filter((member) => showArchivedMembers || !member.isArchived).sort((a, b) => {
 			if (a.name < b.name) {
 				return -1;
 			}
@@ -31,8 +22,41 @@
 				return 1;
 			}
 			return 0;
+		}),
+	);
+	let showFilterDialog: boolean = $state(false);
+
+	let membersSubscription: (event: IDBSyncedModelEvent<Member>) => void;
+	onMount(async () => {
+		const storage = await Storage.getStorage();
+		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
+
+		const userId = storage.getKey();
+		const idb = await IDB.getClient();
+		membersSubscription = idb.member.subscribe(event => {
+			for (const member of event.savedRecords) {
+				const index = members.findIndex(localMember => localMember.id === member.id);
+				if (index >= 0) {
+					members[index] = member;
+				} else {
+					members.push(member);
+				}
+			}
+
+			for (const id of event.deletedRecordIds) {
+				const index = members.findIndex(localMember => localMember.id === id);
+				if (index >= 0) {
+					members.splice(index, 1);
+				}
+			}
 		});
+		members = await idb.member.getByField("userId", userId);
 	});
+
+	onDestroy(async () => {
+		const idb = await IDB.getClient();
+		idb.member.unsubscribe(membersSubscription);
+	})
 
 	async function addMemberButtonOnClick() {
 		await goto(resolve("/members/edit/"));
