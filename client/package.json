@@ -4,7 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && yarn cap sync",
+		"build": "yarn prepare && vite build && yarn cap sync",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -13,8 +13,7 @@
 		"format": "prettier --write .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
-		"test:e2e": "playwright test",
-		"ci:build": "yarn lint && yarn build"
+		"test:e2e": "playwright test"
 	},
 	"packageManager": "yarn@4.13.0",
 	"devDependencies": {
