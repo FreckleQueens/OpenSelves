@@ -18,6 +18,7 @@
 	} from "konsta/svelte";
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
+	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 
 	const forms: Record<string, AuthFormData> = $state({
 		login: {
@@ -32,6 +33,7 @@
 				}
 				const storage = await Storage.getStorage();
 				await storage.setKey(`${result.userId}`);
+				SyncWorker.getInstance().setHasPushBacklog();
 				await goto(resolve("/"));
 			},
 		},

@@ -20,6 +20,7 @@ export class SyncWorker {
 		return this.instance;
 	}
 
+	private _hasPushBacklog: boolean = true;
 	private syncTimeout: number | undefined = undefined;
 	private syncing: boolean = false;
 	public error: unknown = $state(null);
@@ -34,6 +35,7 @@ export class SyncWorker {
 
 	public setHasPushBacklog() {
 		console.debug("push backlog notified, will try to push");
+		this._hasPushBacklog = true;
 		if (this.online) {
 			this.scheduleSync();
 		}
@@ -49,6 +51,25 @@ export class SyncWorker {
 		console.debug("SyncWorker paused");
 		this.online = false;
 		this.unscheduleSync();
+	}
+
+	public async shutdown(): Promise<void> {
+		this.unscheduleSync();
+		for (let attempts = 0; attempts < 3; attempts++) {
+			if (!this._hasPushBacklog) {
+				break;
+			}
+			try {
+				await this.push();
+			} catch (e) {
+				console.error(e);
+				if (attempts < 3) {
+					await new Promise((resolve) => {
+						setTimeout(resolve, 1500);
+					});
+				}
+			}
+		}
 	}
 
 	private scheduleSync(delay: number = 1000) {
@@ -117,6 +138,11 @@ export class SyncWorker {
 				await idb.log.delete(formattedLogs.map((log) => log.id));
 			}
 		}
+
+		if ((await idb.log.getAll(userId)).length === 0) {
+			this._hasPushBacklog = false;
+		}
+
 		console.debug("Push end");
 	}
 

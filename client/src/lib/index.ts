@@ -1,6 +1,7 @@
 // place files you want to import through the `$lib` alias in this folder.
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
+import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { Storage } from "$lib/storage";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
@@ -88,6 +89,7 @@ export async function call(
 }
 
 export async function handleLogout() {
+	await SyncWorker.getInstance().shutdown();
 	const storage = await Storage.getStorage();
 	await storage.setOffline();
 	await goto(resolve("/"));
