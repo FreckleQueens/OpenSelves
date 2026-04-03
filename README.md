@@ -76,7 +76,7 @@ or ETA
 - [x] archive member (test flow of performing client IndexedDB migration)
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
 - [x] client: make server url openselves.org in production
-- [ ] deployment with CI (build and deploy on release tags)
+- [x] deployment with CI (build and deploy on release tags)
 
 ### 0.2.0
 - [ ] linting (git hooks)

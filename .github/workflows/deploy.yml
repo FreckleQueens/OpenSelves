@@ -1,57 +1,29 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
-#  release:
-#    types: [published]
+  release:
+    types: [published]
 
 jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
   deploy:
     runs-on: ubuntu-latest
-
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres
-        # Provide the password for postgres
-        env:
-          POSTGRES_DB: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    needs: build
 
     steps:
-      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 25.x
       - run: corepack enable
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          key: yarn
+          path: ~/.yarn
       - run: yarn install --immutable
       - run: yarn ci:build
-      - run: yarn workspaces foreach --all run lint
-      - run: yarn workspace openselves-server db:migrate:test
-        env:
-          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
-          TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-      - run: yarn ci:test
-        env:
-          LISTEN_PORT: 3000
-          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
-          TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          ALLOWED_ORIGINS: http://localhost
-          JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
-          ACCESS_TOKEN_DURATION: 5
-          REFRESH_TOKEN_DURATION: 2592000
-          REFRESH_TOKEN_SIZE: 32
-          REGISTRATION_PASSWORD: notarealpassword
 
       - name: Install server dependencies
         run: cd server/dist && yarn install --no-immutable
