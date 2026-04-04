@@ -22,7 +22,75 @@ jobs:
       - run: yarn ci:build
       - run: yarn workspaces foreach --all run lint
 
-  test:
+  test-client:
+    runs-on: ubuntu-latest
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 25.x
+      - run: corepack enable
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          key: yarn
+          path: ~/.yarn
+      - run: yarn install --immutable
+      - run: yarn ci:build
+      - run: yarn workspace openselves-server db:migrate
+        env:
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+      - name: Cache playwright binaries
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+      - run: yarn workspace openselves-client playwright install --with-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: yarn workspace openselves-client playwright install-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: yarn workspace openselves-client playwright install --with-deps
+      - run: yarn workspace openselves-client test:e2e
+        env:
+          LISTEN_PORT: 3000
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
+          ALLOWED_ORIGINS: http://localhost
+          JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
+          ACCESS_TOKEN_DURATION: 5
+          REFRESH_TOKEN_DURATION: 2592000
+          REFRESH_TOKEN_SIZE: 32
+          REGISTRATION_PASSWORD: notarealpassword
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: client/playwright-report/
+          retention-days: 30
+
+  test-server:
     runs-on: ubuntu-latest
 
     services:
@@ -59,7 +127,7 @@ jobs:
         env:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
           TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-      - run: yarn ci:test
+      - run: yarn workspace openselves-server test:e2e
         env:
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
@@ -70,4 +138,3 @@ jobs:
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: notarealpassword
-
