@@ -72,7 +72,6 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
       - run: yarn workspace openselves-client playwright install-deps
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-      - run: yarn workspace openselves-client playwright install --with-deps
       - run: yarn workspace openselves-client test:e2e
         env:
           LISTEN_PORT: 3000
