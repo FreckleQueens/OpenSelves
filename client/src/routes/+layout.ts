@@ -1,3 +1,5 @@
+import { dev } from "$app/environment";
+import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { Storage } from "$lib/storage";
 
@@ -15,3 +17,11 @@ window.addEventListener("online", () => {
 window.addEventListener("offline", () => {
 	SyncWorker.getInstance().pause();
 });
+
+if (dev) {
+	window.openselves = {
+		IDB,
+		Storage,
+		SyncWorker,
+	};
+}

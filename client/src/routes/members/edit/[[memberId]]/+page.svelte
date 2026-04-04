@@ -78,12 +78,14 @@
 
 	async function formOnSubmit(e?: SubmitEvent) {
 		e?.preventDefault();
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
-		member = await idb.member.saveSynced(userId, {
-			...member,
-		});
+		if (hasMemberChanged()) {
+			const storage = await Storage.getStorage();
+			const userId = storage.getKey();
+			const idb = await IDB.getClient();
+			member = await idb.member.saveSynced(userId, {
+				...member,
+			});
+		}
 
 		await goto(resolve("/members"));
 	}

@@ -59,6 +59,10 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 					);
 				}
 
+				if (JSON.stringify(finalRecord) === JSON.stringify(originalRecord)) {
+					return finalRecord;
+				}
+
 				if (logOperation) {
 					// Get original record
 					let recordForLog: Partial<Model> = finalRecord;
