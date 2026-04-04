@@ -82,7 +82,7 @@ jobs:
           ACCESS_TOKEN_DURATION: 5
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
-          REGISTRATION_PASSWORD: notarealpassword
+          REGISTRATION_PASSWORD: 12345678
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
