@@ -2,11 +2,13 @@
 import { dev } from "$app/environment";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
+import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { Storage } from "$lib/storage";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
-export const SERVER_URL = dev ? "http://127.0.0.1:3000" : "https://api.openselves.org";
+export const SERVER_URL =
+	dev || PUBLIC_TEST_ENVIRONMENT === "1" ? "http://127.0.0.1:3000" : "https://api.openselves.org";
 
 export type AuthFormData = {
 	name: string;

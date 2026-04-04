@@ -62,7 +62,7 @@ deadline or ETA
 
 ## 🚧 0.2.0
 - [x] linting (git hooks)
-- [ ] client: add a check to prevent an update log from saving with no data (empty object)
+- [x] client: add a check to prevent an update log from saving with no data (empty object)
 - [ ] client: logger
 - [ ] client: graceful error handling
 - [ ] server: logger?

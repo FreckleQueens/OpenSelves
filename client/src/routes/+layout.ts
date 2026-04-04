@@ -1,4 +1,4 @@
-import { dev } from "$app/environment";
+import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
 import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { Storage } from "$lib/storage";
@@ -18,7 +18,7 @@ window.addEventListener("offline", () => {
 	SyncWorker.getInstance().pause();
 });
 
-if (dev) {
+if (PUBLIC_TEST_ENVIRONMENT === "1") {
 	window.openselves = {
 		IDB,
 		Storage,
