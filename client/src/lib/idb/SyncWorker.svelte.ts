@@ -72,6 +72,10 @@ export class SyncWorker {
 		}
 	}
 
+	public clearError() {
+		this.error = null;
+	}
+
 	private scheduleSync(delay: number = 1000) {
 		if (this.syncing) {
 			return;

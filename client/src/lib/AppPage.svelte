@@ -1,9 +1,9 @@
 <script lang="ts">
+	import ErrorDialog from "$lib/ErrorDialog.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 	import { MenuItem } from "$lib/index";
 	import Icon from "@iconify/svelte";
 	import {
-		Block,
 		Link,
 		MenuList,
 		MenuListItem,
@@ -12,6 +12,8 @@
 		Preloader,
 		useTheme,
 	} from "konsta/svelte";
+
+	import { transformErrorToReadable } from "../hooks.client.ts";
 
 	let openMenu = $state(false);
 	let syncWorkerError: unknown = $derived(SyncWorker.getInstance().error);
@@ -49,14 +51,10 @@
 	{/snippet}
 </Navbar>
 
-<div class="sync">
-	{#if syncWorkerError}
-		<Block class="text-brand-red">
-			Synchronization error:<br />
-			{syncWorkerError}
-		</Block>
-	{/if}
-</div>
+<ErrorDialog
+	additionalErrors={[syncWorkerError ? transformErrorToReadable(syncWorkerError) : null]}
+	onDismiss={() => SyncWorker.getInstance().clearError()}
+/>
 
 <Panel side="left" opened={openMenu} onBackdropClick={() => (openMenu = false)}>
 	<MenuList>

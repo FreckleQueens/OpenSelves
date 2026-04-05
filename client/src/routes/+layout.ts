@@ -1,3 +1,5 @@
+import "$lib/global-error-handling.svelte";
+
 import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
 import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";

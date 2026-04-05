@@ -14,6 +14,9 @@ const config = {
 			precompress: false,
 			strict: true,
 		}),
+		experimental: {
+			handleRenderingErrors: true,
+		},
 	},
 };
 

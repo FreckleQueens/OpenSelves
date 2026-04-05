@@ -64,7 +64,7 @@ deadline or ETA
 - [x] linting (git hooks)
 - [x] client: add a check to prevent an update log from saving with no data (empty object)
 - [ ] client: logger
-- [ ] client: graceful error handling
+- [x] client: graceful error handling
 - [ ] server: logger?
 - [ ] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
   -> max-width=9/16 * 100vh? (56.25vh)
