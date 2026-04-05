@@ -52,7 +52,7 @@
 	};
 </script>
 
-<AppPage activeMenuItem={MenuItem.HOME}>
+<AppPage title="" activeMenuItem={MenuItem.HOME}>
 	<Block>
 		<p class="text-2xl">Welcome to OpenSelves!</p>
 	</Block>

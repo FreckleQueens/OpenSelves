@@ -4,10 +4,12 @@
 	import { MenuItem } from "$lib/index";
 	import Icon from "@iconify/svelte";
 	import {
+		BlockTitle,
 		Link,
 		MenuList,
 		MenuListItem,
 		Navbar,
+		Page,
 		Panel,
 		Preloader,
 		useTheme,
@@ -37,46 +39,63 @@
 />
 
 <Panel side="left" opened={openMenu} onBackdropClick={() => (openMenu = false)}>
-	<MenuList>
-		<MenuListItem title="Home" active={activeMenuItem === MenuItem.HOME} href="/main">
-			{#snippet media()}
-				<Icon
-					icon={useTheme() === "ios" ? "f7:house-fill" : "ic:round-home"}
-					font-size="24px"
-				/>
-			{/snippet}
-		</MenuListItem>
-		<MenuListItem title="Members" active={activeMenuItem === MenuItem.MEMBERS} href="/members">
-			{#snippet media()}
-				<Icon
-					icon={useTheme() === "ios" ? "f7:person-2-fill" : "ic:round-people"}
-					font-size="24px"
-				/>
-			{/snippet}
-		</MenuListItem>
-	</MenuList>
+	<Page>
+		<BlockTitle class="justify-start text-2xl mt-2 mb-2">
+			<img
+				src="/logo_trans_x512.png"
+				alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it."
+				class="max-h-16 m-2"
+			/>
+			OpenSelves
+		</BlockTitle>
+
+		<MenuList>
+			<MenuListItem title="Home" active={activeMenuItem === MenuItem.HOME} href="/main">
+				{#snippet media()}
+					<Icon
+						icon={useTheme() === "ios" ? "f7:house-fill" : "ic:round-home"}
+						font-size="24px"
+					/>
+				{/snippet}
+			</MenuListItem>
+			<MenuListItem
+				title="Members"
+				active={activeMenuItem === MenuItem.MEMBERS}
+				href="/members"
+			>
+				{#snippet media()}
+					<Icon
+						icon={useTheme() === "ios" ? "f7:person-2-fill" : "ic:round-people"}
+						font-size="24px"
+					/>
+				{/snippet}
+			</MenuListItem>
+		</MenuList>
+	</Page>
 </Panel>
 
 <div class="app-page-content">
-	<Navbar {title} right={navbarRight} {subnavbar}>
-		{#if !loading && navbar}
-			{@render navbar()}
-		{/if}
+	{#if title || navbarLeft || navbarRight || navbar || showMenu || subnavbar}
+		<Navbar {title} right={navbarRight} {subnavbar}>
+			{#if !loading && navbar}
+				{@render navbar()}
+			{/if}
 
-		{#snippet left()}
-			{#if showMenu}
-				<Link onClick={() => (openMenu = true)}>
-					<Icon
-						icon={useTheme() === "ios" ? "f7:menu" : "ic:baseline-menu"}
-						class="text-2xl"
-					/>
-				</Link>
-			{/if}
-			{#if navbarLeft}
-				{@render navbarLeft()}
-			{/if}
-		{/snippet}
-	</Navbar>
+			{#snippet left()}
+				{#if showMenu}
+					<Link onClick={() => (openMenu = true)}>
+						<Icon
+							icon={useTheme() === "ios" ? "f7:menu" : "ic:baseline-menu"}
+							class="text-2xl"
+						/>
+					</Link>
+				{/if}
+				{#if navbarLeft}
+					{@render navbarLeft()}
+				{/if}
+			{/snippet}
+		</Navbar>
+	{/if}
 
 	{#if loading}
 		<Preloader />

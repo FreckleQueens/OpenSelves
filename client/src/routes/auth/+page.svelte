@@ -10,6 +10,7 @@
 	import Icon from "@iconify/svelte";
 	import {
 		Block,
+		BlockTitle,
 		Button,
 		Dialog,
 		DialogButton,
@@ -105,7 +106,16 @@
 	});
 </script>
 
-<AppPage showMenu={false} loading={!loaded}>
+<AppPage title="" showMenu={false} loading={!loaded}>
+	<BlockTitle class="app-welcome-title flex justify-start text-4xl mb-8!">
+		<img
+			src="/logo_trans_x512.png"
+			alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it."
+			class="max-h-20 m-2"
+		/>
+		OpenSelves
+	</BlockTitle>
+
 	<Block>
 		<Segmented strong rounded class="text-4xl">
 			<SegmentedButton

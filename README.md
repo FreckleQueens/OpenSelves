@@ -1,4 +1,4 @@
-<img src="logo_trans_x512.png" height="64px" align="left" alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.">
+<img src="client/static/logo_trans_x512.png" height="64px" align="left" alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.">
 
 # OpenSelves
 A free and open source, local-first app for system mapping and front tracking

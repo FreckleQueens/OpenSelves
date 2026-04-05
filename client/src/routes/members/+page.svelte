@@ -84,7 +84,7 @@
 	</List>
 </Dialog>
 
-<AppPage activeMenuItem={MenuItem.MEMBERS}>
+<AppPage title="" activeMenuItem={MenuItem.MEMBERS}>
 	<div class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center">
 		<Fab
 			id="open-member-filters-button"
