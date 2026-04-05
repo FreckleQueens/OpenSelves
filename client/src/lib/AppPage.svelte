@@ -30,6 +30,7 @@
 		subnavbar = undefined,
 		title = "Open Selves",
 		loading = false,
+		pageContent = $bindable(),
 	} = $props();
 </script>
 
@@ -74,7 +75,7 @@
 	</Page>
 </Panel>
 
-<div class="app-page-content">
+<div class="app-page-content" bind:this={pageContent}>
 	{#if title || navbarLeft || navbarRight || navbar || showMenu || subnavbar}
 		<Navbar {title} right={navbarRight} {subnavbar}>
 			{#if !loading && navbar}

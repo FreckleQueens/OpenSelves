@@ -67,7 +67,7 @@ deadline or ETA
 - [x] client: graceful error handling
 - [x] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
 - [x] dark theme
-- [ ] client: hide FABs when scrolling in members list
+- [x] client: hide FABs when scrolling in members list
 - [ ] client: put FABs behind a FAB menu
 - [ ] localization
 
@@ -156,6 +156,8 @@ deadline or ETA
 - [ ] Hide plural features toggle (for singlets), off by default, choice at registration
 - [ ] Show system member count
 - [ ] Show group member count
+- [ ] switch between light theme, dark theme and system theme manually
+- [ ] more app themes
 
 ---
 

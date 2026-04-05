@@ -10,6 +10,7 @@
 	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
 	import { onDestroy, onMount } from "svelte";
+	import { fly } from "svelte/transition";
 
 	let members: Member[] = $state([]);
 	let showArchivedMembers = $state(false);
@@ -69,6 +70,25 @@
 		const storage = await Storage.getStorage();
 		await storage.set("showArchivedMembers", showArchivedMembers ? "on" : "");
 	}
+
+	let pageContent: HTMLDivElement | null = $state(null);
+	let scrolling = $state(false);
+	let scrollTimeout: number | undefined = undefined;
+	let onScrollEnd = () => {
+		clearTimeout(scrollTimeout);
+		scrollTimeout = window.setTimeout(() => {
+			scrolling = false;
+		}, 250);
+	};
+
+	$effect(() => {
+		pageContent?.addEventListener("scroll", () => {
+			scrolling = true;
+		});
+		pageContent?.addEventListener("scrollend", () => {
+			onScrollEnd();
+		});
+	});
 </script>
 
 <Dialog opened={showFilterDialog} onBackdropClick={() => (showFilterDialog = false)}>
@@ -84,30 +104,40 @@
 	</List>
 </Dialog>
 
-<AppPage title="" activeMenuItem={MenuItem.MEMBERS}>
-	<div class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center">
-		<Fab
-			id="open-member-filters-button"
-			class="k-color-brand-secondary size-10 mb-3"
-			onclick={() => (showFilterDialog = true)}
+<AppPage title="" activeMenuItem={MenuItem.MEMBERS} bind:pageContent>
+	{#if !scrolling}
+		<div
+			class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center"
+			transition:fly={{ y: 150, opacity: 1, duration: 150 }}
 		>
-			{#snippet icon()}
-				<Icon
-					icon={useTheme() === "ios" ? "heroicons-outline:filter" : "ic:round-filter-alt"}
-					class="text-2xl"
-				/>
-			{/snippet}
-		</Fab>
-		<Fab
-			id="create-member-button"
-			class="k-color-brand-primary"
-			onclick={addMemberButtonOnClick}
-		>
-			{#snippet icon()}
-				<Icon icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"} class="text-2xl" />
-			{/snippet}
-		</Fab>
-	</div>
+			<Fab
+				id="open-member-filters-button"
+				class="k-color-brand-secondary size-10 mb-3"
+				onclick={() => (showFilterDialog = true)}
+			>
+				{#snippet icon()}
+					<Icon
+						icon={useTheme() === "ios"
+							? "heroicons-outline:filter"
+							: "ic:round-filter-alt"}
+						class="text-2xl"
+					/>
+				{/snippet}
+			</Fab>
+			<Fab
+				id="create-member-button"
+				class="k-color-brand-primary"
+				onclick={addMemberButtonOnClick}
+			>
+				{#snippet icon()}
+					<Icon
+						icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"}
+						class="text-2xl"
+					/>
+				{/snippet}
+			</Fab>
+		</div>
+	{/if}
 
 	{#each shownMembers as member (member.id)}
 		<Link href={`/members/edit/${member.id}`} class="block">
