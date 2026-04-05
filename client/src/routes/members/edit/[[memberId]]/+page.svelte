@@ -193,7 +193,7 @@
 		{/if}
 	{/snippet}
 	{#snippet navbarRight()}
-		<Link onClick={formOnSubmit}>
+		<Link id="save-member-button" onClick={formOnSubmit}>
 			<Icon
 				icon={useTheme() === "ios" ? "f7:floppy-disk" : "ic:round-save"}
 				class="text-2xl"

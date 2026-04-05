@@ -173,7 +173,7 @@
 		</p>
 
 		{#snippet buttons()}
-			<DialogButton strong onclick={loginFromRegistration}>
+			<DialogButton id="auto-login-button" strong onclick={loginFromRegistration}>
 				<Icon
 					icon={useTheme() === "ios" ? "f7:square-arrow-right" : "ic:round-login"}
 					class="text-2xl mr-2"

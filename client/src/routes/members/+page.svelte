@@ -86,7 +86,11 @@
 
 <AppPage activeMenuItem={MenuItem.MEMBERS}>
 	<div class="fixed right-safe-4 bottom-safe-4 z-20 flex flex-col items-center">
-		<Fab class="k-color-brand-secondary size-10 mb-3" onclick={() => (showFilterDialog = true)}>
+		<Fab
+			id="open-member-filters-button"
+			class="k-color-brand-secondary size-10 mb-3"
+			onclick={() => (showFilterDialog = true)}
+		>
 			{#snippet icon()}
 				<Icon
 					icon={useTheme() === "ios" ? "heroicons-outline:filter" : "ic:round-filter-alt"}
@@ -94,7 +98,11 @@
 				/>
 			{/snippet}
 		</Fab>
-		<Fab class="k-color-brand-primary" onclick={addMemberButtonOnClick}>
+		<Fab
+			id="create-member-button"
+			class="k-color-brand-primary"
+			onclick={addMemberButtonOnClick}
+		>
 			{#snippet icon()}
 				<Icon icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"} class="text-2xl" />
 			{/snippet}

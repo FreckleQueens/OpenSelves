@@ -16,7 +16,7 @@ test("register", async ({ page }) => {
 	await form.locator("input[name=password]").fill("12345678");
 	await form.locator('input[name="registrationPassword"]').fill("12345678");
 	await form.getByRole("button", { name: "Register" }).click();
-	await page.getByRole("button", { name: "Login" }).nth(1).click();
+	await page.locator("#auto-login-button").click();
 
 	await page.waitForURL("/main");
 });
@@ -46,14 +46,14 @@ async function login(page: Page, context: BrowserContext) {
 test("create member", async ({ page, context }) => {
 	await page.goto("/members");
 	await login(page, context);
-	await page.getByRole("button").nth(1).click();
+	await page.locator("#create-member-button").click();
 
 	await page.locator('input[name="name"]').fill("Alice");
 	await page.locator('input[name="pronouns"]').fill("she/her");
 	await page.locator('textarea[name="description"]').fill("a member of our& system");
 
 	const pushRequest = page.waitForResponse(/\/sync\/push/);
-	await page.getByRole("link").nth(2).click();
+	await page.locator("#save-member-button").click();
 
 	expect((await pushRequest).ok()).toBe(true);
 
@@ -66,7 +66,7 @@ test("update member no change", async ({ page, context }) => {
 	await page.goto("/members");
 	await login(page, context);
 	await page.getByRole("link", { name: "Alice she/her" }).click();
-	await page.getByRole("link").nth(1).click();
+	await page.locator("#save-member-button").click();
 
 	await page.waitForURL("/members");
 
