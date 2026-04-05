@@ -57,22 +57,21 @@ deadline or ETA
 - [x] replace prisma and prisma-idb with AI-free FOSS orm and idb abstraction
 - [x] client: make server url openselves.org in production
 - [x] deployment with CI (build and deploy on release tags)
+- [x] contribution CI (test and build on every commit and PRs)
 
 </details>
 
 ## 🚧 0.2.0
 - [x] linting (git hooks)
 - [x] client: add a check to prevent an update log from saving with no data (empty object)
-- [ ] client: logger
 - [x] client: graceful error handling
-- [ ] server: logger?
-- [ ] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
-  -> max-width=9/16 * 100vh? (56.25vh)
-- [ ] contribution CI (test and build on every commit and PRs)
+- [x] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
+- [x] dark theme
+- [ ] client: hide FABs when scrolling in members list
+- [ ] client: put FABs behind a FAB menu
 - [ ] localization
 
 ## 0.3.0
-- [ ] dark theme
 - [ ] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
@@ -140,6 +139,8 @@ deadline or ETA
 - [ ] User documentation
 
 ## Medium priority
+- [ ] client: logger
+- [ ] server: logger
 - [ ] Reminders (post front events (add member, add custom, add any)) and reoccurring (notifications)
 - [ ] Custom fronts
 

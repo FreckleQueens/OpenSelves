@@ -85,7 +85,7 @@
 </Dialog>
 
 <AppPage activeMenuItem={MenuItem.MEMBERS}>
-	<div class="fixed right-safe-4 bottom-safe-4 z-20 flex flex-col items-center">
+	<div class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center">
 		<Fab
 			id="open-member-filters-button"
 			class="k-color-brand-secondary size-10 mb-3"

@@ -31,26 +31,6 @@
 	} = $props();
 </script>
 
-<Navbar {title} right={navbarRight} {subnavbar}>
-	{#if !loading && navbar}
-		{@render navbar()}
-	{/if}
-
-	{#snippet left()}
-		{#if showMenu}
-			<Link onClick={() => (openMenu = true)}>
-				<Icon
-					icon={useTheme() === "ios" ? "f7:menu" : "ic:baseline-menu"}
-					class="text-2xl"
-				/>
-			</Link>
-		{/if}
-		{#if navbarLeft}
-			{@render navbarLeft()}
-		{/if}
-	{/snippet}
-</Navbar>
-
 <ErrorDialog
 	additionalErrors={[syncWorkerError ? transformErrorToReadable(syncWorkerError) : null]}
 	onDismiss={() => SyncWorker.getInstance().clearError()}
@@ -77,8 +57,37 @@
 	</MenuList>
 </Panel>
 
-{#if loading}
-	<Preloader />
-{:else}
-	{@render children()}
-{/if}
+<div class="app-page-content">
+	<Navbar {title} right={navbarRight} {subnavbar}>
+		{#if !loading && navbar}
+			{@render navbar()}
+		{/if}
+
+		{#snippet left()}
+			{#if showMenu}
+				<Link onClick={() => (openMenu = true)}>
+					<Icon
+						icon={useTheme() === "ios" ? "f7:menu" : "ic:baseline-menu"}
+						class="text-2xl"
+					/>
+				</Link>
+			{/if}
+			{#if navbarLeft}
+				{@render navbarLeft()}
+			{/if}
+		{/snippet}
+	</Navbar>
+
+	{#if loading}
+		<Preloader />
+	{:else}
+		{@render children()}
+	{/if}
+</div>
+
+<style lang="scss">
+	.app-page-content {
+		height: 100%;
+		overflow-y: scroll;
+	}
+</style>

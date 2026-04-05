@@ -297,7 +297,7 @@
 				</Block>
 
 				<BlockTitle class="text-brand-red">
-					<p class="flex items-center border-b border-b-brand-red flex-1">
+					<p class="flex items-center border-b flex-1">
 						<Icon
 							icon={useTheme() === "ios"
 								? "f7:exclamationmark-triangle"
