@@ -10,7 +10,7 @@
 	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
 	import { onDestroy, onMount } from "svelte";
-	import { fly } from "svelte/transition";
+	import { crossfade, fly, scale } from "svelte/transition";
 
 	let members: Member[] = $state([]);
 	let showArchivedMembers = $state(false);
@@ -84,11 +84,25 @@
 	$effect(() => {
 		pageContent?.addEventListener("scroll", () => {
 			scrolling = true;
+			showFabMenu = false;
 		});
 		pageContent?.addEventListener("scrollend", () => {
 			onScrollEnd();
 		});
 	});
+
+	let showFabMenu = $state(false);
+	function openFabMenu(event: Event) {
+		event.stopPropagation();
+		event.preventDefault();
+		showFabMenu = true;
+	}
+	window.addEventListener("mousedown", (event: MouseEvent) => {
+		if (!event.target?.["closest"]?.("[role=button]")) {
+			showFabMenu = false;
+		}
+	});
+	const [send, receive] = crossfade({});
 </script>
 
 <Dialog opened={showFilterDialog} onBackdropClick={() => (showFilterDialog = false)}>
@@ -110,32 +124,62 @@
 			class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center"
 			transition:fly={{ y: 150, opacity: 1, duration: 150 }}
 		>
-			<Fab
-				id="open-member-filters-button"
-				class="k-color-brand-secondary size-10 mb-3"
-				onclick={() => (showFilterDialog = true)}
-			>
-				{#snippet icon()}
-					<Icon
-						icon={useTheme() === "ios"
-							? "heroicons-outline:filter"
-							: "ic:round-filter-alt"}
-						class="text-2xl"
-					/>
-				{/snippet}
-			</Fab>
-			<Fab
-				id="create-member-button"
-				class="k-color-brand-primary"
-				onclick={addMemberButtonOnClick}
-			>
-				{#snippet icon()}
-					<Icon
-						icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"}
-						class="text-2xl"
-					/>
-				{/snippet}
-			</Fab>
+			{#if showFabMenu}
+				<div transition:fly={{ y: 50 }}>
+					<div transition:scale>
+						<Fab
+							id="open-member-filters-button"
+							class="k-color-brand-secondary size-10 mb-3"
+							onclick={() => (showFilterDialog = true)}
+						>
+							{#snippet icon()}
+								<Icon
+									icon={useTheme() === "ios"
+										? "heroicons-outline:filter"
+										: "ic:round-filter-alt"}
+									class="text-2xl"
+								/>
+							{/snippet}
+						</Fab>
+					</div>
+				</div>
+				<div in:receive={{ key: "main" }} out:send={{ key: "main" }}>
+					<Fab
+						id="create-member-button"
+						class="k-color-brand-primary"
+						onclick={addMemberButtonOnClick}
+					>
+						{#snippet icon()}
+							<Icon
+								icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"}
+								class="text-2xl"
+							/>
+						{/snippet}
+					</Fab>
+				</div>
+			{:else}
+				<div
+					class="absolute bottom-0 right-0"
+					in:receive={{ key: "main" }}
+					out:send={{ key: "main" }}
+				>
+					<Fab
+						id="open-fab-menu-button"
+						class="k-color-brand-primary size-10"
+						onclick={openFabMenu}
+						oncontextmenu={openFabMenu}
+					>
+						{#snippet icon()}
+							<Icon
+								icon={useTheme() === "ios"
+									? "f7:ellipsis-vertical"
+									: "mdi:dots-vertical"}
+								class="text-2xl"
+							/>
+						{/snippet}
+					</Fab>
+				</div>
+			{/if}
 		</div>
 	{/if}
 

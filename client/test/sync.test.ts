@@ -46,6 +46,7 @@ async function login(page: Page, context: BrowserContext) {
 test("create member", async ({ page, context }) => {
 	await page.goto("/members");
 	await login(page, context);
+	await page.locator("#open-fab-menu-button").click();
 	await page.locator("#create-member-button").click();
 
 	await page.locator('input[name="name"]').fill("Alice");

@@ -68,7 +68,7 @@ deadline or ETA
 - [x] add a max-width to general interface size (layout?) for widescreen use (desktop, tablet...)
 - [x] dark theme
 - [x] client: hide FABs when scrolling in members list
-- [ ] client: put FABs behind a FAB menu
+- [x] client: put FABs behind a FAB menu
 - [ ] localization
 
 ## 0.3.0
