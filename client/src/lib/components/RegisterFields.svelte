@@ -11,7 +11,7 @@
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput
-			label="Email"
+			label={t("Email")}
 			floatingLabel
 			placeholder="alice@example.com"
 			type="email"
@@ -29,7 +29,7 @@
 			{/snippet}
 		</ListInput>
 		<ListInput
-			label="Password"
+			label={t("Password")}
 			floatingLabel
 			type="password"
 			name="password"
@@ -52,9 +52,11 @@
 	<BlockTitle>Authorization</BlockTitle>
 	<List>
 		<ListInput
-			label="Registration password"
+			label={t("Registration password")}
 			floatingLabel
-			info="This is provided by the website's administrator. It may be required to be allowed to create a new account."
+			info={t(
+				"This is provided by the website's administrator. It may be required to be allowed to create a new account.",
+			)}
 			type="password"
 			name="registrationPassword"
 			bind:value={formState.data["registrationPassword"]}

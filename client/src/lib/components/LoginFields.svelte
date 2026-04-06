@@ -11,7 +11,7 @@
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput
-			label="Email"
+			label={t("Email")}
 			floatingLabel
 			placeholder="alice@example.com"
 			type="email"
@@ -29,7 +29,7 @@
 			{/snippet}
 		</ListInput>
 		<ListInput
-			label="Password"
+			label={t("Password")}
 			floatingLabel
 			type="password"
 			name="password"
