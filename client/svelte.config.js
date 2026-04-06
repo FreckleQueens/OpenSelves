@@ -2,7 +2,7 @@ import adapter from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
 // noinspection ES6PreferShortImport
-import { i18nSveltePreprocessor } from "./src/lib/i18n/i18n-svelte-preprocessor.ts";
+import { i18nSveltePreprocessor } from "./build-tools/i18n-svelte-preprocessor.ts";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

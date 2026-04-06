@@ -8,6 +8,7 @@
 	<ListInput
 		label={t("Language")}
 		type="select"
+		name="language"
 		dropdown
 		required
 		onChange={(ev) => setLocale(ev.target.value)}

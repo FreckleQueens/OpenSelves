@@ -1,11 +1,11 @@
 import * as fs from "node:fs";
 import type { Directive, Expression, Identifier, ModuleDeclaration, Statement } from "estree";
 import MagicString from "magic-string";
-import path from "node:path";
+import { resolve } from "path";
 import { type AST, type PreprocessorGroup, parse } from "svelte/compiler";
 
 // noinspection ES6PreferShortImport
-import { DEFAULT_LOCALE, supportedLocales } from "./i18n.ts";
+import { DEFAULT_LOCALE, supportedLocales } from "../src/lib/i18n/i18n.ts";
 
 export const i18nSveltePreprocessor: PreprocessorGroup = {
 	async markup({ content }) {
@@ -96,7 +96,7 @@ function checkKeysAreTranslated(i18nKeys: string[]) {
 	for (const locale of supportedLocales) {
 		if (locale === DEFAULT_LOCALE) continue;
 
-		const file = path.resolve(translationDir, locale + ".json");
+		const file = resolve(translationDir, locale + ".json");
 		if (!fs.existsSync(file)) {
 			throw new Error("Missing translation file " + file);
 		}

@@ -1,4 +1,4 @@
-import * as fr from "./locales/fr.json" with { type: "json" };
+import fr from "./locales/fr.json" with { type: "json" };
 
 export const DEFAULT_LOCALE = "en";
 export const supportedLocales = [DEFAULT_LOCALE, "fr"];
@@ -35,7 +35,7 @@ globalThis.t = function translate(key: string, ...args: string[]): string {
 
 		const newValue = localeMap[key];
 		if (!newValue) {
-			console.error("Key `" + key + "` not translated in locale " + locale);
+			throw new Error(`Key \`${key}\` not translated in locale ${locale}`);
 		} else {
 			key = newValue;
 		}

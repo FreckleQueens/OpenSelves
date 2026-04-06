@@ -1,0 +1,3 @@
+{
+	"extends": "openselves-common/tsconfig.json"
+}
