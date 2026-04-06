@@ -8,6 +8,7 @@ A free and open source, local-first app for system mapping and front tracking
 - 📶 Connectivity drop resilience (local-first sync)
 - ℹ️ Local-first: your data is always saved to your device first. If connected with an account, it is then synchronized
 when there is connectivity
+- 🌐 Translated in English and French
 
 ## 🚧 Planned features
 - 🗺 Fully featured system mapping
@@ -15,7 +16,6 @@ when there is connectivity
 - ⬇️ Simply plural data importing
 - 📶 Exclusive-offline mode (and ability to add account)
 - 📈 Front history chronological graph
-- 🌐 Localization
 - 🏠 Self-hosting
 - 📱 PWA, Android app and iOS app
 

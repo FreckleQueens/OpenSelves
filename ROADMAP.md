@@ -5,7 +5,7 @@ deadline or ETA
 
 ## ✅ 0.1.0
 <details>
-  <summary>Detailed dev todo</summary>
+  <summary>dev todo</summary>
 
 - [x] DB orm (prisma?)
 - [x] Single command dev env build and start (client and server)
@@ -61,7 +61,11 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.2.0
+## ✅ 0.2.0
+
+<details>
+  <summary>dev todo</summary>
+
 - [x] linting (git hooks)
 - [x] client: add a check to prevent an update log from saving with no data (empty object)
 - [x] client: graceful error handling
@@ -71,7 +75,11 @@ deadline or ETA
 - [x] client: put FABs behind a FAB menu
 - [x] localization
 
-## 0.3.0
+</details>
+
+## 🚧 0.3.0
+- [ ] set favicon to logo
+- [ ] set android app icon to logo
 - [ ] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
