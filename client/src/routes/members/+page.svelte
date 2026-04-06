@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
-	import AppPage from "$lib/AppPage.svelte";
+	import AppPage from "$lib/components/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 	import { Storage } from "$lib/storage";
@@ -110,7 +110,7 @@
 		Filter members
 	{/snippet}
 	<List nested>
-		<ListItem label title="Show archived members">
+		<ListItem label title={t("Show archived members")}>
 			{#snippet after()}
 				<Toggle checked={showArchivedMembers} onChange={toggleShowArchivedMembers} />
 			{/snippet}

@@ -2,7 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { CallResult, MenuItem, call, handleLogout } from "$lib";
-	import AppPage from "$lib/AppPage.svelte";
+	import AppPage from "$lib/components/AppPage.svelte";
+	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
 	import { Block, BlockTitle, Button, Preloader, useTheme } from "konsta/svelte";
@@ -54,16 +55,21 @@
 
 <AppPage title="" activeMenuItem={MenuItem.HOME}>
 	<Block>
-		<p class="text-2xl">Welcome to OpenSelves!</p>
+		<p class="text-2xl">Account settings</p>
 	</Block>
 
 	<BlockTitle medium>Status</BlockTitle>
 	<Block strong inset>
 		{#if user}
-			<p>You are logged in as user #{user.id}, {user.email}</p>
+			<p>{t("You are logged in as user #{user.id}, {user.email}", user.id, user.email)}</p>
 		{:else}
 			<Preloader />
 		{/if}
+	</Block>
+
+	<BlockTitle medium>Language</BlockTitle>
+	<Block strong inset>
+		<LanguageSwitcher />
 	</Block>
 
 	<BlockTitle medium>Actions</BlockTitle>

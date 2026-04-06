@@ -2,7 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { type AuthFormData, SERVER_URL } from "$lib";
-	import AppPage from "$lib/AppPage.svelte";
+	import AppPage from "$lib/components/AppPage.svelte";
+	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
@@ -110,7 +111,9 @@
 	<BlockTitle class="app-welcome-title flex justify-start text-4xl mb-8!">
 		<img
 			src="/logo_trans_x512.png"
-			alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it."
+			alt={t(
+				"A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.",
+			)}
 			class="max-h-20 m-2"
 		/>
 		OpenSelves
@@ -168,6 +171,11 @@
 				</form>
 			{/if}
 		</div>
+	</Block>
+
+	<BlockTitle>Change language</BlockTitle>
+	<Block>
+		<LanguageSwitcher />
 	</Block>
 
 	<Dialog opened={registerSuccessDialogOpen}>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import AppPage from "$lib/AppPage.svelte";
+	import AppPage from "$lib/components/AppPage.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
@@ -65,12 +65,12 @@
 		}
 	> = {
 		[Tab.INFO]: {
-			title: "Info",
+			title: t("Info"),
 			iosIcon: "f7:info-circle",
 			materialIcon: "ic:round-info",
 		},
 		[Tab.SETTINGS]: {
-			title: "Settings",
+			title: t("Settings"),
 			iosIcon: "f7:ellipsis",
 			materialIcon: "ic:round-settings",
 		},
@@ -221,7 +221,13 @@
 	<form onsubmit={formOnSubmit}>
 		<div class:hidden={activeTab !== Tab.INFO}>
 			<List>
-				<ListInput name="name" label="Name" floatingLabel required bind:value={member.name}>
+				<ListInput
+					name="name"
+					label={t("Name")}
+					floatingLabel
+					required
+					bind:value={member.name}
+				>
 					{#snippet media()}
 						<Icon
 							icon={useTheme() === "ios"
@@ -233,7 +239,7 @@
 				</ListInput>
 				<ListInput
 					name="pronouns"
-					label="Pronouns"
+					label={t("Pronouns")}
 					floatingLabel
 					bind:value={member.pronouns}
 				>
@@ -243,7 +249,7 @@
 				</ListInput>
 				<ListInput
 					name="description"
-					label="Description"
+					label={t("Description")}
 					floatingLabel
 					type="textarea"
 					autocomplete="off"
@@ -264,7 +270,7 @@
 			{#if member.id}
 				<Block>
 					<List>
-						<ListItem label title="Archive member">
+						<ListItem label title={t("Archive member")}>
 							{#snippet after()}
 								<Toggle
 									name="isArchived"
@@ -276,7 +282,7 @@
 						<div class:hidden={!member.isArchived}>
 							<ListInput
 								name="archivedReason"
-								label="Archived reason"
+								label={t("Archived reason")}
 								floatingLabel
 								type="textarea"
 								autocomplete="off"

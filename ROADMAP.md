@@ -69,7 +69,7 @@ deadline or ETA
 - [x] dark theme
 - [x] client: hide FABs when scrolling in members list
 - [x] client: put FABs behind a FAB menu
-- [ ] localization
+- [x] localization
 
 ## 0.3.0
 - [ ] self-hosting (choose server url in client)

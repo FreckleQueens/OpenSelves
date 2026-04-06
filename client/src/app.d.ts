@@ -5,6 +5,8 @@ import type { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import type { Storage } from "$lib/storage";
 
 declare global {
+	function t(key: string, ...args: string[]): string;
+
 	namespace App {
 		// interface Error {}
 		// interface Locals {}

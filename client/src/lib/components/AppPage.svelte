@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ErrorDialog from "$lib/ErrorDialog.svelte";
-	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
-	import { MenuItem } from "$lib/index";
+	import { MenuItem } from "$lib";
+	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
+	import { SyncWorker } from "$lib/idb/SyncWorker.svelte.js";
 	import Icon from "@iconify/svelte";
 	import {
 		BlockTitle,
@@ -15,7 +15,7 @@
 		useTheme,
 	} from "konsta/svelte";
 
-	import { transformErrorToReadable } from "../hooks.client.ts";
+	import { transformErrorToReadable } from "../../hooks.client.ts";
 
 	let openMenu = $state(false);
 	let syncWorkerError: unknown = $derived(SyncWorker.getInstance().error);
@@ -28,7 +28,7 @@
 		navbarLeft = undefined,
 		navbarRight = undefined,
 		subnavbar = undefined,
-		title = "Open Selves",
+		title = "OpenSelves",
 		loading = false,
 		pageContent = $bindable(),
 	} = $props();
@@ -44,14 +44,16 @@
 		<BlockTitle class="justify-start text-2xl mt-2 mb-2">
 			<img
 				src="/logo_trans_x512.png"
-				alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it."
+				alt={t(
+					"A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.",
+				)}
 				class="max-h-16 m-2"
 			/>
 			OpenSelves
 		</BlockTitle>
 
 		<MenuList>
-			<MenuListItem title="Home" active={activeMenuItem === MenuItem.HOME} href="/main">
+			<MenuListItem title={t("Home")} active={activeMenuItem === MenuItem.HOME} href="/main">
 				{#snippet media()}
 					<Icon
 						icon={useTheme() === "ios" ? "f7:house-fill" : "ic:round-home"}
@@ -60,7 +62,7 @@
 				{/snippet}
 			</MenuListItem>
 			<MenuListItem
-				title="Members"
+				title={t("Members")}
 				active={activeMenuItem === MenuItem.MEMBERS}
 				href="/members"
 			>

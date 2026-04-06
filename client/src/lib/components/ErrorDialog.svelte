@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { globalError } from "$lib/global-error-handling.svelte";
+	import { globalError } from "$lib/global-error-handling.svelte.js";
 	import Icon from "@iconify/svelte";
 	import { Button, Dialog, useTheme } from "konsta/svelte";
 

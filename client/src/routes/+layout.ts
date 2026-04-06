@@ -1,4 +1,5 @@
 import "$lib/global-error-handling.svelte";
+import "$lib/i18n/i18n-client";
 
 import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
 import { IDB } from "$lib/idb";
