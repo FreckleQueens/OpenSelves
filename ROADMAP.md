@@ -79,7 +79,7 @@ deadline or ETA
 
 ## 🚧 0.3.0
 - [x] set favicon to logo
-- [ ] set android app icon to logo
+- [x] set android app icon to logo
 - [ ] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
