@@ -43,11 +43,11 @@
 	<Page>
 		<BlockTitle class="justify-start text-2xl mt-2 mb-2">
 			<img
-				src="/logo_trans_x512.png"
+				src="/logo_trans.svg"
 				alt={t(
 					"A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.",
 				)}
-				class="max-h-16 m-2"
+				class="h-16 m-2"
 			/>
 			OpenSelves
 		</BlockTitle>
