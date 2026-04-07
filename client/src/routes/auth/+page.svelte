@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { type AuthFormData, SERVER_URL } from "$lib";
+	import { type AuthFormData } from "$lib";
+	import { apiState } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
@@ -15,6 +15,7 @@
 		Button,
 		Dialog,
 		DialogButton,
+		Link,
 		Segmented,
 		SegmentedButton,
 		useTheme,
@@ -59,7 +60,7 @@
 	async function submitActiveForm() {
 		let response: Response;
 		try {
-			response = await fetch(`${SERVER_URL}${forms[activeForm].endpoint}`, {
+			response = await fetch(`${apiState.url}${forms[activeForm].endpoint}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(forms[activeForm].data),
@@ -107,7 +108,13 @@
 	});
 </script>
 
-<AppPage title="" showMenu={false} loading={!loaded}>
+<AppPage title="" showMenu={false} loading={!loaded} transparentNavbar>
+	{#snippet navbarRight()}
+		<Link href={resolve("/auth/settings")} id="settings-link">
+			<Icon icon={useTheme() === "ios" ? "f7:" : "ic:round-settings"} class="text-3xl" />
+		</Link>
+	{/snippet}
+
 	<BlockTitle class="app-welcome-title flex justify-start text-4xl mb-8!">
 		<img
 			src="/logo_trans.svg"
@@ -146,7 +153,7 @@
 		</Segmented>
 	</Block>
 
-	<Block class="overflow-x-hidden">
+	<Block class="overflow-hidden">
 		<div
 			class={{
 				relative: true,
@@ -171,11 +178,6 @@
 				</form>
 			{/if}
 		</div>
-	</Block>
-
-	<BlockTitle>Change language</BlockTitle>
-	<Block>
-		<LanguageSwitcher />
 	</Block>
 
 	<Dialog opened={registerSuccessDialogOpen}>

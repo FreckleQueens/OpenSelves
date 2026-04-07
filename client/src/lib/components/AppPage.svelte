@@ -28,6 +28,7 @@
 		navbarLeft = undefined,
 		navbarRight = undefined,
 		subnavbar = undefined,
+		transparentNavbar = false,
 		title = "OpenSelves",
 		loading = false,
 		pageContent = $bindable(),
@@ -79,7 +80,7 @@
 
 <div class="app-page-content" bind:this={pageContent}>
 	{#if title || navbarLeft || navbarRight || navbar || showMenu || subnavbar}
-		<Navbar {title} right={navbarRight} {subnavbar}>
+		<Navbar {title} right={navbarRight} {subnavbar} transparent={transparentNavbar}>
 			{#if !loading && navbar}
 				{@render navbar()}
 			{/if}

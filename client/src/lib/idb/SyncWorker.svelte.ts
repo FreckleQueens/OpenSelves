@@ -1,4 +1,4 @@
-import { call } from "$lib";
+import { call } from "$lib/api.svelte";
 import { IDB } from "$lib/idb/idb";
 import { Storage } from "$lib/storage";
 

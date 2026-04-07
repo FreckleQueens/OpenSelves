@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { CallResult, MenuItem, call, handleLogout } from "$lib";
+	import { MenuItem } from "$lib";
+	import { CallResult, call, handleLogout } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
 	import { Storage } from "$lib/storage";

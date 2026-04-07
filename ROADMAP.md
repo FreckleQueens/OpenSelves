@@ -80,7 +80,7 @@ deadline or ETA
 ## 🚧 0.3.0
 - [x] set favicon to logo
 - [x] set android app icon to logo
-- [ ] self-hosting (choose server url in client)
+- [x] self-hosting (choose server url in client)
 - [ ] client config (default server url, web-client listen addr and port)
 - [ ] api config (listen addr and port)
 - [ ] PWA (service worker)
@@ -94,6 +94,7 @@ deadline or ETA
 
 ## 0.5.0
 - [ ] client: switch to a better md3 library
+- [ ] show proper language names in language switcher
 
 ## 0.6.0
 - [ ] add version checks on /push and /pull endpoints
@@ -169,6 +170,7 @@ deadline or ETA
 - [ ] Show group member count
 - [ ] switch between light theme, dark theme and system theme manually
 - [ ] more app themes
+- [ ] android adaptive icon
 
 ---
 

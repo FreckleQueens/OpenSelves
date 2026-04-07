@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import BackLink from "$lib/components/BackLink.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import Icon from "@iconify/svelte";
@@ -177,12 +178,7 @@
 
 <AppPage title="" loading={!mounted} showMenu={false}>
 	{#snippet navbarLeft()}
-		<Link onClick={backLinkOnClick}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:arrow-left" : "ic:round-arrow-back"}
-				class="text-2xl"
-			/>
-		</Link>
+		<BackLink onClick={backLinkOnClick} />
 		{#if hasMemberChanged()}
 			<Link onClick={() => (showDiscardChangesDialog = true)}>
 				<Icon

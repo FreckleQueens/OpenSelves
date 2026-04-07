@@ -6,7 +6,7 @@ const email = createId() + "@example.com";
 let cookies: Array<Cookie> = [];
 let key: string = "";
 test("register", async ({ page }) => {
-	await page.goto("/");
+	await page.goto("/auth");
 
 	await page.getByRole("button", { name: "Register" }).click();
 
@@ -22,7 +22,7 @@ test("register", async ({ page }) => {
 });
 
 test("login", async ({ page, context }) => {
-	await page.goto("/");
+	await page.goto("/auth");
 
 	const form = page.locator("form.login");
 	await form.locator("input[name=email]").fill(email);
