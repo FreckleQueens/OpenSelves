@@ -36,7 +36,7 @@
 
 <App safeAreas theme={isIos() ? "ios" : "material"}>
 	<div class="safe-areas">
-		<Page class="bg-surface-darker">
+		<Page class="bg-md-light-surface-darker dark:bg-md-dark-surface-darker">
 			<div class="frame bg-md-light-surface dark:bg-md-dark-surface">
 				{@render children()}
 			</div>
@@ -45,15 +45,6 @@
 </App>
 
 <style lang="scss">
-	:global(.bg-surface-darker) {
-		background-color: color-mix(in oklch, var(--color-md-light-surface) 100%, #000 100%);
-	}
-	@media (prefers-color-scheme: dark) {
-		:global(.bg-surface-darker) {
-			background-color: color-mix(in oklch, var(--color-md-dark-surface) 100%, #000 100%);
-		}
-	}
-
 	.frame {
 		position: relative;
 		max-width: 75vh;

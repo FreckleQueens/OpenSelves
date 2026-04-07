@@ -93,6 +93,9 @@ deadline or ETA
 - [ ] show current fronts
 
 ## 0.5.0
+- [ ] client: switch to a better md3 library
+
+## 0.6.0
 - [ ] add version checks on /push and /pull endpoints
 - [ ] member profile picture
 - [ ] password recovery
@@ -100,11 +103,11 @@ deadline or ETA
 - [ ] change email
 - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
 
-## 0.6.0
+## 0.7.0
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
-## 0.7.0
+## 0.8.0
 - [ ] Sync engine optimizations
     - [ ] client
         - [ ] drop prior unsynced create and update operations when deleting a record

@@ -54,12 +54,17 @@
 </script>
 
 <AppPage title="" activeMenuItem={MenuItem.HOME}>
-	<Block>
-		<p class="text-2xl">Account settings</p>
+	<BlockTitle large>App settings</BlockTitle>
+
+	<BlockTitle medium>Language</BlockTitle>
+	<Block strong>
+		<LanguageSwitcher />
 	</Block>
 
+	<BlockTitle large>Account settings</BlockTitle>
+
 	<BlockTitle medium>Status</BlockTitle>
-	<Block strong inset>
+	<Block strong>
 		{#if user}
 			<p>{t("You are logged in as user #{user.id}, {user.email}", user.id, user.email)}</p>
 		{:else}
@@ -67,13 +72,8 @@
 		{/if}
 	</Block>
 
-	<BlockTitle medium>Language</BlockTitle>
-	<Block strong inset>
-		<LanguageSwitcher />
-	</Block>
-
 	<BlockTitle medium>Actions</BlockTitle>
-	<Block strong inset>
+	<Block strong>
 		<Button tonal raised onclick={logoutButtonOnclick}>
 			<Icon
 				icon={useTheme() === "ios" ? "f7:square-arrow-left" : "ic:round-logout"}
