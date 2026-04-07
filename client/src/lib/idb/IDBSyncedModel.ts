@@ -1,3 +1,4 @@
+import type { ClientLog } from "$lib/idb/IDBLog";
 import { IDBModel } from "$lib/idb/IDBModel";
 import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import { IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
@@ -37,6 +38,12 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 	): Promise<Model> {
 		const operationType: Log["operationType"] = saveData.id ? "update" : "create";
 
+		if (Object.keys(saveData).length === 0) {
+			throw new Error("Tried to save a model with no changes");
+		}
+
+		saveData.updatedAt = new Date();
+
 		const finalRecord: Model = await this.idb.transaction(
 			["logs", this.storeName],
 			async (transaction) => {
@@ -45,19 +52,15 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 					originalRecord = await transaction.get(this.storeName, saveData.id);
 				}
 
-				const finalRecord = {
+				const fullRecordData = {
 					...(originalRecord || {}),
 					...saveData,
 					userId,
 				};
-				if (!finalRecord.id) {
-					finalRecord.id = this.generateUniquePrimaryKey();
+				if (!fullRecordData.id) {
+					fullRecordData.id = this.generateUniquePrimaryKey();
 				}
-				if (!this.matchesModel(finalRecord)) {
-					throw new Error(
-						`Tried to save invalid record for ${this.storeName}: ${JSON.stringify(saveData)}`,
-					);
-				}
+				const finalRecord = this.parseModel(fullRecordData);
 
 				if (JSON.stringify(finalRecord) === JSON.stringify(originalRecord)) {
 					return finalRecord;
@@ -68,11 +71,21 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 					let recordForLog: Partial<Model> = finalRecord;
 					if (originalRecord) {
 						recordForLog = {};
-						for (const [key, val] of Object.entries(finalRecord)) {
-							if (val !== originalRecord[key]) {
-								recordForLog[key] = val;
+						for (const [key, newValue] of Object.entries(finalRecord)) {
+							const originalValue = originalRecord[key];
+							let isDifferent = newValue !== originalValue;
+							if (newValue instanceof Date && originalValue instanceof Date) {
+								isDifferent =
+									newValue.toISOString() !== originalValue.toISOString();
+							}
+							if (isDifferent) {
+								recordForLog[key] = newValue;
 							}
 						}
+					}
+
+					if (Object.keys(recordForLog).length === 0) {
+						throw new Error("Tried to log a record update with no changes");
 					}
 
 					// Log operation
@@ -148,7 +161,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 				delete recordDataForLog.userId;
 				delete recordDataForLog.id;
 			}
-			const log = {
+			const logData: ClientLog = {
 				userId,
 				id: createId(),
 				[logIdKey]: recordId,
@@ -156,9 +169,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 				data: recordDataForLog === null ? null : JSON.stringify(recordDataForLog),
 				executedAt: new Date(),
 			};
-			if (!this.idb.log.matchesModel(log)) {
-				throw new Error("Log data doesn't match model");
-			}
+			const log = this.idb.log.parseModel(logData);
 			await transaction.put("logs", log);
 		}
 	}

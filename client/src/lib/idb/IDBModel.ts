@@ -19,20 +19,14 @@ export abstract class IDBModel<Model extends ModelBase> {
 		if (!record) {
 			throw new Error(`Record not found: ${this.storeName}#${id}`);
 		}
-		if (!this.matchesModel(record)) {
-			throw new Error(`Stored data doesn't match model for ${this.storeName}#${id}`);
-		}
-		return record;
+		return this.parseModel(record);
 	}
 
 	public async getAll(userId: string): Promise<Model[]> {
 		const records = (await this.idb.getAll(this.storeName)).filter(
 			(record) => record.userId === userId,
 		);
-		if (!this.matchesModelArray(records)) {
-			throw new Error(`Stored data doesn't match model for ${this.storeName}`);
-		}
-		return records;
+		return this.parseModels(records);
 	}
 
 	public async getByField<Field extends keyof Model & string>(
@@ -40,10 +34,7 @@ export abstract class IDBModel<Model extends ModelBase> {
 		value: Model[Field],
 	): Promise<Model[]> {
 		const records = await this.idb.getByIndex(this.storeName, field, IDBKeyRange.only(value));
-		if (!this.matchesModelArray(records)) {
-			throw new Error(`Stored data doesn't match model for ${this.storeName}`);
-		}
-		return records;
+		return this.parseModels(records);
 	}
 
 	public async delete(recordIds: string[]): Promise<void> {
@@ -64,7 +55,8 @@ export abstract class IDBModel<Model extends ModelBase> {
 		return rest;
 	}
 
-	public matchesModel(record: Partial<ModelBase>): record is Model {
+	public parseModel(record: Partial<ModelBase>): Model {
+		const out: Partial<Model> = {};
 		const keys: string[] = [];
 		for (const [key, column] of Object.entries(this.getDrizzleModel())) {
 			keys.push(key);
@@ -84,16 +76,19 @@ export abstract class IDBModel<Model extends ModelBase> {
 						},
 					);
 				} else {
+					out[key] = record[key];
 					continue;
 				}
 			}
 
 			if (record[key] instanceof Date && column.dataType === "object date") {
+				out[key] = record[key];
 				continue;
 			}
 
 			if (column.dataType === "string enum") {
 				if (typeof record[key] === "string" && column.enumValues?.includes(record[key])) {
+					out[key] = record[key];
 					continue;
 				} else {
 					throw new Error(
@@ -107,8 +102,9 @@ export abstract class IDBModel<Model extends ModelBase> {
 
 			if (column.dataType === "object json") {
 				if (typeof record[key] === "string") {
+					let parsedJson: Record<string, unknown>;
 					try {
-						JSON.parse(record[key]);
+						parsedJson = JSON.parse(record[key]);
 					} catch (e) {
 						throw new Error(
 							`${this.storeName} record[${key}]="${record[key]}" is invalid json`,
@@ -117,14 +113,22 @@ export abstract class IDBModel<Model extends ModelBase> {
 							},
 						);
 					}
+					out[key] = parsedJson;
 					continue;
 				} else {
-					throw new Error(
-						`${this.storeName} record[${key}]="${record[key]}" is invalid json`,
-						{
-							cause: record,
-						},
-					);
+					// Check value can be serialized
+					try {
+						JSON.stringify(record[key]);
+						out[key] = record[key];
+						continue;
+					} catch (e) {
+						throw new Error(
+							`${this.storeName} record[${key}]="${record[key]}" is invalid json`,
+							{
+								cause: e,
+							},
+						);
+					}
 				}
 			}
 
@@ -138,6 +142,7 @@ export abstract class IDBModel<Model extends ModelBase> {
 						},
 					);
 				} else {
+					out[key] = date;
 					continue;
 				}
 			}
@@ -150,6 +155,8 @@ export abstract class IDBModel<Model extends ModelBase> {
 					},
 				);
 			}
+
+			out[key] = record[key];
 		}
 
 		const extraKeys = Object.keys(record).filter((key) => !keys.includes(key));
@@ -162,15 +169,10 @@ export abstract class IDBModel<Model extends ModelBase> {
 			);
 		}
 
-		return true;
+		return out as Model;
 	}
 
-	public matchesModelArray(records: ModelBase[]): records is Model[] {
-		for (const record of records) {
-			if (!this.matchesModel(record)) {
-				throw new Error(`Stored data doesn't match model for ${this.storeName}`);
-			}
-		}
-		return true;
+	public parseModels(records: ModelBase[]): Model[] {
+		return records.map((record) => this.parseModel(record));
 	}
 }
