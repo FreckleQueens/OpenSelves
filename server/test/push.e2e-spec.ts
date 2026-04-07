@@ -559,5 +559,19 @@ describe(pushEndpoint, () => {
 				await verifyLogMatrixResult(member);
 			}
 		});
+
+		test("can handle date fields", async () => {
+			const { createLog } = await createMember();
+
+			await putLog({
+				id: createId(),
+				memberId: createLog.memberId,
+				operationType: "update",
+				data: {
+					updatedAt: new Date(),
+				},
+				executedAt: new Date(),
+			});
+		});
 	});
 });

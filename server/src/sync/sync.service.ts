@@ -363,13 +363,15 @@ export class SyncService {
 				const fields: Record<string, SQL[]> = {};
 				for (const { id, data } of updateData) {
 					for (const field of Object.keys(data)) {
-						if (data[field] !== undefined) {
+						let value = data[field] as unknown;
+						if (value !== undefined) {
 							if (!fields[field]) {
 								fields[field] = [];
 							}
-							fields[field].push(
-								sql`when ${model.table.id} = ${id} then ${data[field]}`,
-							);
+							if (value instanceof Date) {
+								value = value.toISOString();
+							}
+							fields[field].push(sql`when ${model.table.id} = ${id} then ${value}`);
 						}
 					}
 				}
