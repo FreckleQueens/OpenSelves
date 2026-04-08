@@ -21,21 +21,25 @@ test("register", async ({ page }) => {
 	await page.waitForURL("/main");
 });
 
-test("login", async ({ page, context }) => {
-	await page.goto("/auth");
-
-	const form = page.locator("form.login");
-	await form.locator("input[name=email]").fill(email);
-	await form.locator("input[name=password]").fill("12345678");
-	await form.getByRole("button", { name: "Login" }).click();
-
-	await page.waitForURL("/main");
-	cookies = await context.cookies();
-	key = await page.evaluate(async () => (await window.openselves.Storage.getStorage()).getKey());
-	expect(key).toBeDefined();
-});
-
 async function login(page: Page, context: BrowserContext) {
+	await page.goto("/");
+
+	if (cookies.length === 0) {
+		await page.goto("/auth");
+
+		const form = page.locator("form.login");
+		await form.locator("input[name=email]").fill(email);
+		await form.locator("input[name=password]").fill("12345678");
+		await form.getByRole("button", { name: "Login" }).click();
+
+		await page.waitForURL("/main");
+		cookies = await context.cookies();
+		key = await page.evaluate(async () =>
+			(await window.openselves.Storage.getStorage()).getKey(),
+		);
+		expect(key).toBeDefined();
+	}
+
 	await context.addCookies(cookies);
 	await page.waitForFunction(() => !!window.openselves);
 	await page.evaluate(async (key) => {
@@ -43,9 +47,13 @@ async function login(page: Page, context: BrowserContext) {
 		window.openselves.SyncWorker.getInstance().resume();
 	}, key);
 }
-test("create member", async ({ page, context }) => {
-	await page.goto("/members");
+test("login", async ({ page, context }) => {
 	await login(page, context);
+});
+
+test("create member", async ({ page, context }) => {
+	await login(page, context);
+	await page.goto("/members");
 	await page.locator("#open-fab-menu-button").click();
 	await page.locator("#create-member-button").click();
 
@@ -64,8 +72,8 @@ test("create member", async ({ page, context }) => {
 });
 
 test("update member no change", async ({ page, context }) => {
-	await page.goto("/members");
 	await login(page, context);
+	await page.goto("/members");
 	await page.getByRole("link", { name: "Alice she/her" }).click();
 	await page.locator("#save-member-button").click();
 
