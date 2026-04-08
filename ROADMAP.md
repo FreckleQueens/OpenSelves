@@ -81,7 +81,7 @@ deadline or ETA
 - [x] set favicon to logo
 - [x] set android app icon to logo
 - [x] self-hosting (choose server url in client)
-- [ ] client config (default server url, web-client listen addr and port)
+- [x] client config (default server url)
 - [ ] api config (listen addr and port)
 - [ ] PWA (service worker)
 
