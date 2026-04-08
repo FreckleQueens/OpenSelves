@@ -32,6 +32,7 @@
 	"Logout": "Se déconnecter",
 	"Members": "Membres",
 	"Name": "Nom",
+	"Offline - #{user.id}": "Hors ligne - #{user.id}",
 	"OpenSelves": "OpenSelves",
 	"Password": "Mot de passe",
 	"Please note that if you close the app instead, you will have to re-enter your credentials manually.": "Attention : si vous fermez l'application, vous devrez à nouveau saisir vos identifiants.",

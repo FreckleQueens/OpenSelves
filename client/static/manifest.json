@@ -1,0 +1,29 @@
+{
+	"name": "OpenSelves",
+	"description": "A free and open source, local-first app for system mapping and front tracking.",
+	"categories": ["lifestyle", "utilities"],
+	"icons": [
+		{
+			"src": "/app-icon.png",
+			"sizes": "4096x4096",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		},
+		{
+			"src": "/favicon_x32.png",
+			"sizes": "32x32",
+			"type": "image/png",
+			"purpose": "any"
+		}
+	],
+	"background_color": "#fff2e9",
+	"theme_color": "#df6800",
+	"display": "standalone",
+	"start_url": "/?pwa_version=1"
+}

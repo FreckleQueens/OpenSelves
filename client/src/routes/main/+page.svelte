@@ -16,6 +16,8 @@
 				email: string;
 		  }
 		| undefined = undefined;
+	let offline = false;
+	let storageKey: string | undefined = undefined;
 
 	const load = (async () => {
 		const storage = await Storage.getStorage();
@@ -26,7 +28,9 @@
 	onMount(async () => {
 		await load;
 		const storage = await Storage.getStorage();
-		if (storage.isOffline()) {
+		if (storage.isOffline() || !navigator.onLine) {
+			offline = true;
+			storageKey = storage.getKey();
 			return;
 		}
 
@@ -68,6 +72,8 @@
 	<Block strong>
 		{#if user}
 			<p>{t("You are logged in as user #{user.id}, {user.email}", user.id, user.email)}</p>
+		{:else if offline && storageKey}
+			<p>{t("Offline - #{user.id}", storageKey)}</p>
 		{:else}
 			<Preloader />
 		{/if}

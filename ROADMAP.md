@@ -82,8 +82,7 @@ deadline or ETA
 - [x] set android app icon to logo
 - [x] self-hosting (choose server url in client)
 - [x] client config (default server url)
-- [ ] api config (listen addr and port)
-- [ ] PWA (service worker)
+- [x] PWA (service worker)
 
 ## 0.4.0
 - [ ] add front (created_at, start_at, end_at, member_id, note)
