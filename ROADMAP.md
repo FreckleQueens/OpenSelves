@@ -77,14 +77,20 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.3.0
+## ✅ 0.3.0
+
+<details>
+  <summary>dev todo</summary>
+
 - [x] set favicon to logo
 - [x] set android app icon to logo
 - [x] self-hosting (choose server url in client)
 - [x] client config (default server url)
 - [x] PWA (service worker)
 
-## 0.4.0
+</details>
+
+## 🚧 0.4.0
 - [ ] add front (created_at, start_at, end_at, member_id, note)
 - [ ] show front list (history table)
 - [ ] edit front
