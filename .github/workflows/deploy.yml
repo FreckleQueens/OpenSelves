@@ -38,4 +38,4 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $VPS_IP >> ~/.ssh/known_hosts
           rsync -avz --delete ./client/build/ github@$VPS_IP:/var/openselves/client/
-          rsync -avz --delete ./server/dist/ github@$VPS_IP:/var/openselves/server/
+          rsync -avz --delete --exclude ".env" ./server/dist/ github@$VPS_IP:/var/openselves/server/
