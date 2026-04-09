@@ -3,11 +3,15 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import ArchivedIcon from "$lib/components/icons/ArchivedIcon.svelte";
+	import FilterIcon from "$lib/components/icons/FilterIcon.svelte";
+	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
+	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
+	import VerticalMenuIcon from "$lib/components/icons/VerticalMenuIcon.svelte";
 	import { IDB } from "$lib/idb";
 	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 	import { Storage } from "$lib/storage";
-	import Icon from "@iconify/svelte";
-	import { Card, Dialog, Fab, Link, List, ListItem, Toggle, useTheme } from "konsta/svelte";
+	import { Card, Dialog, Fab, Link, List, ListItem, Toggle } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
 	import { onDestroy, onMount } from "svelte";
 	import { crossfade, fly, scale } from "svelte/transition";
@@ -133,12 +137,7 @@
 							onclick={() => (showFilterDialog = true)}
 						>
 							{#snippet icon()}
-								<Icon
-									icon={useTheme() === "ios"
-										? "heroicons-outline:filter"
-										: "ic:round-filter-alt"}
-									class="text-2xl"
-								/>
+								<FilterIcon fab />
 							{/snippet}
 						</Fab>
 					</div>
@@ -150,10 +149,7 @@
 						onclick={addMemberButtonOnClick}
 					>
 						{#snippet icon()}
-							<Icon
-								icon={useTheme() === "ios" ? "f7:plus" : "ic:round-plus"}
-								class="text-2xl"
-							/>
+							<PlusIcon fab />
 						{/snippet}
 					</Fab>
 				</div>
@@ -170,12 +166,7 @@
 						oncontextmenu={openFabMenu}
 					>
 						{#snippet icon()}
-							<Icon
-								icon={useTheme() === "ios"
-									? "f7:ellipsis-vertical"
-									: "mdi:dots-vertical"}
-								class="text-2xl"
-							/>
+							<VerticalMenuIcon fab />
 						{/snippet}
 					</Fab>
 				</div>
@@ -187,19 +178,13 @@
 		<Link href={`/members/edit/${member.id}`} class="block">
 			<Card raised>
 				<div class="flex items-center">
-					<Icon
-						icon={useTheme() === "ios" ? "f7:person" : "ic:round-person"}
-						class="text-4xl mr-2"
-					/>
+					<PersonIcon class="text-3xl mr-2" />
 					<div class="flex-1">
 						<p>{member.name}</p>
 						<p class="opacity-70">{member.pronouns}</p>
 					</div>
 					{#if member.isArchived}
-						<Icon
-							icon={useTheme() === "ios" ? "f7:archivebox" : "ic:round-archive"}
-							class="text-4xl opacity-75"
-						/>
+						<ArchivedIcon class="text-3xl opacity-75" />
 					{/if}
 				</div>
 			</Card>

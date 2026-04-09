@@ -1,5 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
+import "../auto-imports";
+
 import { IDB } from "$lib/idb";
 import type { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 import type { Storage } from "$lib/storage";

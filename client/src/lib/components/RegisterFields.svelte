@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { AuthFormData } from "$lib";
 	import AuthFields from "$lib/components/AuthFields.svelte";
-	import Icon from "@iconify/svelte";
-	import { BlockTitle, List, ListInput, useTheme } from "konsta/svelte";
+	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
+	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
+	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
+	import { BlockTitle, List, ListInput } from "konsta/svelte";
 
 	let { formState }: { formState: AuthFormData } = $props();
 </script>
@@ -22,10 +24,7 @@
 			required
 		>
 			{#snippet media()}
-				<Icon
-					icon={useTheme() === "ios" ? "f7:at-alt" : "ic:round-alternate-email"}
-					class="text-2xl"
-				/>
+				<EmailIcon input />
 			{/snippet}
 		</ListInput>
 		<ListInput
@@ -41,10 +40,7 @@
 			autocomplete="new-password"
 		>
 			{#snippet media()}
-				<Icon
-					icon={useTheme() === "ios" ? "f7:lock-shield" : "ic:round-password"}
-					class="text-2xl"
-				/>
+				<PasswordIcon input />
 			{/snippet}
 		</ListInput>
 	</List>
@@ -66,7 +62,7 @@
 			autocomplete="current-password"
 		>
 			{#snippet media()}
-				<Icon icon={useTheme() === "ios" ? "f7:lock" : "ic:round-key"} class="text-2xl" />
+				<PassphraseIcon input />
 			{/snippet}
 		</ListInput>
 	</List>

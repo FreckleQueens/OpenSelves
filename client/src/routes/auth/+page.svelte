@@ -6,9 +6,11 @@
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LoginFields from "$lib/components/LoginFields.svelte";
 	import RegisterFields from "$lib/components/RegisterFields.svelte";
+	import LoginIcon from "$lib/components/icons/LoginIcon.svelte";
+	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
+	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 	import { Storage } from "$lib/storage";
-	import Icon from "@iconify/svelte";
 	import {
 		Block,
 		BlockTitle,
@@ -18,7 +20,6 @@
 		Link,
 		Segmented,
 		SegmentedButton,
-		useTheme,
 	} from "konsta/svelte";
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
@@ -111,7 +112,7 @@
 <AppPage title="" showMenu={false} loading={!loaded} transparentNavbar>
 	{#snippet navbarRight()}
 		<Link href={resolve("/auth/settings")} id="settings-link">
-			<Icon icon={useTheme() === "ios" ? "f7:" : "ic:round-settings"} class="text-3xl" />
+			<SettingsIcon button />
 		</Link>
 	{/snippet}
 
@@ -132,22 +133,14 @@
 				active={activeForm === "login"}
 				onclick={() => (activeForm = forms.login.name)}
 			>
-				<Icon
-					icon={useTheme() === "ios" ? "f7:square-arrow-right" : "ic:round-login"}
-					class="text-2xl mr-1"
-				/>
+				<LoginIcon button before />
 				Login
 			</SegmentedButton>
 			<SegmentedButton
 				active={activeForm === "register"}
 				onclick={() => (activeForm = forms.register.name)}
 			>
-				<Icon
-					icon={useTheme() === "ios"
-						? "f7:person-crop-circle-badge-plus"
-						: "material-symbols:group-add-rounded"}
-					class="text-2xl mr-1"
-				/>
+				<RegisterIcon button before />
 				Register
 			</SegmentedButton>
 		</Segmented>
@@ -194,10 +187,7 @@
 
 		{#snippet buttons()}
 			<DialogButton id="auto-login-button" strong onclick={loginFromRegistration}>
-				<Icon
-					icon={useTheme() === "ios" ? "f7:square-arrow-right" : "ic:round-login"}
-					class="text-2xl mr-2"
-				/>
+				<LoginIcon button before />
 				Login
 			</DialogButton>
 		{/snippet}

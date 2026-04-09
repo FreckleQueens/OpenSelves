@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Icon from "@iconify/svelte";
-	import { Link, useTheme } from "konsta/svelte";
+	import BackIcon from "$lib/components/icons/BackIcon.svelte";
+	import { Link } from "konsta/svelte";
 
 	let {
 		onClick = () => {
@@ -16,5 +16,5 @@
 </script>
 
 <Link onclick={onClick} {href} id="back-link">
-	<Icon icon={useTheme() === "ios" ? "f7:arrow-left" : "ic:round-arrow-back"} class="text-2xl" />
+	<BackIcon button />
 </Link>

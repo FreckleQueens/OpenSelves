@@ -3,9 +3,18 @@
 	import { resolve } from "$app/paths";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
+	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
+	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
+	import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
+	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
+	import DiscardIcon from "$lib/components/icons/DiscardIcon.svelte";
+	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
+	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
+	import PronounsInputIcon from "$lib/components/icons/PronounsInputIcon.svelte";
+	import SaveIcon from "$lib/components/icons/SaveIcon.svelte";
+	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
-	import Icon from "@iconify/svelte";
 	import {
 		Block,
 		BlockTitle,
@@ -19,10 +28,9 @@
 		Segmented,
 		SegmentedButton,
 		Toggle,
-		useTheme,
 	} from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
-	import { onMount } from "svelte";
+	import { type Component, onMount } from "svelte";
 
 	import type { PageProps } from "./$types";
 
@@ -61,19 +69,16 @@
 		Tab,
 		{
 			title: string;
-			iosIcon: string;
-			materialIcon: string;
+			icon: Component;
 		}
 	> = {
 		[Tab.INFO]: {
 			title: t("Info"),
-			iosIcon: "f7:info-circle",
-			materialIcon: "ic:round-info",
+			icon: InfoIcon,
 		},
 		[Tab.SETTINGS]: {
 			title: t("Settings"),
-			iosIcon: "f7:ellipsis",
-			materialIcon: "ic:round-settings",
+			icon: SettingsIcon,
 		},
 	};
 
@@ -128,10 +133,7 @@
 	{#snippet buttons()}
 		<DialogButton onClick={() => (showSaveConfirmDialog = false)}>Cancel</DialogButton>
 		<DialogButton strong onClick={formOnSubmit}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:floppy-disk" : "ic:round-save"}
-				class="text-2xl mr-2"
-			/>
+			<SaveIcon button before />
 			Save
 		</DialogButton>
 	{/snippet}
@@ -148,10 +150,7 @@
 	{#snippet buttons()}
 		<DialogButton onClick={() => (showDiscardChangesDialog = false)}>Cancel</DialogButton>
 		<DialogButton strong onClick={discardChanges} class="k-color-brand-red">
-			<Icon
-				icon={useTheme() === "ios" ? "f7:xmark-circle" : "ic:round-cancel"}
-				class="text-2xl mr-2"
-			/>
+			<DiscardIcon button before />
 			Discard
 		</DialogButton>
 	{/snippet}
@@ -167,10 +166,7 @@
 	{#snippet buttons()}
 		<DialogButton onClick={() => (openDeleteMemberDialog = false)}>Cancel</DialogButton>
 		<DialogButton strong onClick={deleteMember} class="k-color-brand-red">
-			<Icon
-				icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
-				class="text-2xl mr-2"
-			/>
+			<DeleteIcon button before />
 			Delete
 		</DialogButton>
 	{/snippet}
@@ -181,19 +177,13 @@
 		<BackLink onClick={backLinkOnClick} />
 		{#if hasMemberChanged()}
 			<Link onClick={() => (showDiscardChangesDialog = true)}>
-				<Icon
-					icon={useTheme() === "ios" ? "f7:xmark-circle" : "ic:round-cancel"}
-					class="text-2xl"
-				/>
+				<DiscardIcon button />
 			</Link>
 		{/if}
 	{/snippet}
 	{#snippet navbarRight()}
 		<Link id="save-member-button" onClick={formOnSubmit}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:floppy-disk" : "ic:round-save"}
-				class="text-2xl"
-			/>
+			<SaveIcon button />
 		</Link>
 	{/snippet}
 
@@ -204,10 +194,8 @@
 					active={activeTab === parseInt(key)}
 					onClick={() => (activeTab = parseInt(key))}
 				>
-					<Icon
-						icon={useTheme() === "ios" ? tab.iosIcon : tab.materialIcon}
-						class="text-2xl mr-1"
-					/>
+					{@const Comp = tab.icon}
+					<Comp button before />
 					{tab.title}
 				</SegmentedButton>
 			{/each}
@@ -225,12 +213,7 @@
 					bind:value={member.name}
 				>
 					{#snippet media()}
-						<Icon
-							icon={useTheme() === "ios"
-								? "f7:square-pencil"
-								: "ic:round-drive-file-rename-outline"}
-							class="text-2xl"
-						/>
+						<NameInputIcon input />
 					{/snippet}
 				</ListInput>
 				<ListInput
@@ -240,7 +223,7 @@
 					bind:value={member.pronouns}
 				>
 					{#snippet media()}
-						<Icon icon="heroicons:slash-20-solid" class="text-2xl" />
+						<PronounsInputIcon input />
 					{/snippet}
 				</ListInput>
 				<ListInput
@@ -253,10 +236,7 @@
 					bind:value={member.description}
 				>
 					{#snippet media()}
-						<Icon
-							icon={useTheme() === "ios" ? "f7:doc-text" : "ic:round-description"}
-							class="text-2xl"
-						/>
+						<DescriptionInputIcon input />
 					{/snippet}
 				</ListInput>
 			</List>
@@ -286,12 +266,7 @@
 								bind:value={member.archivedReason}
 							>
 								{#snippet media()}
-									<Icon
-										icon={useTheme() === "ios"
-											? "f7:gobackward"
-											: "ic:round-history"}
-										class="text-2xl"
-									/>
+									<ArchiveInputIcon input />
 								{/snippet}
 							</ListInput>
 						</div>
@@ -300,12 +275,7 @@
 
 				<BlockTitle class="text-brand-red">
 					<p class="flex items-center border-b flex-1">
-						<Icon
-							icon={useTheme() === "ios"
-								? "f7:exclamationmark-triangle"
-								: "ic:round-warning"}
-							class="text-2xl mr-1"
-						/>
+						<DangerIcon class="text-xl mr-1" />
 						Danger zone
 					</p>
 				</BlockTitle>
@@ -317,10 +287,7 @@
 						class="k-color-brand-red"
 						type="button"
 					>
-						<Icon
-							icon={useTheme() === "ios" ? "f7:trash" : "ic:round-delete"}
-							class="text-2xl mr-1"
-						/>
+						<DeleteIcon button before />
 						Delete member (irreversible)
 					</Button>
 				</Block>

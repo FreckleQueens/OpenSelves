@@ -5,9 +5,9 @@
 	import { CallResult, call, handleLogout } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
+	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
 	import { Storage } from "$lib/storage";
-	import Icon from "@iconify/svelte";
-	import { Block, BlockTitle, Button, Preloader, useTheme } from "konsta/svelte";
+	import { Block, BlockTitle, Button, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
 	let user:
@@ -82,10 +82,7 @@
 	<BlockTitle medium>Actions</BlockTitle>
 	<Block strong>
 		<Button tonal raised onclick={logoutButtonOnclick}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:square-arrow-left" : "ic:round-logout"}
-				class="text-2xl mr-1"
-			/>
+			<LogoutIcon button before />
 			Logout
 		</Button>
 	</Block>

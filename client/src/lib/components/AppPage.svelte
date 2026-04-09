@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
+	import HomeIcon from "$lib/components/icons/HomeIcon.svelte";
+	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
+	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte.js";
-	import Icon from "@iconify/svelte";
 	import {
 		BlockTitle,
 		Link,
@@ -12,7 +14,6 @@
 		Page,
 		Panel,
 		Preloader,
-		useTheme,
 	} from "konsta/svelte";
 
 	import { transformErrorToReadable } from "../../hooks.client.ts";
@@ -56,10 +57,7 @@
 		<MenuList>
 			<MenuListItem title={t("Home")} active={activeMenuItem === MenuItem.HOME} href="/main">
 				{#snippet media()}
-					<Icon
-						icon={useTheme() === "ios" ? "f7:house-fill" : "ic:round-home"}
-						font-size="24px"
-					/>
+					<HomeIcon class="text-xl" />
 				{/snippet}
 			</MenuListItem>
 			<MenuListItem
@@ -68,10 +66,7 @@
 				href="/members"
 			>
 				{#snippet media()}
-					<Icon
-						icon={useTheme() === "ios" ? "f7:person-2-fill" : "ic:round-people"}
-						font-size="24px"
-					/>
+					<PeopleIcon class="text-xl" />
 				{/snippet}
 			</MenuListItem>
 		</MenuList>
@@ -88,10 +83,7 @@
 			{#snippet left()}
 				{#if showMenu}
 					<Link onClick={() => (openMenu = true)}>
-						<Icon
-							icon={useTheme() === "ios" ? "f7:menu" : "ic:baseline-menu"}
-							class="text-2xl"
-						/>
+						<MenuIcon button />
 					</Link>
 				{/if}
 				{#if navbarLeft}

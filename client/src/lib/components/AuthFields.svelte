@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { AuthFormData } from "$lib";
-	import Icon from "@iconify/svelte";
-	import { Card, useTheme } from "konsta/svelte";
+	import ErrorIcon from "$lib/components/icons/ErrorIcon.svelte";
+	import { Card } from "konsta/svelte";
 	import { type Snippet, onMount } from "svelte";
 
 	let { children, formState }: { children: Snippet; formState: AuthFormData } = $props();
@@ -33,10 +33,7 @@
 {#if formState.generalError}
 	<Card class="k-color-brand-red">
 		<p class="flex items-center">
-			<Icon
-				icon={useTheme() === "ios" ? "f7:exclamationmark-circle" : "ic:baseline-error"}
-				class="text-2xl mr-2 inline"
-			/>
+			<ErrorIcon class="text-xl mr-2 inline" />
 			Error: {formState.generalError}
 		</p>
 	</Card>

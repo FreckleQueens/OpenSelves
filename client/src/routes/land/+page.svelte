@@ -4,9 +4,9 @@
 	import { USER_LANDED_STORAGE_KEY } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
+	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
 	import { Storage } from "$lib/storage";
-	import Icon from "@iconify/svelte";
-	import { Block, BlockTitle, Button, useTheme } from "konsta/svelte";
+	import { Block, BlockTitle, Button } from "konsta/svelte";
 
 	async function goForward() {
 		const client = await Storage.getStorage();
@@ -25,10 +25,7 @@
 
 		<Button id="continue-button" class="w-auto" onClick={goForward}>
 			Continue
-			<Icon
-				icon={useTheme() === "ios" ? "f7:" : "ic:round-arrow-forward"}
-				class="text-2xl ml-1"
-			/>
+			<ContinueIcon button after />
 		</Button>
 	</div>
 </AppPage>

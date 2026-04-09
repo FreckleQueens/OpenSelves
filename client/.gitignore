@@ -27,3 +27,6 @@ test-results
 
 # Yarn
 /.yarn
+
+# Generated
+/auto-imports.d.ts

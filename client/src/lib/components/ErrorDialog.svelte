@@ -1,7 +1,9 @@
 <script lang="ts">
+	import AppErrorIcon from "$lib/components/icons/AppErrorIcon.svelte";
+	import CopyIcon from "$lib/components/icons/CopyIcon.svelte";
+	import DismissIcon from "$lib/components/icons/DismissIcon.svelte";
 	import { globalError } from "$lib/global-error-handling.svelte.js";
-	import Icon from "@iconify/svelte";
-	import { Button, Dialog, useTheme } from "konsta/svelte";
+	import { Button, Dialog } from "konsta/svelte";
 
 	let { additionalErrors = [], onDismiss = undefined } = $props();
 	let errors = $derived([...additionalErrors.filter((error) => !!error), ...globalError]);
@@ -23,12 +25,7 @@
 <Dialog opened={errors.length > 0}>
 	{#snippet title()}
 		<span>
-			<Icon
-				icon={useTheme() === "ios"
-					? "f7:exclamationmark-octagon"
-					: "ic:outline-error-outline"}
-				class="inline text-brand-red"
-			/>
+			<AppErrorIcon class="inline text-brand-red" />
 			Application error
 		</span>
 	{/snippet}
@@ -39,17 +36,11 @@
 
 	{#snippet buttons()}
 		<Button class="k-color-brand-red" onclick={dismissError}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:xmark" : "ic:round-close"}
-				class="text-2xl mr-2"
-			/>
+			<DismissIcon button before />
 			Dismiss
 		</Button>
 		<Button class="k-color-brand-primary" onclick={copyErrorToClipboard}>
-			<Icon
-				icon={useTheme() === "ios" ? "f7:doc-on-clipboard-fill" : "ic:round-content-copy"}
-				class="text-2xl mr-2"
-			/>
+			<CopyIcon button before />
 			Copy
 		</Button>
 	{/snippet}
