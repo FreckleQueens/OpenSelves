@@ -209,7 +209,10 @@ describe("/sync/pull", () => {
 			expect(logs.length).toBe(logs1.length);
 			for (let i = 0; i < logs.length; i++) {
 				const log: Log = logs[i] as Log;
-				const { userId, deletedId, executedAt, pushedAt, ...expectedLog }: Log = logs1[i];
+				const expectedSentLog = logs1.find((sentLog) => sentLog.id === log.id);
+				expect(expectedSentLog).toBeDefined();
+				const { userId, deletedId, executedAt, pushedAt, ...expectedLog }: Log =
+					expectedSentLog as Log;
 				expect(log).toStrictEqual({
 					...expectedLog,
 					executedAt: executedAt.toISOString(),

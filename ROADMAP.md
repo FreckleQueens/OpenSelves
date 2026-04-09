@@ -93,6 +93,8 @@ deadline or ETA
 ## 🚧 0.4.0
 - [x] client: offline icons
 - [x] client: improve service worker's ability to start from offline
+- [ ] client: don't show network errors, simply put the app in offline mode
+- [ ] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
 - [ ] add front (created_at, start_at, end_at, member_id, note)
 - [ ] show front list (history table)
 - [ ] edit front

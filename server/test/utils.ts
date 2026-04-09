@@ -12,8 +12,6 @@ import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
 import type { DB } from "../src/db/drizzle.js";
 
-let wasDbCleaned = false;
-
 type CreateUsersEnv = {
 	db: DB;
 	registrationPassword: string;
@@ -89,11 +87,6 @@ export function setupTestSuite(
 			registrationPassword,
 			server,
 		};
-
-		if (!wasDbCleaned) {
-			wasDbCleaned = true;
-			await createUsersEnv.db.delete(users);
-		}
 
 		env = {
 			...createUsersEnv,
