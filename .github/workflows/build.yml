@@ -60,7 +60,7 @@ jobs:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
       - name: Get installed Playwright version
         id: playwright-version
-        run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+        run: 'cd client && echo "PLAYWRIGHT_VERSION=$(yarn info --name-only "@playwright/test" | cut -d"@" -f3 | cut -d: -f2)" >> $GITHUB_ENV'
       - name: Cache playwright binaries
         uses: actions/cache@v5
         id: playwright-cache
