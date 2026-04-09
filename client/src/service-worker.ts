@@ -16,51 +16,71 @@ const ASSETS = [
 	...files, // everything in `static`
 ];
 
-self.addEventListener("install", (event) => {
-	console.debug("install", CACHE, event);
+self.addEventListener("install", async (event) => {
+	console.debug("install");
 
 	event.waitUntil(
 		(async () => {
-			const cache = await caches.open(CACHE);
+			const cache = await self.caches.open(CACHE);
 			await cache.addAll(ASSETS);
 		})(),
 	);
+
+	await self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
-	console.debug("activate", CACHE, event);
+	console.debug("activate");
 
 	event.waitUntil(
 		(async () => {
-			for (const key of await caches.keys()) {
-				if (key !== CACHE) await caches.delete(key);
+			for (const key of await self.caches.keys()) {
+				if (key !== CACHE) await self.caches.delete(key);
 			}
+			await self.clients.claim();
 		})(),
 	);
 });
 self.addEventListener("fetch", (event) => {
-	console.debug("fetch", CACHE, event);
+	console.debug("fetch");
 
 	if (event.request.method === "GET") {
 		event.respondWith(
 			(async () => {
 				const url = new URL(event.request.url);
-				const cache = await caches.open(CACHE);
+				const cache = await self.caches.open(CACHE);
 
-				if (ASSETS.includes(url.pathname)) {
+				if (url.pathname !== "/service-worker.ts" && ASSETS.includes(url.pathname)) {
 					const response = await cache.match(url.pathname);
+					console.debug("asset cache hit", url.pathname);
 
 					if (response) {
 						return response;
 					}
 				}
 
-				const response = await fetch(event.request);
+				try {
+					const response = await fetch(event.request);
 
-				if (!(response instanceof Response)) {
-					throw new Error("invalid response from fetch");
+					if (!(response instanceof Response)) {
+						throw new Error("invalid response from fetch");
+					}
+
+					if (response.status === 200) {
+						console.log("new cache", url.pathname);
+						await cache.put(event.request, response.clone());
+					}
+
+					return response;
+				} catch (error) {
+					const response = await cache.match(event.request);
+
+					if (response) {
+						console.log("fallback cache hit", url.pathname);
+						return response;
+					}
+
+					throw error;
 				}
-
-				return response;
 			})(),
 		);
 	}

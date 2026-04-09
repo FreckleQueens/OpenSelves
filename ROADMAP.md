@@ -92,7 +92,7 @@ deadline or ETA
 
 ## 🚧 0.4.0
 - [x] client: offline icons
-- [ ] client: improve service worker's ability to start from offline
+- [x] client: improve service worker's ability to start from offline
 - [ ] add front (created_at, start_at, end_at, member_id, note)
 - [ ] show front list (history table)
 - [ ] edit front
