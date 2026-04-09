@@ -58,7 +58,7 @@ export async function call(
 	};
 
 	const tryFetch = async () => await fetch(`${apiState.url}${path}`, fetchInit);
-	let response: Response | undefined = undefined;
+	let response: Response;
 	let responseBody: Record<string, unknown> | undefined = undefined;
 
 	for (let attempt = 0; attempt < 3; attempt++) {

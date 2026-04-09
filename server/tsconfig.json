@@ -1,7 +1,9 @@
 {
 	"extends": "openselves-common/tsconfig.json",
 	"compilerOptions": {
-		"outDir": "./dist"
+		"rootDir": "./src",
+		"outDir": "./dist",
+		"tsBuildInfoFile": "./dist/.tsbuildinfo"
 	},
 	"include": ["./src/**/*", "./test/**/*"],
 	"exclude": ["./node_modules/**/*"]
