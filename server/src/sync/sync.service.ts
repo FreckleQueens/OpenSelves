@@ -39,6 +39,12 @@ type SyncedModelParams<T extends TableMap = TableMap> = {
 	modelIdLogKey: keyof (typeof models)["logs"] & T["modelIdLogKey"];
 };
 type SyncedModels<T extends TableMap = TableMap> = Record<T["table"], SyncedModelParams<T>>;
+
+/**
+ * !!ORDER MATTERS!!
+ * Must be ordered by cascade delete dependency so that deleting from next model won't cascade
+ * delete from previous model.
+ */
 export const syncedModels: SyncedModels = {
 	members: {
 		name: "members",
@@ -486,7 +492,7 @@ export class SyncService {
 		userId: string,
 		recordsToDelete: RecordsToDelete,
 	) {
-		for (const model of Object.values(syncedModels)) {
+		for (const model of Object.values(syncedModels).reverse()) {
 			const recordsToDeleteIds = recordsToDelete[model.name];
 			if (recordsToDeleteIds && recordsToDeleteIds.length > 0) {
 				const deletedRecords = await tx

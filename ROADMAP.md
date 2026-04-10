@@ -95,7 +95,7 @@ deadline or ETA
 - [x] client: improve service worker's ability to start from offline
 - [x] db: fronts
 - [x] server: create, update, delete fronts
-- [ ] server: both fronts and members in single request
+- [x] server: both fronts and members in single request
 - [ ] client: add front
 - [ ] client: show front list (history table)
 - [ ] client: edit front

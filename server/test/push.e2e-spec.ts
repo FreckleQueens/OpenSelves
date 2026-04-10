@@ -652,5 +652,78 @@ describe(pushEndpoint, () => {
 			await putLog(deleteLog);
 			await checkLogIsServed(deleteLog);
 		});
+
+		test("create member and front in same request", async () => {
+			const date = new Date();
+			const { createLog: memberCreateLog } = makeMemberWithLog(date);
+			const { createLog: frontCreateLog } = makeFrontWithLog(date, memberCreateLog);
+			await putLogs([memberCreateLog, frontCreateLog]);
+			await checkLogIsServed(memberCreateLog);
+			await checkLogIsServed(frontCreateLog);
+		});
+
+		test("do operations on both members and fronts in a single request", async () => {
+			const date = new Date();
+			const { createLog: frontCreateLog, memberCreateLog } = await createFrontEntry();
+			const { createLog: frontCreateLogToDelete, memberCreateLog: memberCreateLogToDelete } =
+				await createFrontEntry();
+			const { createLog: member2CreateLog } = makeMemberWithLog(date);
+			const { createLog: front2CreateLog } = makeFrontWithLog(date, memberCreateLog);
+			const logs: ClientLog[] = [
+				member2CreateLog,
+				front2CreateLog,
+				{
+					id: createId(),
+					memberId: memberCreateLog.memberId,
+					operationType: "update",
+					data: {
+						description: "a new description",
+						updatedAt: new Date(),
+					},
+					executedAt: new Date(),
+				},
+				{
+					id: createId(),
+					frontId: frontCreateLog.frontId,
+					operationType: "update",
+					data: {
+						memberId: member2CreateLog.memberId,
+						note: "oopsie",
+						updatedAt: new Date(),
+					},
+					executedAt: new Date(),
+				},
+				{
+					id: createId(),
+					memberId: member2CreateLog.memberId,
+					operationType: "update",
+					data: {
+						description: "another new description",
+						updatedAt: new Date(),
+					},
+					executedAt: new Date(),
+				},
+				{
+					id: createId(),
+					frontId: frontCreateLogToDelete.frontId,
+					operationType: "delete",
+					data: null,
+					executedAt: new Date(),
+				},
+				{
+					id: createId(),
+					memberId: memberCreateLogToDelete.memberId,
+					operationType: "delete",
+					data: null,
+					executedAt: new Date(),
+				},
+			];
+			await putLogs(logs);
+
+			await getSyncFrom("init");
+			for (const log of logs.slice(0, -2)) {
+				await checkLogIsServed(log);
+			}
+		});
 	});
 });
