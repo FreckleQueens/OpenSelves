@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
-import type { Log, Member, MemberCreate } from "openselves-common/db";
+import type { FrontCreate, Log, Member, MemberCreate } from "openselves-common/db";
 import request from "supertest";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
@@ -8,8 +8,9 @@ import { type TestEnv, setupTestSuite } from "./utils.js";
 const pushEndpoint = "/sync/push";
 const pullEndpoint = "/sync/pull";
 
-type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId"> & {
-	memberId: string;
+type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId" | "frontId"> & {
+	memberId?: string;
+	frontId?: string;
 };
 type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt">;
 
@@ -26,7 +27,9 @@ describe(pushEndpoint, () => {
 			createdAt: date,
 			updatedAt: date,
 		};
-		const createLog: ClientLog = {
+		const createLog: ClientLog & {
+			memberId: string;
+		} = {
 			id: createId(),
 			memberId: createId(),
 			operationType: "create",
@@ -34,6 +37,30 @@ describe(pushEndpoint, () => {
 			executedAt: date,
 		};
 		return { member, createLog, date };
+	}
+
+	function makeFrontWithLog(date: Date, memberCreateLog: ClientLog) {
+		if (!memberCreateLog.memberId) {
+			throw new Error("Missing memberId on memberCreateLog");
+		}
+		const front: Omit<FrontCreate, "userId" | "id"> = {
+			memberId: memberCreateLog.memberId,
+			note: "A note on this front",
+			startedAt: new Date(),
+			endedAt: new Date(Date.now() + 60 * 1000),
+			createdAt: date,
+			updatedAt: date,
+		};
+		const createLog: ClientLog & {
+			frontId: string;
+		} = {
+			id: createId(),
+			frontId: createId(),
+			operationType: "create",
+			data: front,
+			executedAt: date,
+		};
+		return { front, createLog, memberCreateLog, date };
 	}
 
 	async function putLog(
@@ -64,12 +91,14 @@ describe(pushEndpoint, () => {
 		const response = await putLog(createLog);
 		expect(response.body.logs).not.toBeDefined();
 		await checkLogIsServed(createLog);
-		return { member, createLog };
+		return { member, createLog, response };
 	}
 	async function createAndDeleteMember() {
 		const { member, createLog } = await createMember();
 
-		const deleteLog: ClientLog = {
+		const deleteLog: ClientLog & {
+			memberId: string;
+		} = {
 			...createLog,
 			id: createId(),
 			operationType: "delete",
@@ -78,6 +107,15 @@ describe(pushEndpoint, () => {
 		};
 		const response = await putLog(deleteLog);
 		return { member, deleteLog, response };
+	}
+
+	async function createFrontEntry() {
+		const { member, createLog: memberCreateLog } = await createMember();
+		const { front, createLog } = makeFrontWithLog(new Date(), memberCreateLog);
+		const response = await putLog(createLog);
+		expect(response.body.logs).not.toBeDefined();
+		await checkLogIsServed(createLog);
+		return { front, createLog, member, memberCreateLog, response };
 	}
 
 	async function getSyncFrom(timestamp: number | "init", cookies: string = env.users.cookies) {
@@ -94,7 +132,12 @@ describe(pushEndpoint, () => {
 		return response;
 	}
 
-	async function checkLogIsServed(logToCheck: Record<string, unknown>) {
+	async function checkLogIsServed(logToCheck: ClientLog) {
+		const logToCheckServer: Omit<Log, "userId" | "pushedAt" | "deletedId"> = {
+			memberId: null,
+			frontId: null,
+			...logToCheck,
+		};
 		const response = await getSyncFrom(0);
 		const pulledLogs = response.body.logs as Array<unknown>;
 		const pulledLog = pulledLogs.find(
@@ -103,7 +146,7 @@ describe(pushEndpoint, () => {
 		expect(pulledLog).toBeDefined();
 		expect(pulledLog).toStrictEqual(
 			Object.fromEntries(
-				Object.entries(logToCheck).map(([key, value]) => {
+				Object.entries(logToCheckServer).map(([key, value]) => {
 					if (value instanceof Date) {
 						value = value.toISOString();
 					} else if (value && typeof value === "object") {
@@ -338,7 +381,9 @@ describe(pushEndpoint, () => {
 				makeMemberWithLog(new Date(2)),
 				makeMemberWithLog(new Date(4)),
 			];
-			const logs: ClientLog[] = [
+			const logs: (ClientLog & {
+				memberId: string;
+			})[] = [
 				members[0].createLog,
 				members[1].createLog,
 				{
@@ -573,6 +618,39 @@ describe(pushEndpoint, () => {
 				},
 				executedAt: new Date(),
 			});
+		});
+
+		test("create front", async () => {
+			await createFrontEntry();
+		});
+
+		test("update front", async () => {
+			const { createLog } = await createFrontEntry();
+			const updateLog: ClientLog = {
+				id: createId(),
+				frontId: createLog.frontId,
+				operationType: "update",
+				data: {
+					note: "hi",
+					endedAt: new Date(),
+				},
+				executedAt: new Date(),
+			};
+			await putLog(updateLog);
+			await checkLogIsServed(updateLog);
+		});
+
+		test("delete front", async () => {
+			const { createLog } = await createFrontEntry();
+			const deleteLog: ClientLog = {
+				id: createId(),
+				frontId: createLog.frontId,
+				operationType: "delete",
+				data: null,
+				executedAt: new Date(),
+			};
+			await putLog(deleteLog);
+			await checkLogIsServed(deleteLog);
 		});
 	});
 });

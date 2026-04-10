@@ -93,13 +93,16 @@ deadline or ETA
 ## 🚧 0.4.0
 - [x] client: offline icons
 - [x] client: improve service worker's ability to start from offline
+- [x] db: fronts
+- [x] server: create, update, delete fronts
+- [ ] server: both fronts and members in single request
+- [ ] client: add front
+- [ ] client: show front list (history table)
+- [ ] client: edit front
+- [ ] client: delete front
+- [ ] client: show current fronts
 - [ ] client: don't show network errors, simply put the app in offline mode
 - [ ] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
-- [ ] add front (created_at, start_at, end_at, member_id, note)
-- [ ] show front list (history table)
-- [ ] edit front
-- [ ] delete front
-- [ ] show current fronts
 
 ## 0.5.0
 - [ ] client: switch to a better md3 library

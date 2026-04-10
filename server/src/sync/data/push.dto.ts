@@ -11,21 +11,43 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from "class-validator";
-import type { Log, Member } from "openselves-common/db";
+import type { Front, Log, Member } from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
 type OmitBaseFields<K> = Omit<K, "id" | "userId">;
 
-class PushRecordDto {
+class PushRecordCreateDto {
 	@IsIn([undefined])
 	public readonly id!: undefined;
 
 	@IsIn([undefined])
 	public readonly userId!: undefined;
+
+	@IsDate()
+	public readonly createdAt!: Date;
+
+	@IsDate()
+	public readonly updatedAt!: Date;
 }
 
-export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields<Member> {
+class PushRecordUpdateDto {
+	@IsIn([undefined])
+	public readonly id!: undefined;
+
+	@IsIn([undefined])
+	public readonly userId!: undefined;
+
+	@IsOptional()
+	@IsDate()
+	public readonly createdAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	public readonly updatedAt?: Date;
+}
+
+export class PushCreateMemberDto extends PushRecordCreateDto implements OmitBaseFields<Member> {
 	@IsString()
 	public readonly name!: string;
 
@@ -41,15 +63,29 @@ export class PushCreateMemberDto extends PushRecordDto implements OmitBaseFields
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason!: string | null;
-
-	@IsDate()
-	public readonly createdAt!: Date;
-
-	@IsDate()
-	public readonly updatedAt!: Date;
 }
 
-export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBaseFields<Member>> {
+export class PushCreateFrontDto extends PushRecordCreateDto implements OmitBaseFields<Front> {
+	@IsCuid2()
+	public readonly memberId!: string;
+
+	@IsDate()
+	public readonly startedAt!: Date;
+
+	@ValidateIf((object, value) => value !== null)
+	@IsDate()
+	@Type(() => Date)
+	public readonly endedAt!: Date | null;
+
+	@IsString()
+	@ValidateIf((object, value) => value !== null)
+	public readonly note!: string | null;
+}
+
+export class PushUpdateMemberDto
+	extends PushRecordUpdateDto
+	implements Partial<OmitBaseFields<Member>>
+{
 	@IsString()
 	@IsNumber()
 	@IsIn([undefined])
@@ -90,45 +126,99 @@ export class PushUpdateMemberDto extends PushRecordDto implements Partial<OmitBa
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason?: string | null;
+}
+
+export class PushUpdateFrontDto
+	extends PushRecordUpdateDto
+	implements Partial<OmitBaseFields<Front>>
+{
+	@IsString()
+	@IsNumber()
+	@IsIn([undefined])
+	@ValidateIf((object) => {
+		const obj = object as unknown;
+		if (!obj || typeof obj !== "object") return true;
+		return !["memberId", "startedAt", "endedAt", "note", "createdAt", "updatedAt"].find(
+			(field) => {
+				return typeof obj[field] !== "undefined";
+			},
+		);
+	})
+	public readonly _atLeastOneFieldIsRequired!: undefined;
+
+	@IsOptional()
+	@IsCuid2()
+	public readonly memberId?: string;
 
 	@IsOptional()
 	@IsDate()
-	public readonly createdAt?: Date;
+	public readonly startedAt?: Date;
 
 	@IsOptional()
 	@IsDate()
-	public readonly updatedAt?: Date;
+	@Type(() => Date)
+	@ValidateIf((object, value) => value !== null)
+	public readonly endedAt?: Date | null;
+
+	@IsOptional()
+	@IsString()
+	@ValidateIf((object, value) => value !== null)
+	public readonly note?: string | null;
 }
 
 export type CreateOperation = {
 	type: "create";
 	data: PushCreateMemberDto;
-	memberId: string;
+	recordId: string | null;
 	deletedId: null;
 };
 export type UpdateOperation = {
 	type: "update";
 	data: PushUpdateMemberDto;
-	memberId: string;
+	recordId: string | null;
 	deletedId: null;
 };
 export type DeleteOperation = {
 	type: "delete";
 	data: undefined;
-	memberId: null;
+	recordId: null;
 	deletedId: string;
 };
 export type OperationType = CreateOperation | UpdateOperation | DeleteOperation;
 
-export class PushLogDto<Op extends OperationType = OperationType> implements Omit<
+type ClientPushLog = Omit<
 	Log,
-	"userId" | "pushedAt" | "deletedId" | "data"
-> {
+	"userId" | "pushedAt" | "deletedId" | "data" | "memberId" | "frontId"
+> & {
+	memberId?: string;
+	frontId?: string;
+};
+
+export class PushLogDto<Op extends OperationType = OperationType> implements ClientPushLog {
+	@IsString()
+	@IsNumber()
+	@IsIn([undefined])
+	@ValidateIf((object) => {
+		const obj = object as unknown;
+		if (!obj || typeof obj !== "object") return true;
+		return (
+			["memberId", "frontId"].filter((field) => {
+				return typeof obj[field] !== "undefined";
+			}).length !== 1
+		);
+	})
+	public readonly _exactlyOneRecordIdIsRequired!: undefined;
+
 	@IsCuid2()
 	public readonly id!: string;
 
+	@IsOptional()
 	@IsCuid2()
-	public readonly memberId!: string;
+	public readonly memberId?: string;
+
+	@IsOptional()
+	@IsCuid2()
+	public readonly frontId?: string;
 
 	@IsIn(["create", "update", "delete"])
 	public readonly operationType!: Op["type"];
@@ -144,11 +234,25 @@ export class PushLogDto<Op extends OperationType = OperationType> implements Omi
 	})
 	@ValidateNested()
 	@Type((helper) => {
+		const types = {
+			member: [PushCreateMemberDto, PushUpdateMemberDto],
+			front: [PushCreateFrontDto, PushUpdateFrontDto],
+		};
+		let model: keyof typeof types | null = null;
+		if (helper?.object.memberId) {
+			model = "member";
+		}
+		if (helper?.object.frontId) {
+			model = "front";
+		}
+		if (model === null) {
+			return Object;
+		}
 		switch (helper?.object.operationType) {
 			case "create":
-				return PushCreateMemberDto;
+				return types[model][0];
 			case "update":
-				return PushUpdateMemberDto;
+				return types[model][1];
 			case "delete":
 			default:
 				return Object;

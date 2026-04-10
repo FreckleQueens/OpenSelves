@@ -4,6 +4,7 @@ import {
 	Controller,
 	HttpCode,
 	HttpStatus,
+	InternalServerErrorException,
 	Post,
 	Put,
 	Req,
@@ -15,7 +16,7 @@ import { InjectDb } from "../db/db.service.js";
 import type { DB } from "../db/drizzle.js";
 import { PullDto } from "./data/pull.dto.js";
 import { PushDto } from "./data/push.dto.js";
-import { SyncService } from "./sync.service.js";
+import { SyncService, syncedModels } from "./sync.service.js";
 
 export type ClientLog = Omit<Log, "userId" | "deletedId" | "pushedAt">;
 
@@ -84,7 +85,14 @@ export class SyncController {
 		return rawLogs.map((log) => {
 			const { userId, deletedId, pushedAt, ...newLog } = log;
 			if (log.operationType === "delete") {
-				newLog.memberId = (deletedId as string).split(".")[1];
+				const [table, recordId] = (deletedId as string).split(".");
+				const model = Object.values(syncedModels).find((model) => model.name === table);
+				if (!model) {
+					throw new InternalServerErrorException(
+						"Got record of non-synced model " + table,
+					);
+				}
+				newLog[model.modelIdLogKey] = recordId;
 			}
 			return newLog;
 		});

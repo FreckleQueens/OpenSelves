@@ -174,5 +174,5 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 		}
 	}
 
-	protected abstract getLogIdKey(): keyof Log & string & "memberId";
+	protected abstract getLogIdKey(): keyof Log & string;
 }

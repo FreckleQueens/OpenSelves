@@ -6,6 +6,7 @@ export const relations = defineRelations(models, (r) => ({
 		sessions: r.many.sessions(),
 		logs: r.many.logs(),
 		members: r.many.members(),
+		fronts: r.many.fronts(),
 	},
 	sessions: {
 		user: r.one.users({
@@ -19,14 +20,30 @@ export const relations = defineRelations(models, (r) => ({
 			to: r.users.id,
 		}),
 		member: r.one.members({
-			from: r.logs.memberId,
-			to: r.members.id,
+			from: [r.logs.userId, r.logs.memberId],
+			to: [r.members.userId, r.members.id],
+		}),
+		front: r.one.fronts({
+			from: [r.logs.userId, r.logs.frontId],
+			to: [r.fronts.userId, r.fronts.id],
 		}),
 	},
 	members: {
 		user: r.one.users({
 			from: r.members.userId,
 			to: r.users.id,
+		}),
+		fronts: r.many.fronts(),
+		logs: r.many.logs(),
+	},
+	fronts: {
+		user: r.one.users({
+			from: r.fronts.userId,
+			to: r.users.id,
+		}),
+		member: r.one.members({
+			from: [r.fronts.userId, r.fronts.memberId],
+			to: [r.members.userId, r.members.id],
 		}),
 		logs: r.many.logs(),
 	},

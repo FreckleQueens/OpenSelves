@@ -11,8 +11,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { id } from "./utils.js";
 import { members } from "./members.js";
-import { and, eq, inArray, isNotNull, isNull, not, or, SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, not, or, sql, SQL } from "drizzle-orm";
 import { users } from "./users.js";
+import { fronts } from "./fronts.js";
 
 export const logOperationType = pgEnum("logOperationType", ["create", "update", "delete"]);
 export const logs = pgTable(
@@ -25,6 +26,7 @@ export const logs = pgTable(
 			}),
 		...id,
 		memberId: text(),
+		frontId: text(),
 		operationType: logOperationType().notNull(),
 		data: json(),
 		deletedId: text(),
@@ -39,23 +41,29 @@ export const logs = pgTable(
 			columns: [table.userId, table.memberId],
 			foreignColumns: [members.userId, members.id],
 		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.userId, table.frontId],
+			foreignColumns: [fronts.userId, fronts.id],
+		}).onDelete("cascade"),
 		uniqueIndex("unique_create_delete")
-			.on(table.userId, table.memberId, table.operationType)
+			.on(table.userId, table.memberId, table.frontId, table.operationType)
 			.where(inArray(table.operationType, ["create", "delete"])),
 		check(
-			"delete_or_has_ref_id_check",
-			or(eq(table.operationType, "delete"), isNotNull(table.memberId)) as SQL,
-		),
-		check(
-			"deletedId_check",
+			"deleteOperation_check",
 			or(
-				and(eq(table.operationType, "delete"), isNotNull(table.deletedId)),
-				and(not(eq(table.operationType, "delete")), isNull(table.deletedId)),
+				and(
+					eq(table.operationType, "delete"),
+					eq(sql`num_nonnulls(${table.memberId}, ${table.frontId})`, 0),
+					isNotNull(table.deletedId),
+					isNull(table.data),
+				),
+				and(
+					not(eq(table.operationType, "delete")),
+					eq(sql`num_nonnulls(${table.memberId}, ${table.frontId})`, 1),
+					isNull(table.deletedId),
+					isNotNull(table.data),
+				),
 			) as SQL,
-		),
-		check(
-			"delete_op_data_null_check",
-			or(not(eq(table.operationType, "delete")), isNull(table.data)) as SQL,
 		),
 	],
 );

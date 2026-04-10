@@ -61,22 +61,18 @@ export abstract class IDBModel<Model extends ModelBase> {
 		for (const [key, column] of Object.entries(this.getDrizzleModel())) {
 			keys.push(key);
 
-			if (!(key in record)) {
-				throw new Error(`${this.storeName} record doesn't have expected key ${key}`, {
-					cause: record,
-				});
-			}
-
-			if (record[key] === null) {
+			if (!(key in record) || record[key] === null) {
 				if (column.notNull) {
 					throw new Error(
-						`${this.storeName} record[${key}] is null but column is notNull`,
+						`${this.storeName} record doesn't have required, non-null key ${key} (${record[key]})`,
 						{
 							cause: record,
 						},
 					);
 				} else {
-					out[key] = record[key];
+					if (record[key] !== undefined) {
+						out[key] = record[key];
+					}
 					continue;
 				}
 			}
