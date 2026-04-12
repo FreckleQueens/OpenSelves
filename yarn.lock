@@ -2867,9 +2867,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sveltejs/kit@npm:^2.57.0":
-  version: 2.57.0
-  resolution: "@sveltejs/kit@npm:2.57.0"
+"@sveltejs/kit@npm:^2.57.1":
+  version: 2.57.1
+  resolution: "@sveltejs/kit@npm:2.57.1"
   dependencies:
     "@standard-schema/spec": "npm:^1.0.0"
     "@sveltejs/acorn-typescript": "npm:^1.0.5"
@@ -2896,7 +2896,7 @@ __metadata:
       optional: true
   bin:
     svelte-kit: svelte-kit.js
-  checksum: 10c0/387d418fc711591dcfc8119251b8d3dbde98961f435b1862673cf61fe7623ab8699ea1185883844fe043ad2d3947b5539ca0cc41c69a131a2e73d04c140c9463
+  checksum: 10c0/53a15aa190931f34449f887e1f4ca433788220a15221dafaed82cdb120655fe8826fb6089bad4d3ca48540db4d48147652c97d3a414f7d06ba419c3ea0bdce19
   languageName: node
   linkType: hard
 
@@ -9992,7 +9992,7 @@ __metadata:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     "@playwright/test": "npm:=1.58.2"
     "@sveltejs/adapter-static": "npm:^3.0.10"
-    "@sveltejs/kit": "npm:^2.57.0"
+    "@sveltejs/kit": "npm:^2.57.1"
     "@sveltejs/vite-plugin-svelte": "npm:^7.0.0"
     "@tailwindcss/vite": "npm:^4.2.2"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
