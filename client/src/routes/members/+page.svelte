@@ -3,23 +3,25 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import ArchivedIcon from "$lib/components/icons/ArchivedIcon.svelte";
+	import FabMenu from "$lib/components/FabMenu.svelte";
+	import MemberCard from "$lib/components/MemberCard.svelte";
 	import FilterIcon from "$lib/components/icons/FilterIcon.svelte";
-	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
-	import VerticalMenuIcon from "$lib/components/icons/VerticalMenuIcon.svelte";
 	import { IDB } from "$lib/idb";
-	import type { IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
+	import { subscribeToModel } from "$lib/idb/component-utils";
 	import { Storage } from "$lib/storage";
-	import { Card, Dialog, Fab, Link, List, ListItem, Toggle } from "konsta/svelte";
+	import { Dialog, List, ListItem, Toggle } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
-	import { onDestroy, onMount } from "svelte";
-	import { crossfade, fly, scale } from "svelte/transition";
+	import { onMount } from "svelte";
 
-	let members: Member[] = $state([]);
+	let members: {
+		records: Member[];
+	} = $state({
+		records: [],
+	});
 	let showArchivedMembers = $state(false);
 	let shownMembers: Member[] = $derived(
-		members
+		members.records
 			.filter((member) => showArchivedMembers || !member.isArchived)
 			.sort((a, b) => {
 				if (a.name < b.name) {
@@ -32,37 +34,16 @@
 			}),
 	);
 	let showFilterDialog: boolean = $state(false);
+	let pageContent: HTMLDivElement | undefined = $state();
 
-	let membersSubscription: (event: IDBSyncedModelEvent<Member>) => void;
+	subscribeToModel(async () => {
+		const idb = await IDB.getClient();
+		return idb.member;
+	}, members);
+
 	onMount(async () => {
 		const storage = await Storage.getStorage();
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
-
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
-		membersSubscription = idb.member.subscribe((event) => {
-			for (const member of event.savedRecords) {
-				const index = members.findIndex((localMember) => localMember.id === member.id);
-				if (index >= 0) {
-					members[index] = member;
-				} else {
-					members.push(member);
-				}
-			}
-
-			for (const id of event.deletedRecordIds) {
-				const index = members.findIndex((localMember) => localMember.id === id);
-				if (index >= 0) {
-					members.splice(index, 1);
-				}
-			}
-		});
-		members = await idb.member.getByField("userId", userId);
-	});
-
-	onDestroy(async () => {
-		const idb = await IDB.getClient();
-		idb.member.unsubscribe(membersSubscription);
 	});
 
 	async function addMemberButtonOnClick() {
@@ -74,39 +55,6 @@
 		const storage = await Storage.getStorage();
 		await storage.set("showArchivedMembers", showArchivedMembers ? "on" : "");
 	}
-
-	let pageContent: HTMLDivElement | null = $state(null);
-	let scrolling = $state(false);
-	let scrollTimeout: number | undefined = undefined;
-	let onScrollEnd = () => {
-		clearTimeout(scrollTimeout);
-		scrollTimeout = window.setTimeout(() => {
-			scrolling = false;
-		}, 250);
-	};
-
-	$effect(() => {
-		pageContent?.addEventListener("scroll", () => {
-			scrolling = true;
-			showFabMenu = false;
-		});
-		pageContent?.addEventListener("scrollend", () => {
-			onScrollEnd();
-		});
-	});
-
-	let showFabMenu = $state(false);
-	function openFabMenu(event: Event) {
-		event.stopPropagation();
-		event.preventDefault();
-		showFabMenu = true;
-	}
-	window.addEventListener("mousedown", (event: MouseEvent) => {
-		if (!event.target?.["closest"]?.("[role=button]")) {
-			showFabMenu = false;
-		}
-	});
-	const [send, receive] = crossfade({});
 </script>
 
 <Dialog opened={showFilterDialog} onBackdropClick={() => (showFilterDialog = false)}>
@@ -123,71 +71,25 @@
 </Dialog>
 
 <AppPage title="" activeMenuItem={MenuItem.MEMBERS} bind:pageContent>
-	{#if !scrolling}
-		<div
-			class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center"
-			transition:fly={{ y: 150, opacity: 1, duration: 150 }}
-		>
-			{#if showFabMenu}
-				<div transition:fly={{ y: 50 }}>
-					<div transition:scale>
-						<Fab
-							id="open-member-filters-button"
-							class="k-color-brand-secondary size-10 mb-3"
-							onclick={() => (showFilterDialog = true)}
-						>
-							{#snippet icon()}
-								<FilterIcon fab />
-							{/snippet}
-						</Fab>
-					</div>
-				</div>
-				<div in:receive={{ key: "main" }} out:send={{ key: "main" }}>
-					<Fab
-						id="create-member-button"
-						class="k-color-brand-primary"
-						onclick={addMemberButtonOnClick}
-					>
-						{#snippet icon()}
-							<PlusIcon fab />
-						{/snippet}
-					</Fab>
-				</div>
-			{:else}
-				<div
-					class="absolute bottom-0 right-0"
-					in:receive={{ key: "main" }}
-					out:send={{ key: "main" }}
-				>
-					<Fab
-						id="open-fab-menu-button"
-						class="k-color-brand-primary size-10"
-						onclick={openFabMenu}
-						oncontextmenu={openFabMenu}
-					>
-						{#snippet icon()}
-							<VerticalMenuIcon fab />
-						{/snippet}
-					</Fab>
-				</div>
-			{/if}
-		</div>
-	{/if}
+	<FabMenu
+		menuItems={[
+			{
+				id: "create-member",
+				icon: PlusIcon,
+				action: addMemberButtonOnClick,
+			},
+			{
+				id: "open-member-filters",
+				icon: FilterIcon,
+				action: () => {
+					showFilterDialog = true;
+				},
+			},
+		]}
+		bind:pageContent
+	/>
 
 	{#each shownMembers as member (member.id)}
-		<Link href={`/members/edit/${member.id}`} class="block">
-			<Card raised>
-				<div class="flex items-center">
-					<PersonIcon class="text-3xl mr-2" />
-					<div class="flex-1">
-						<p>{member.name}</p>
-						<p class="opacity-70">{member.pronouns}</p>
-					</div>
-					{#if member.isArchived}
-						<ArchivedIcon class="text-3xl opacity-75" />
-					{/if}
-				</div>
-			</Card>
-		</Link>
+		<MemberCard {member} onClick={() => goto(resolve(`/members/edit/${member.id}`))} />
 	{/each}
 </AppPage>

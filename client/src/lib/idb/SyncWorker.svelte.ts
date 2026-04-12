@@ -2,6 +2,9 @@ import { call } from "$lib/api.svelte";
 import { IDB } from "$lib/idb/idb";
 import { Storage } from "$lib/storage";
 
+import type { IDBFront } from "./IDBFront";
+import type { IDBMember } from "./IDBMember";
+
 export class SyncWorker {
 	private static instance: SyncWorker;
 
@@ -170,18 +173,33 @@ export class SyncWorker {
 		console.debug("Logs to apply:", logs);
 		if (Array.isArray(logs)) {
 			for (const log of logs) {
-				const { memberId, operationType, data } = log as {
-					memberId: string;
+				const { memberId, frontId, operationType, data } = log as {
+					frontId?: string;
+					memberId?: string;
 					operationType: string;
 					data: Record<string, unknown>;
 				};
+				let model: IDBMember | IDBFront | undefined;
+				let recordId: string | undefined;
+				if (typeof memberId === "string") {
+					recordId = memberId;
+					model = idb.member;
+				} else if (typeof frontId === "string") {
+					recordId = frontId;
+					model = idb.front;
+				}
+
+				if (!model || !recordId) {
+					throw new Error("Received log for unknown model");
+				}
+
 				switch (operationType) {
 					case "create":
 					case "update":
-						await idb.member.saveSynced(userId, { ...data, id: memberId }, false);
+						await model.saveSynced(userId, { ...data, id: recordId }, false);
 						break;
 					case "delete":
-						await idb.member.deleteSynced(userId, [memberId], false);
+						await model.deleteSynced(userId, [recordId], false);
 						break;
 					default:
 						throw new Error("unrecognized operation type: " + operationType);

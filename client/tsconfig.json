@@ -1,7 +1,6 @@
 {
 	"extends": ["openselves-common/tsconfig.json", "./.svelte-kit/tsconfig.json"],
 	"compilerOptions": {
-		"rootDir": "./src",
 		"rewriteRelativeImportExtensions": true,
 		"allowJs": true,
 		"checkJs": true,

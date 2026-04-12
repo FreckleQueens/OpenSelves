@@ -1122,6 +1122,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@iconify-json/material-symbols-light@npm:^1.2.66":
+  version: 1.2.66
+  resolution: "@iconify-json/material-symbols-light@npm:1.2.66"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/a5f931c1fc315feb6244fc2193e98c9e4e4252aa62ae6a168a35c75273b94d204cfc65c3499c43f232500c49cc17d88959f09e4720575c25d9379f4140f0aa47
+  languageName: node
+  linkType: hard
+
 "@iconify-json/material-symbols@npm:^1.2.65":
   version: 1.2.65
   resolution: "@iconify-json/material-symbols@npm:1.2.65"
@@ -9978,6 +9987,7 @@ __metadata:
     "@iconify-json/heroicons-outline": "npm:^1.2.1"
     "@iconify-json/ic": "npm:^1.2.4"
     "@iconify-json/material-symbols": "npm:^1.2.65"
+    "@iconify-json/material-symbols-light": "npm:^1.2.66"
     "@iconify-json/mdi": "npm:^1.2.3"
     "@paralleldrive/cuid2": "npm:^3.3.0"
     "@playwright/test": "npm:=1.58.2"

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
+	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
 	import HomeIcon from "$lib/components/icons/HomeIcon.svelte";
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
@@ -58,6 +59,15 @@
 			<MenuListItem title={t("Home")} active={activeMenuItem === MenuItem.HOME} href="/main">
 				{#snippet media()}
 					<HomeIcon class="text-xl" />
+				{/snippet}
+			</MenuListItem>
+			<MenuListItem
+				title={t("Front")}
+				active={activeMenuItem === MenuItem.FRONT}
+				href="/front"
+			>
+				{#snippet media()}
+					<FrontIcon class="text-xl" />
 				{/snippet}
 			</MenuListItem>
 			<MenuListItem

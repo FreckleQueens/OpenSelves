@@ -25,6 +25,7 @@
 		"@iconify-json/heroicons-outline": "^1.2.1",
 		"@iconify-json/ic": "^1.2.4",
 		"@iconify-json/material-symbols": "^1.2.65",
+		"@iconify-json/material-symbols-light": "^1.2.66",
 		"@iconify-json/mdi": "^1.2.3",
 		"@playwright/test": "=1.58.2",
 		"@sveltejs/adapter-static": "^3.0.10",

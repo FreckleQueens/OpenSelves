@@ -13,5 +13,6 @@ export type AuthFormData = {
 
 export enum MenuItem {
 	HOME,
+	FRONT,
 	MEMBERS,
 }

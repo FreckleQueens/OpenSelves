@@ -1,7 +1,8 @@
+import { IDBFront } from "$lib/idb/IDBFront";
 import { IDBLog } from "$lib/idb/IDBLog";
 import { IDBMember } from "$lib/idb/IDBMember";
 
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 
 export type ModelBase = {
 	userId: string;
@@ -30,6 +31,7 @@ export class IDB {
 
 	public readonly log: IDBLog = new IDBLog(this);
 	public readonly member: IDBMember = new IDBMember(this);
+	public readonly front: IDBFront = new IDBFront(this);
 	private db?: IDBDatabase;
 
 	private async init() {
@@ -49,13 +51,17 @@ export class IDB {
 				}
 
 				const promises: Promise<void>[] = [];
-				function trackStoreTransaction(store: IDBObjectStore) {
+				function trackTransaction(tx: IDBTransaction) {
 					promises.push(
 						new Promise<void>((resolve) => {
-							store.transaction.oncomplete = () => resolve();
+							tx.oncomplete = () => resolve();
 						}),
 					);
 				}
+				if (!dbRequest.transaction) {
+					throw new Error("IDBOpenDBRequest has no transaction");
+				}
+				trackTransaction(dbRequest.transaction);
 
 				if (event.newVersion !== IDB_VERSION) {
 					return reject(new Error("Wrong newVersion"));
@@ -65,7 +71,7 @@ export class IDB {
 					const membersStore = this.db.createObjectStore("members", { keyPath: "id" });
 					membersStore.createIndex("id", "id", { unique: true });
 					membersStore.createIndex("userId", "userId");
-					trackStoreTransaction(membersStore);
+					trackTransaction(membersStore.transaction);
 				}
 
 				if (event.oldVersion === 1) {
@@ -78,7 +84,20 @@ export class IDB {
 					});
 					logsStore.createIndex("id", "id", { unique: true });
 					logsStore.createIndex("memberId", "memberId");
-					trackStoreTransaction(logsStore);
+					trackTransaction(logsStore.transaction);
+				}
+
+				if (event.oldVersion < 3) {
+					const frontsStore = this.db.createObjectStore("fronts", {
+						keyPath: "id",
+					});
+					frontsStore.createIndex("id", "id", { unique: true });
+					frontsStore.createIndex("userId", "userId");
+					frontsStore.createIndex("memberId", "memberId");
+					trackTransaction(frontsStore.transaction);
+
+					const logsStore = dbRequest.transaction.objectStore("logs");
+					logsStore.createIndex("frontId", "frontId");
 				}
 
 				Promise.all(promises).then(() => {

@@ -96,16 +96,18 @@ deadline or ETA
 - [x] db: fronts
 - [x] server: create, update, delete fronts
 - [x] server: both fronts and members in single request
-- [ ] client: add front
+- [x] client: add front
+- [ ] client: delete a member's fronts when deleting a member (in the same transaction)
 - [ ] client: show front list (history table)
 - [ ] client: edit front
 - [ ] client: delete front
-- [ ] client: show current fronts
+- [x] client: show current fronts
 - [ ] client: don't show network errors, simply put the app in offline mode
 - [ ] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
 
 ## 0.5.0
 - [ ] client: switch to a better md3 library
+- [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers 
 - [ ] show proper language names in language switcher
 
 ## 0.6.0

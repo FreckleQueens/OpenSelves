@@ -68,15 +68,18 @@
 	const tabs: Record<
 		Tab,
 		{
+			buttonId: string;
 			title: string;
 			icon: Component;
 		}
 	> = {
 		[Tab.INFO]: {
+			buttonId: "info",
 			title: t("Info"),
 			icon: InfoIcon,
 		},
 		[Tab.SETTINGS]: {
+			buttonId: "settings",
 			title: t("Settings"),
 			icon: SettingsIcon,
 		},
@@ -165,7 +168,12 @@
 
 	{#snippet buttons()}
 		<DialogButton onClick={() => (openDeleteMemberDialog = false)}>Cancel</DialogButton>
-		<DialogButton strong onClick={deleteMember} class="k-color-brand-red">
+		<DialogButton
+			id="delete-member-confirm-button"
+			strong
+			onClick={deleteMember}
+			class="k-color-brand-red"
+		>
 			<DeleteIcon button before />
 			Delete
 		</DialogButton>
@@ -191,6 +199,7 @@
 		<Segmented class="p-0">
 			{#each Object.entries(tabs) as [key, tab] (key)}
 				<SegmentedButton
+					id={tab.buttonId + "-tab-button"}
 					active={activeTab === parseInt(key)}
 					onClick={() => (activeTab = parseInt(key))}
 				>
@@ -281,6 +290,7 @@
 				</BlockTitle>
 				<Block>
 					<Button
+						id="delete-member-button"
 						onClick={() => {
 							openDeleteMemberDialog = true;
 						}}

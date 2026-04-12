@@ -81,7 +81,7 @@
 
 	<BlockTitle medium>Actions</BlockTitle>
 	<Block strong>
-		<Button tonal raised onclick={logoutButtonOnclick}>
+		<Button id="logout-button" tonal raised onclick={logoutButtonOnclick}>
 			<LogoutIcon button before />
 			Logout
 		</Button>

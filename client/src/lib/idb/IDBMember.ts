@@ -17,7 +17,7 @@ export class IDBMember extends IDBSyncedModel<Member> {
 		return this.stripDrizzleFromModel(members);
 	}
 
-	protected getLogIdKey(): keyof Log & string & "memberId" {
+	protected getLogIdKey(): keyof Log & string {
 		return "memberId";
 	}
 }
