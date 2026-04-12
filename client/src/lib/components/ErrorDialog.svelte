@@ -22,7 +22,11 @@
 	}
 </script>
 
-<Dialog id="application-error-dialog" opened={errors.length > 0}>
+<Dialog
+	id="application-error-dialog"
+	opened={errors.length > 0}
+	class={errors.length > 0 ? "has-errors" : ""}
+>
 	{#snippet title()}
 		<span>
 			<AppErrorIcon class="inline text-brand-red" />

@@ -12,6 +12,11 @@ export type DBColumn = {
 	enumValues: string[] | undefined;
 };
 
+export type CascadeDelete<T extends SyncedModelBase> = {
+	get model(): IDBSyncedModel<T>;
+	key: keyof T & string;
+};
+
 export class IDBSyncedModelEvent<Model extends SyncedModelBase> {
 	constructor(
 		public readonly savedRecords: Model[],
@@ -21,6 +26,7 @@ export class IDBSyncedModelEvent<Model extends SyncedModelBase> {
 
 export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBModel<Model> {
 	private readonly subscriptions: Set<(event: IDBSyncedModelEvent<Model>) => void> = new Set();
+	private readonly cascadeDeletes: CascadeDelete<never>[] = [];
 
 	public subscribe(callback: (event: IDBSyncedModelEvent<Model>) => void) {
 		this.subscriptions.add(callback);
@@ -125,17 +131,36 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 		recordIds: string[],
 		logOperation: boolean = true,
 	): Promise<void> {
-		await this.idb.transaction(["logs", this.storeName], async (transaction) => {
-			for (const recordId of recordIds) {
-				if (logOperation && this.storeName !== "logs") {
-					// Log operation
-					await this.logOperation(userId, recordId, null, "delete", transaction);
-				}
+		const additionalStores = this.cascadeDeletes.map(
+			(cascadeDelete) => cascadeDelete.model.storeName,
+		);
 
-				// Delete record
-				await transaction.delete(this.storeName, recordId);
-			}
-		});
+		await this.idb.transaction(
+			["logs", this.storeName, ...additionalStores],
+			async (transaction) => {
+				for (const recordId of recordIds) {
+					if (logOperation && this.storeName !== "logs") {
+						// Log operation
+						await this.logOperation(userId, recordId, null, "delete", transaction);
+					}
+
+					// Delete record
+					await transaction.delete(this.storeName, recordId);
+
+					// Delete dependent records
+					for (const cascadeDelete of this.cascadeDeletes) {
+						const records = await transaction.getByIndex(
+							cascadeDelete.model.storeName,
+							cascadeDelete.key,
+							recordId,
+						);
+						for (const record of records) {
+							await transaction.delete(cascadeDelete.model.storeName, record.id);
+						}
+					}
+				}
+			},
+		);
 
 		if (logOperation) {
 			SyncWorker.getInstance().setHasPushBacklog();
@@ -175,4 +200,17 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 	}
 
 	protected abstract getLogIdKey(): keyof Log & string;
+
+	protected onDeleteCascade<T extends SyncedModelBase>(
+		model: () => IDBSyncedModel<T>,
+		key: keyof T & string,
+	) {
+		this.cascadeDeletes.push({
+			get model() {
+				const val = model();
+				return val as unknown as IDBSyncedModel<never>;
+			},
+			key,
+		});
+	}
 }

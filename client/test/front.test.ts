@@ -33,9 +33,10 @@ test("create then delete member", async ({ page }) => {
 	await page.locator("#delete-member-confirm-button").click();
 	await page.waitForURL("/members");
 
-	await expect(getMemberEntry(page, member)).not.toBeVisible();
+	await expect(getMemberEntry(page, member)).toHaveCount(0);
 
 	await page.goto("/front");
-	await expect(getMemberEntry(page, member)).not.toBeVisible();
-	await expect(page.locator("#application-error-dialog")).not.toBeVisible();
+	await expect(page.locator(".no-front")).toHaveCount(1);
+	await expect(getMemberEntry(page, member)).toHaveCount(0);
+	await expect(page.locator("#application-error-dialog")).not.toHaveClass("has-errors");
 });

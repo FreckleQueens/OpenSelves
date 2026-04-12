@@ -8,13 +8,13 @@
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
 	import { Storage } from "$lib/storage";
-	import { Block, BlockTitle, Sheet } from "konsta/svelte";
+	import { Block, BlockTitle, Preloader, Sheet } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 
-	let members: { records: Member[] } = $state({
+	let members: { loaded?: boolean; records: Member[] } = $state({
 		records: [],
 	});
-	let fronts: { records: Front[] } = $state({
+	let fronts: { loaded?: boolean; records: Front[] } = $state({
 		records: [],
 	});
 	let currentFronts = $derived(
@@ -110,6 +110,12 @@
 			{@const member = members.records.find((member) => member.id === front.memberId)}
 			{#if member}
 				<MemberCard {member} onClick={() => {}} />
+			{/if}
+		{:else}
+			{#if !members.loaded || !fronts.loaded}
+				<Preloader />
+			{:else}
+				<p class="no-front">No one is currently fronting.</p>
 			{/if}
 		{/each}
 	</Block>

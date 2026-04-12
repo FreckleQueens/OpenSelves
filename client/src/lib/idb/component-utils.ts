@@ -6,9 +6,12 @@ import { onDestroy, onMount } from "svelte";
 export function subscribeToModel<T extends SyncedModelBase>(
 	getModel: () => Promise<IDBSyncedModel<T>>,
 	state: {
+		loaded?: boolean;
 		records: T[];
 	},
 ) {
+	state.loaded = false;
+
 	let subscription: (event: IDBSyncedModelEvent<T>) => void;
 	onMount(async () => {
 		const storage = await Storage.getStorage();
@@ -33,6 +36,7 @@ export function subscribeToModel<T extends SyncedModelBase>(
 			}
 		});
 		state.records = await model.getByField("userId", userId);
+		state.loaded = true;
 	});
 
 	onDestroy(async () => {

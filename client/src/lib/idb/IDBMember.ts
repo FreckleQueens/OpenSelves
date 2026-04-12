@@ -7,6 +7,7 @@ import { type Log, type Member, members } from "openselves-common/db";
 export class IDBMember extends IDBSyncedModel<Member> {
 	public constructor(idb: IDB) {
 		super(idb, "members", "id");
+		this.onDeleteCascade(() => idb.front, "memberId");
 	}
 
 	protected generateUniquePrimaryKey(): Member["id"] {

@@ -34,6 +34,7 @@
 	"Logout": "Se déconnecter",
 	"Members": "Membres",
 	"Name": "Nom",
+	"No one is currently fronting.": "Personne n'est présent.e actuellement.",
 	"Offline - #{user.id}": "Hors ligne - #{user.id}",
 	"OpenSelves": "OpenSelves",
 	"Password": "Mot de passe",

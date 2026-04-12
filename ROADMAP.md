@@ -97,7 +97,7 @@ deadline or ETA
 - [x] server: create, update, delete fronts
 - [x] server: both fronts and members in single request
 - [x] client: add front
-- [ ] client: delete a member's fronts when deleting a member (in the same transaction)
+- [x] client: delete a member's fronts when deleting a member (in the same transaction)
 - [ ] client: show front list (history table)
 - [ ] client: edit front
 - [ ] client: delete front
