@@ -12,7 +12,7 @@
 		"emitDecoratorMetadata": true,
 		"allowSyntheticDefaultImports": true,
 		"sourceMap": true,
-		"rootDirs": ["./src"],
+		"rootDir": "./src",
 		"outDir": "./dist",
 		"tsBuildInfoFile": "./dist/.tsbuildinfo",
 		"incremental": true,
