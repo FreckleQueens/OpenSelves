@@ -12,12 +12,16 @@
 		small = false,
 		actions,
 		chips,
+		secondaryActions,
+		footer,
 	}: {
 		member: Member;
 		onClick: ClickEventHandler;
 		small?: boolean;
 		actions?: { id: string; icon: Component; onClick: ClickEventHandler }[];
 		chips?: Snippet;
+		secondaryActions?: Snippet;
+		footer?: Snippet;
 	} = $props();
 
 	function onLinkClick(event: MouseEvent) {
@@ -63,9 +67,25 @@
 				{/if}
 			</div>
 
-			{#if chips}
-				<div class="mt-4">
-					{@render chips()}
+			{#if chips || secondaryActions}
+				<div class="flex flex-wrap gap-4 items-start pt-4">
+					{#if chips}
+						<div class="min-w-max">
+							{@render chips()}
+						</div>
+					{/if}
+
+					{#if secondaryActions}
+						<div class="ml-auto">
+							{@render secondaryActions()}
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			{#if footer}
+				<div>
+					{@render footer()}
 				</div>
 			{/if}
 		</Card>

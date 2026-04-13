@@ -5,6 +5,7 @@
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
+	import AddNoteIcon from "$lib/components/icons/AddNoteIcon.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
@@ -19,6 +20,8 @@
 		Button,
 		Chip,
 		Dialog,
+		List,
+		ListInput,
 		Navbar,
 		Preloader,
 		Searchbar,
@@ -79,6 +82,7 @@
 	let pageContent: HTMLDivElement | undefined = $state();
 	let showMemberSelectSheet = $state(false);
 	let showClearFrontDialog = $state(false);
+	let addNoteToFrontId: string | undefined = $state();
 
 	subscribeToModel(async () => {
 		const idb = await IDB.getClient();
@@ -128,6 +132,20 @@
 		}
 	}
 
+	async function setFrontNote(frontId: string, value: string) {
+		addNoteToFrontId = frontId;
+		const storage = await Storage.getStorage();
+		const idb = await IDB.getClient();
+		await idb.front.saveSynced(
+			storage.getKey(),
+			{
+				id: frontId,
+				note: value ? value : null,
+			},
+			true,
+		);
+	}
+
 	onMount(() => {
 		const interval = window.setInterval(() => {
 			fronts.records = [...fronts.records]; // Re-calculate frontingFor
@@ -175,15 +193,48 @@
 				>
 					{#snippet chips()}
 						<Chip>
-							<time datetime={front.startedAt.toISOString()}
-								>{humanizeDuration(front.frontingFor, {
+							<time datetime={front.startedAt.toISOString()}>
+								{humanizeDuration(front.frontingFor, {
 									language: localeState.locale || undefined,
 									round: true,
 									fallbacks: ["en"],
 									largest: 2,
-								})}</time
-							>
+								})}
+							</time>
 						</Chip>
+					{/snippet}
+
+					{#snippet secondaryActions()}
+						<div class="mt-2 inline">
+							<Button
+								class="p-2"
+								inline
+								tonal
+								raised
+								onclick={(ev) => {
+									ev.stopPropagation();
+									addNoteToFrontId = front.id;
+								}}
+							>
+								<AddNoteIcon button />
+							</Button>
+						</div>
+					{/snippet}
+
+					{#snippet footer()}
+						{#if front.note || front.id === addNoteToFrontId}
+							<List class="m-0 mt-2">
+								{@const initialValue = front.note}
+								<ListInput
+									name="note"
+									placeholder={t("Note")}
+									floatingLabel
+									onclick={(ev) => ev.stopPropagation()}
+									onInput={(ev) => setFrontNote(front.id, ev.target?.value)}
+									value={initialValue}
+								/>
+							</List>
+						{/if}
 					{/snippet}
 				</MemberCard>
 			{/if}

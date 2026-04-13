@@ -37,6 +37,7 @@
 	"Members": "Membres",
 	"Name": "Nom",
 	"No one is currently fronting.": "Personne n'est présent.e actuellement.",
+	"Note": "Note",
 	"Offline - #{user.id}": "Hors ligne - #{user.id}",
 	"OpenSelves": "OpenSelves",
 	"Password": "Mot de passe",
