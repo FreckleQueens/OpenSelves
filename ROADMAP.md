@@ -103,7 +103,7 @@ deadline or ETA
 - [x] client: display live front duration
 - [x] client: search member list by name when selecting a fronter
 - [x] client: fix /members list missing padding
-- [ ] client: clicking on front goes to member edit page
+- [x] client: clicking on front goes to member edit page
 - [ ] client: add note to front
 - [ ] client: edit front start and end date
 - [ ] client: replace front member

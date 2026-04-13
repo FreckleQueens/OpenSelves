@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
@@ -162,7 +164,7 @@
 			{#if member}
 				<MemberCard
 					{member}
-					onClick={() => {}}
+					onClick={() => goto(resolve(`/members/edit/${front.memberId}`))}
 					actions={[
 						{
 							id: "end-front",

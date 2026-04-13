@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
-	import { resolve } from "$app/paths";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
@@ -100,7 +98,7 @@
 			);
 		}
 
-		await goto(resolve("/members"));
+		history.back();
 	}
 
 	let showSaveConfirmDialog = $state(false);
@@ -128,7 +126,7 @@
 		const userId = storage.getKey();
 		const idb = await IDB.getClient();
 		await idb.member.deleteSynced(userId, [member.id]);
-		await goto(resolve("/members"));
+		history.back();
 	}
 </script>
 
