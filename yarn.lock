@@ -3395,6 +3395,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/humanize-duration@npm:^3":
+  version: 3.27.4
+  resolution: "@types/humanize-duration@npm:3.27.4"
+  checksum: 10c0/0d92b036ac284c4ae248dca6efa826f9d397e7369f2d5e11de1813e05b32fd44e3d696f999acdc5a7eb412efc33668b8a68f6ad671392c0bbcf797a6329d674f
+  languageName: node
+  linkType: hard
+
 "@types/istanbul-lib-coverage@npm:*, @types/istanbul-lib-coverage@npm:^2.0.1, @types/istanbul-lib-coverage@npm:^2.0.6":
   version: 2.0.6
   resolution: "@types/istanbul-lib-coverage@npm:2.0.6"
@@ -7732,6 +7739,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"humanize-duration@npm:^3.33.2":
+  version: 3.33.2
+  resolution: "humanize-duration@npm:3.33.2"
+  checksum: 10c0/eae493c113f1c11c96e42195002e8016ab7c08bfcc3414ba5459027da4faaa2df012429bc4eae200873a65d0a86b7cc6a9656783aa45705ffe6106b5256af973
+  languageName: node
+  linkType: hard
+
 "husky@npm:^9.1.7":
   version: 9.1.7
   resolution: "husky@npm:9.1.7"
@@ -9996,12 +10010,14 @@ __metadata:
     "@sveltejs/vite-plugin-svelte": "npm:^7.0.0"
     "@tailwindcss/vite": "npm:^4.2.2"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
+    "@types/humanize-duration": "npm:^3"
     "@types/node": "npm:^25.5.2"
     "@vitest/browser-playwright": "npm:^4.1.4"
     eslint: "npm:^10.2.0"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-svelte: "npm:^3.17.0"
     globals: "npm:^17.4.0"
+    humanize-duration: "npm:^3.33.2"
     idb: "npm:^8.0.3"
     konsta: "npm:^5.0.8"
     magic-string: "npm:^0.30.21"

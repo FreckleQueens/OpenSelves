@@ -6,11 +6,14 @@
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
+	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
 	import { Storage } from "$lib/storage";
-	import { Block, BlockTitle, Button, Dialog, Preloader, Sheet } from "konsta/svelte";
+	import humanizeDuration from "humanize-duration";
+	import { Block, BlockTitle, Button, Chip, Dialog, Preloader, Sheet } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
+	import { onMount } from "svelte";
 
 	let members: { loaded?: boolean; records: Member[] } = $state({
 		records: [],
@@ -26,7 +29,11 @@
 				if (!member) {
 					throw new Error("Member not found for front " + front.id);
 				}
-				return { ...front, member: member };
+				return {
+					...front,
+					member: member,
+					frontingFor: Date.now() - front.startedAt.getTime(),
+				};
 			})
 			.sort((a, b) => {
 				if (a.member.name < b.member.name) {
@@ -106,6 +113,13 @@
 			await endFront(front.id);
 		}
 	}
+
+	onMount(() => {
+		const interval = window.setInterval(() => {
+			fronts.records = [...fronts.records]; // Re-calculate frontingFor
+		}, 1000);
+		return () => window.clearInterval(interval);
+	});
 </script>
 
 <AppPage title="" bind:pageContent activeMenuItem={MenuItem.FRONT}>
@@ -144,7 +158,20 @@
 							onClick: () => endFront(front.id),
 						},
 					]}
-				/>
+				>
+					{#snippet chips()}
+						<Chip>
+							<time datetime={front.startedAt.toISOString()}
+								>{humanizeDuration(front.frontingFor, {
+									language: localeState.locale || undefined,
+									round: true,
+									fallbacks: ["en"],
+									largest: 2,
+								})}</time
+							>
+						</Chip>
+					{/snippet}
+				</MemberCard>
 			{/if}
 		{:else}
 			{#if !members.loaded || !fronts.loaded}
