@@ -89,7 +89,9 @@
 		bind:pageContent
 	/>
 
-	{#each shownMembers as member (member.id)}
-		<MemberCard {member} onClick={() => goto(resolve(`/members/edit/${member.id}`))} />
-	{/each}
+	<div class="p-4">
+		{#each shownMembers as member (member.id)}
+			<MemberCard {member} onClick={() => goto(resolve(`/members/edit/${member.id}`))} />
+		{/each}
+	</div>
 </AppPage>

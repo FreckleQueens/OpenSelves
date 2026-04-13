@@ -102,8 +102,12 @@ deadline or ETA
 - [x] client: end all fronts at once with confirmation
 - [x] client: display live front duration
 - [x] client: search member list by name when selecting a fronter
+- [x] client: fix /members list missing padding
+- [ ] client: clicking on front goes to member edit page
+- [ ] client: add note to front
+- [ ] client: edit front start and end date
+- [ ] client: replace front member
 - [ ] client: show front list (history table)
-- [ ] client: edit front
 - [ ] client: delete front
 - [x] client: show current fronts
 - [ ] client: don't show network errors, simply put the app in offline mode
