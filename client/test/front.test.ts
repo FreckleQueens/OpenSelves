@@ -1,16 +1,13 @@
-import { type Locator, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import type { Page } from "playwright";
 
-import { createMember, expectNoAppError, registerAndLoginUser } from "./utils";
-
-const getMemberEntry = (root: Page | Locator, member: { name: string }) =>
-	root.locator(`.member-entry[data-name=${member.name}]`);
+import { createMember, expectNoAppError, getMemberEntry, registerAndLoginUser } from "./utils";
 
 async function createFront(page: Page, member: { name: string; pronouns: string }) {
 	await page.goto("/front");
 	await page.locator("#open-fab-menu-button").click();
 	await page.locator("#add-front-button").click();
-	await getMemberEntry(page, member).locator("a").click();
+	await getMemberEntry(page, member).locator(".member-card").click();
 
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
 }
@@ -27,7 +24,7 @@ test("create front then delete member", async ({ page }) => {
 	await createFront(page, member);
 
 	await page.goto("/members");
-	await getMemberEntry(page, member).click();
+	await getMemberEntry(page, member).locator(".member-card").click();
 	await page.locator("#settings-tab-button").click();
 	await page.locator("#delete-member-button").click();
 	await page.locator("#delete-member-confirm-button").click();

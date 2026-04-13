@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { createMember, getLogsCount, registerAndLoginUser } from "./utils";
+import { createMember, getLogsCount, getMemberEntry, registerAndLoginUser } from "./utils";
 
 test("create member", async ({ page }) => {
 	await registerAndLoginUser(page);
@@ -10,8 +10,7 @@ test("create member", async ({ page }) => {
 
 	expect((await pushRequest).ok()).toBe(true);
 
-	const memberEntry = page.getByRole("link", { name: `${member.name} ${member.pronouns}` });
-	await expect(memberEntry).toBeVisible();
+	await expect(getMemberEntry(page, member)).toHaveCount(1);
 });
 
 test("update member no change", async ({ page }) => {
@@ -19,7 +18,7 @@ test("update member no change", async ({ page }) => {
 	const member = await createMember(page);
 
 	const previousLogsCount = await getLogsCount(page);
-	await page.getByRole("link", { name: `${member.name} ${member.pronouns}` }).click();
+	await getMemberEntry(page, member).locator(".member-card").click();
 	await page.locator("#save-member-button").click();
 
 	await page.waitForURL("/members");

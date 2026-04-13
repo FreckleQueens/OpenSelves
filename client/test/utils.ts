@@ -1,6 +1,9 @@
 import { createId } from "@paralleldrive/cuid2";
-import { expect } from "@playwright/test";
+import { type Locator, expect } from "@playwright/test";
 import type { Page } from "playwright";
+
+export const getMemberEntry = (root: Page | Locator, member: { name: string }) =>
+	root.locator(`.member-entry[data-name=${member.name}]`);
 
 export async function expectNoAppError(page: Page) {
 	return expect(page.locator("#application-error-dialog")).not.toHaveClass("has-errors");

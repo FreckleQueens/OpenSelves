@@ -35,7 +35,7 @@
 <div class="member-entry flex items-center" data-id={member.id} data-name={member.name}>
 	<div class="flex-1">
 		<!-- TODO: touch ripple -->
-		<Card raised class="my-4 mx-0! cursor-pointer" onclick={onLinkClick}>
+		<Card raised class="member-card my-4 mx-0! cursor-pointer" onclick={onLinkClick}>
 			<div class="flex items-center">
 				<PersonIcon class={(small ? "text-xl" : "text-3xl") + " mr-2"} />
 				<div class="flex-1">
