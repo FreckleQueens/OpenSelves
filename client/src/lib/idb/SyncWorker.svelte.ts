@@ -195,8 +195,10 @@ export class SyncWorker {
 
 				switch (operationType) {
 					case "create":
+						await model.saveSynced(userId, { ...data, id: recordId }, false, false);
+						break;
 					case "update":
-						await model.saveSynced(userId, { ...data, id: recordId }, false);
+						await model.saveSynced(userId, { ...data, id: recordId }, true, false);
 						break;
 					case "delete":
 						await model.deleteSynced(userId, [recordId], false);

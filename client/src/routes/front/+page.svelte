@@ -4,6 +4,7 @@
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
+	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
@@ -19,7 +20,7 @@
 	});
 	let currentFronts = $derived(
 		fronts.records
-			.filter((front) => !front.endedAt)
+			.filter((front) => members.loaded && !front.endedAt)
 			.map((front) => {
 				const member = members.records.find((member) => member.id === front.memberId);
 				if (!member) {
@@ -83,6 +84,20 @@
 		await idb.front.saveSynced(storage.getKey(), front);
 		showMemberSelectSheet = false;
 	}
+
+	async function endFront(frontId: string) {
+		const storage = await Storage.getStorage();
+		const idb = await IDB.getClient();
+
+		await idb.front.saveSynced(
+			storage.getKey(),
+			{
+				id: frontId,
+				endedAt: new Date(),
+			},
+			true,
+		);
+	}
 </script>
 
 <AppPage title="" bind:pageContent activeMenuItem={MenuItem.FRONT}>
@@ -105,11 +120,21 @@
 	/>
 
 	<BlockTitle medium>Currently fronting</BlockTitle>
-	<Block class="pt-2 pb-2">
+	<Block id="current-fronting-members" class="pt-2 pb-2">
 		{#each currentFronts as front (front.id)}
 			{@const member = members.records.find((member) => member.id === front.memberId)}
 			{#if member}
-				<MemberCard {member} onClick={() => {}} />
+				<MemberCard
+					{member}
+					onClick={() => {}}
+					actions={[
+						{
+							id: "end-front",
+							icon: LeaveFrontIcon,
+							onClick: () => endFront(front.id),
+						},
+					]}
+				/>
 			{/if}
 		{:else}
 			{#if !members.loaded || !fronts.loaded}

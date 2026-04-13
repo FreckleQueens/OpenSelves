@@ -1,18 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { type Locator, expect, test } from "@playwright/test";
 import type { Page } from "playwright";
 
-import { createMember, registerAndLoginUser } from "./utils";
+import { createMember, expectNoAppError, registerAndLoginUser } from "./utils";
 
-const getMemberEntry = (page: Page, member: { name: string; pronouns: string }) =>
-	page.getByRole("link", { name: `${member.name} ${member.pronouns}` });
+const getMemberEntry = (root: Page | Locator, member: { name: string }) =>
+	root.locator(`.member-entry[data-name=${member.name}]`);
 
 async function createFront(page: Page, member: { name: string; pronouns: string }) {
 	await page.goto("/front");
 	await page.locator("#open-fab-menu-button").click();
 	await page.locator("#add-front-button").click();
-	await page.getByRole("link", { name: member.name }).click();
+	await getMemberEntry(page, member).locator("a").click();
 
-	await expect(getMemberEntry(page, member)).toBeVisible();
+	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
 }
 
 test("create front", async ({ page }) => {
@@ -21,7 +21,7 @@ test("create front", async ({ page }) => {
 	await createFront(page, member);
 });
 
-test("create then delete member", async ({ page }) => {
+test("create front then delete member", async ({ page }) => {
 	await registerAndLoginUser(page);
 	const member = await createMember(page);
 	await createFront(page, member);
@@ -38,5 +38,15 @@ test("create then delete member", async ({ page }) => {
 	await page.goto("/front");
 	await expect(page.locator(".no-front")).toHaveCount(1);
 	await expect(getMemberEntry(page, member)).toHaveCount(0);
-	await expect(page.locator("#application-error-dialog")).not.toHaveClass("has-errors");
+	await expectNoAppError(page);
+});
+
+test("end front", async ({ page }) => {
+	await registerAndLoginUser(page);
+	const member = await createMember(page);
+	await createFront(page, member);
+
+	await getMemberEntry(page, member).locator(`.end-front-button`).click();
+	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(0);
+	await expectNoAppError(page);
 });

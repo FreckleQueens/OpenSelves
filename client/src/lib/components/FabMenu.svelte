@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ClickEventHandler } from "$lib";
 	import VerticalMenuIcon from "$lib/components/icons/VerticalMenuIcon.svelte";
 	import { Fab } from "konsta/svelte";
 	import type { Component } from "svelte";
@@ -11,7 +12,7 @@
 		menuItems: {
 			id: string;
 			icon: Component;
-			action: (event: MouseEvent) => Promise<void> | void;
+			action: ClickEventHandler;
 		}[];
 		pageContent: HTMLDivElement | undefined;
 	} = $props();

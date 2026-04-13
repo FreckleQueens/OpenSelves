@@ -16,3 +16,5 @@ export enum MenuItem {
 	FRONT,
 	MEMBERS,
 }
+
+export type ClickEventHandler = (event: MouseEvent) => Promise<void> | void;

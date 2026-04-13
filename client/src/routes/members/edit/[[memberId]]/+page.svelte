@@ -91,9 +91,13 @@
 			const storage = await Storage.getStorage();
 			const userId = storage.getKey();
 			const idb = await IDB.getClient();
-			member = await idb.member.saveSynced(userId, {
-				...member,
-			});
+			member = await idb.member.saveSynced(
+				userId,
+				{
+					...member,
+				},
+				!!member.id,
+			);
 		}
 
 		await goto(resolve("/members"));

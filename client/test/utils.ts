@@ -1,5 +1,10 @@
 import { createId } from "@paralleldrive/cuid2";
+import { expect } from "@playwright/test";
 import type { Page } from "playwright";
+
+export async function expectNoAppError(page: Page) {
+	return expect(page.locator("#application-error-dialog")).not.toHaveClass("has-errors");
+}
 
 export async function registerAndLoginUser(
 	page: Page,

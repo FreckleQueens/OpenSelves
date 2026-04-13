@@ -40,12 +40,16 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 	public async saveSynced(
 		userId: string,
 		saveData: Partial<Omit<Model, "userId">>,
+		requiresExistingRecord = false,
 		logOperation: boolean = true,
 	): Promise<Model> {
 		const operationType: Log["operationType"] = saveData.id ? "update" : "create";
 
 		if (Object.keys(saveData).length === 0) {
 			throw new Error("Tried to save a model with no changes");
+		}
+		if (requiresExistingRecord && !saveData.id) {
+			throw new Error("Tried to update existing record without providing an id");
 		}
 
 		saveData.updatedAt = new Date();
@@ -56,6 +60,10 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 				let originalRecord: ModelBase | undefined;
 				if (saveData.id) {
 					originalRecord = await transaction.get(this.storeName, saveData.id);
+				}
+
+				if (requiresExistingRecord && !originalRecord) {
+					throw new Error(this.storeName + " record not found for id " + saveData.id);
 				}
 
 				const fullRecordData = {
