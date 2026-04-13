@@ -105,9 +105,10 @@ deadline or ETA
 - [x] client: fix /members list missing padding
 - [x] client: clicking on front goes to member edit page
 - [x] client: add note to front
-- [ ] client: edit front start and end date
+- [x] client: edit front start datetime
 - [ ] client: replace front member
 - [ ] client: show front list (history table)
+- [ ] client: edit front end datetime
 - [ ] client: delete front
 - [x] client: show current fronts
 - [ ] client: don't show network errors, simply put the app in offline mode

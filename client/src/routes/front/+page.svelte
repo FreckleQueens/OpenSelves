@@ -6,6 +6,7 @@
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import AddNoteIcon from "$lib/components/icons/AddNoteIcon.svelte";
+	import DateTimeInputIcon from "$lib/components/icons/DateTimeInputIcon.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
@@ -79,6 +80,7 @@
 				return 0;
 			}),
 	);
+	let frontInputMap: Record<string, HTMLInputElement> = $state({});
 	let pageContent: HTMLDivElement | undefined = $state();
 	let showMemberSelectSheet = $state(false);
 	let showClearFrontDialog = $state(false);
@@ -141,6 +143,19 @@
 			{
 				id: frontId,
 				note: value ? value : null,
+			},
+			true,
+		);
+	}
+
+	async function setFrontStartDate(frontId: string, value: Date) {
+		const storage = await Storage.getStorage();
+		const idb = await IDB.getClient();
+		await idb.front.saveSynced(
+			storage.getKey(),
+			{
+				id: frontId,
+				startedAt: value,
 			},
 			true,
 		);
@@ -213,6 +228,29 @@
 								raised
 								onclick={(ev) => {
 									ev.stopPropagation();
+									// In Firefox desktop, datetime-local currently fails to display a time picker
+									// See https://bugzilla.mozilla.org/show_bug.cgi?id=1726107
+									const userAgent = navigator.userAgent.toLowerCase();
+									if (
+										userAgent.includes("firefox") &&
+										!userAgent.includes("mobile") &&
+										!userAgent.includes("android")
+									) {
+										frontInputMap[front.id]?.classList.remove("hidden");
+										frontInputMap[front.id]?.focus();
+									}
+									frontInputMap[front.id]?.showPicker();
+								}}
+							>
+								<DateTimeInputIcon button />
+							</Button>
+							<Button
+								class="p-2"
+								inline
+								tonal
+								raised
+								onclick={(ev) => {
+									ev.stopPropagation();
 									addNoteToFrontId = front.id;
 								}}
 							>
@@ -224,17 +262,40 @@
 					{#snippet footer()}
 						{#if front.note || front.id === addNoteToFrontId}
 							<List class="m-0 mt-2">
-								{@const initialValue = front.note}
+								{@const initialNote = front.note}
 								<ListInput
 									name="note"
 									placeholder={t("Note")}
 									floatingLabel
 									onclick={(ev) => ev.stopPropagation()}
 									onInput={(ev) => setFrontNote(front.id, ev.target?.value)}
-									value={initialValue}
+									value={initialNote}
 								/>
 							</List>
 						{/if}
+						<!-- onblur is part of the firefox desktop datetime picker bug workaround -->
+						<input
+							class="hidden"
+							type="datetime-local"
+							name="startedAt"
+							onclick={(ev) => ev.stopPropagation()}
+							oninput={(ev) => {
+								const value = ev.currentTarget?.value;
+								if (!value) return;
+								return setFrontStartDate(front.id, new Date(value));
+							}}
+							onblur={(ev) => ev.currentTarget?.classList.add("hidden")}
+							value={new Date(
+								front.startedAt.getTime() -
+									front.startedAt.getTimezoneOffset() * 60 * 1000,
+							)
+								.toISOString()
+								.slice(0, 16)}
+							bind:this={frontInputMap[front.id]}
+							max={new Date(Date.now() - new Date().getTimezoneOffset() * 60 * 1000)
+								.toISOString()
+								.slice(0, 16)}
+						/>
 					{/snippet}
 				</MemberCard>
 			{/if}
