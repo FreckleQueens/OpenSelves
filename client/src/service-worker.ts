@@ -49,7 +49,10 @@ self.addEventListener("fetch", (event) => {
 				const url = new URL(event.request.url);
 				const cache = await self.caches.open(CACHE);
 
-				if (url.pathname !== "/service-worker.ts" && ASSETS.includes(url.pathname)) {
+				if (
+					!["/service-worker.ts", "/manifest.json"].includes(url.pathname) &&
+					ASSETS.includes(url.pathname)
+				) {
 					const response = await cache.match(url.pathname);
 					console.debug("asset cache hit", url.pathname);
 
