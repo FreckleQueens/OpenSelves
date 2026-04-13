@@ -34,7 +34,7 @@
 		</span>
 	{/snippet}
 
-	<code class="block max-h-64 overflow-scroll whitespace-pre"
+	<code class="block max-h-64 overflow-auto whitespace-pre"
 		>{JSON.stringify(errors, null, 2)}</code
 	>
 

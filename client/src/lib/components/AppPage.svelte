@@ -113,6 +113,6 @@
 <style lang="scss">
 	.app-page-content {
 		height: 100%;
-		overflow-y: scroll;
+		overflow-y: auto;
 	}
 </style>

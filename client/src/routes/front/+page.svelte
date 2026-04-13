@@ -190,7 +190,7 @@
 	onBackdropClick={() => (showMemberSelectSheet = false)}
 >
 	<BlockTitle large>Select fronter</BlockTitle>
-	<Block class="overflow-scroll">
+	<Block class="overflow-y-auto">
 		{#each selectableMembers as member (member.id)}
 			<MemberCard {member} onClick={() => selectMember(member)} small />
 		{/each}
