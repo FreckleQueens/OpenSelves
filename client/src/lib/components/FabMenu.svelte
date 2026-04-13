@@ -28,6 +28,7 @@
 
 	$effect(() => {
 		pageContent?.addEventListener("scroll", () => {
+			clearTimeout(scrollTimeout);
 			scrolling = true;
 			showFabMenu = false;
 		});
