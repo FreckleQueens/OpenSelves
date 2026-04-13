@@ -9,7 +9,7 @@
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
 	import { Storage } from "$lib/storage";
-	import { Block, BlockTitle, Preloader, Sheet } from "konsta/svelte";
+	import { Block, BlockTitle, Button, Dialog, Preloader, Sheet } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 
 	let members: { loaded?: boolean; records: Member[] } = $state({
@@ -57,6 +57,7 @@
 	);
 	let pageContent: HTMLDivElement | undefined = $state();
 	let showMemberSelectSheet = $state(false);
+	let showClearFrontDialog = $state(false);
 
 	subscribeToModel(async () => {
 		const idb = await IDB.getClient();
@@ -98,6 +99,13 @@
 			true,
 		);
 	}
+
+	async function endAllFronts() {
+		showClearFrontDialog = false;
+		for (const front of [...currentFronts]) {
+			await endFront(front.id);
+		}
+	}
 </script>
 
 <AppPage title="" bind:pageContent activeMenuItem={MenuItem.FRONT}>
@@ -113,7 +121,9 @@
 			{
 				id: "reset-front",
 				icon: DeleteSweepIcon,
-				action: () => {},
+				action: () => {
+					showClearFrontDialog = true;
+				},
 			},
 		]}
 		bind:pageContent
@@ -159,3 +169,19 @@
 		{/each}
 	</Block>
 </Sheet>
+
+<Dialog opened={showClearFrontDialog} onBackdropClick={() => (showClearFrontDialog = false)}>
+	{#snippet title()}
+		Clear front
+	{/snippet}
+
+	This will mark all front entries as ended.
+
+	{#snippet buttons()}
+		<Button onclick={() => (showClearFrontDialog = false)}>Cancel</Button>
+		<Button class="k-color-brand-red" onclick={() => endAllFronts()}>
+			<DeleteSweepIcon button before />
+			Confirm
+		</Button>
+	{/snippet}
+</Dialog>

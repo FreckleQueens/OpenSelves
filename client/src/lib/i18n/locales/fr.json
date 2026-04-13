@@ -11,6 +11,8 @@
 	"Cancel": "Annuler",
 	"Change language": "Changer la langue",
 	"Change server": "Changer de serveur",
+	"Clear front": "Finir toutes les présences",
+	"Confirm": "Confirmer",
 	"Continue": "Continuer",
 	"Copy": "Copier",
 	"Credentials": "Identifiants",
@@ -51,6 +53,7 @@
 	"Status": "Statut",
 	"Success!": "Succès !",
 	"This is provided by the website's administrator. It may be required to be allowed to create a new account.": "Cette valeur est fournie par l'administrateur.ice du site. Elle est peut-être nécessaire pour pouvoir créer un compte.",
+	"This will mark all front entries as ended.": "Cela marquera toutes les présences comme terminées.",
 	"What language do you prefer?": "Quelle langue préférez-vous ?",
 	"You are logged in as user #{user.id}, {user.email}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email}",
 	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte."

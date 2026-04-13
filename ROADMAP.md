@@ -99,6 +99,7 @@ deadline or ETA
 - [x] client: add front
 - [x] client: delete a member's fronts when deleting a member (in the same transaction)
 - [x] client: end front
+- [x] client: end all fronts at once with confirmation
 - [ ] client: display live front duration
 - [ ] client: show front list (history table)
 - [ ] client: edit front
