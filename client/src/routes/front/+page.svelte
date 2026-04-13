@@ -11,7 +11,17 @@
 	import { subscribeToModel } from "$lib/idb/component-utils";
 	import { Storage } from "$lib/storage";
 	import humanizeDuration from "humanize-duration";
-	import { Block, BlockTitle, Button, Chip, Dialog, Preloader, Sheet } from "konsta/svelte";
+	import {
+		Block,
+		BlockTitle,
+		Button,
+		Chip,
+		Dialog,
+		Navbar,
+		Preloader,
+		Searchbar,
+		Sheet,
+	} from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 	import { onMount } from "svelte";
 
@@ -45,12 +55,14 @@
 				return 0;
 			}),
 	);
+	let memberSearch: string = $state("");
 	let selectableMembers = $derived(
 		members.records
 			.filter(
 				(member) =>
 					!member.isArchived &&
-					!currentFronts.find((front) => front.memberId === member.id),
+					!currentFronts.find((front) => front.memberId === member.id) &&
+					member.name.includes(memberSearch),
 			)
 			.sort((a, b) => {
 				if (a.name < b.name) {
@@ -185,11 +197,21 @@
 
 <Sheet
 	class="pb-safe flex flex-col"
-	style="max-height: calc(100vh - 72px)"
+	style="height: calc(100vh - 72px)"
 	opened={showMemberSelectSheet}
 	onBackdropClick={() => (showMemberSelectSheet = false)}
 >
-	<BlockTitle large>Select fronter</BlockTitle>
+	<Navbar title="Select fronter" bgClass="bg-transparent">
+		{#snippet subnavbar()}
+			<Searchbar
+				placeholder={t("Search by name...")}
+				class="p-4 rounded-3xl"
+				clearButton
+				bind:value={memberSearch}
+				onClear={() => (memberSearch = "")}
+			/>
+		{/snippet}
+	</Navbar>
 	<Block class="overflow-y-auto">
 		{#each selectableMembers as member (member.id)}
 			<MemberCard {member} onClick={() => selectMember(member)} small />

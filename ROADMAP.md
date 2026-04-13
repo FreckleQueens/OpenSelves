@@ -101,7 +101,7 @@ deadline or ETA
 - [x] client: end front
 - [x] client: end all fronts at once with confirmation
 - [x] client: display live front duration
-- [ ] client: search member list by name when selecting a fronter
+- [x] client: search member list by name when selecting a fronter
 - [ ] client: show front list (history table)
 - [ ] client: edit front
 - [ ] client: delete front
