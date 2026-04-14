@@ -202,6 +202,43 @@
 							onClick: () => endFront(front.id),
 						},
 					]}
+					secondaryActions={[
+						{
+							id: "change-start-date",
+							icon: DateTimeInputIcon,
+							onClick: () => {
+								// In Firefox desktop, datetime-local currently fails to display a time picker
+								// See https://bugzilla.mozilla.org/show_bug.cgi?id=1726107
+								const userAgent = navigator.userAgent.toLowerCase();
+								if (
+									userAgent.includes("firefox") &&
+									!userAgent.includes("mobile") &&
+									!userAgent.includes("android")
+								) {
+									frontInputMap[front.id]?.classList.remove("hidden");
+									frontInputMap[front.id]?.focus();
+								}
+								frontInputMap[front.id]?.showPicker();
+							},
+						},
+						{
+							id: "replace-member",
+							icon: ReplaceMemberIcon,
+							onClick: () => {
+								selectMemberAction = "replaceFrontMember";
+								replaceMemberFrontId = front.id;
+								showMemberSelectSheet = true;
+							},
+						},
+						{
+							id: "add-note",
+							icon: AddNoteIcon,
+							onClick: () => {
+								selectMemberAction = "replaceFrontMember";
+								addNoteToFrontId = front.id;
+							},
+						},
+					]}
 				>
 					{#snippet chips()}
 						<Chip>
@@ -214,60 +251,6 @@
 								})}
 							</time>
 						</Chip>
-					{/snippet}
-
-					{#snippet secondaryActions()}
-						<div class="mt-2 inline">
-							<Button
-								class="p-2"
-								inline
-								tonal
-								raised
-								onclick={(ev) => {
-									ev.stopPropagation();
-									// In Firefox desktop, datetime-local currently fails to display a time picker
-									// See https://bugzilla.mozilla.org/show_bug.cgi?id=1726107
-									const userAgent = navigator.userAgent.toLowerCase();
-									if (
-										userAgent.includes("firefox") &&
-										!userAgent.includes("mobile") &&
-										!userAgent.includes("android")
-									) {
-										frontInputMap[front.id]?.classList.remove("hidden");
-										frontInputMap[front.id]?.focus();
-									}
-									frontInputMap[front.id]?.showPicker();
-								}}
-							>
-								<DateTimeInputIcon button />
-							</Button>
-							<Button
-								class="p-2"
-								inline
-								tonal
-								raised
-								onclick={(ev) => {
-									ev.stopPropagation();
-									selectMemberAction = "replaceFrontMember";
-									replaceMemberFrontId = front.id;
-									showMemberSelectSheet = true;
-								}}
-							>
-								<ReplaceMemberIcon button />
-							</Button>
-							<Button
-								class="p-2"
-								inline
-								tonal
-								raised
-								onclick={(ev) => {
-									ev.stopPropagation();
-									addNoteToFrontId = front.id;
-								}}
-							>
-								<AddNoteIcon button />
-							</Button>
-						</div>
 					{/snippet}
 
 					{#snippet footer()}

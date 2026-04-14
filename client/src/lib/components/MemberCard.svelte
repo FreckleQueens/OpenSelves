@@ -20,7 +20,11 @@
 		small?: boolean;
 		actions?: { id: string; icon: Component; onClick: ClickEventHandler }[];
 		chips?: Snippet;
-		secondaryActions?: Snippet;
+		secondaryActions?: {
+			id: string;
+			onClick: ClickEventHandler;
+			icon: Component;
+		}[];
 		footer?: Snippet;
 	} = $props();
 
@@ -68,7 +72,7 @@
 			</div>
 
 			{#if chips || secondaryActions}
-				<div class="flex flex-wrap gap-4 items-start pt-4">
+				<div class="flex flex-wrap-reverse gap-4 items-center pt-4">
 					{#if chips}
 						<div class="min-w-max">
 							{@render chips()}
@@ -76,8 +80,22 @@
 					{/if}
 
 					{#if secondaryActions}
-						<div class="ml-auto">
-							{@render secondaryActions()}
+						<div class="ml-auto inline-flex gap-2">
+							{#each secondaryActions as action (action.id)}
+								<Button
+									class={`${action.id}-button p-2`}
+									inline
+									tonal
+									raised
+									onclick={(ev) => {
+										ev.stopPropagation();
+										return action.onClick(ev);
+									}}
+								>
+									{@const Icon = action.icon}
+									<Icon button />
+								</Button>
+							{/each}
 						</div>
 					{/if}
 				</div>
