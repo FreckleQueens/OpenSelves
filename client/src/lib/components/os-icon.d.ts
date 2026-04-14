@@ -4,6 +4,7 @@ import type { Snippet } from "svelte";
 export type OSIconProps = {
 	material?: Snippet;
 	ios?: Snippet;
+	secondaryIcon?: Snippet;
 	button?: boolean;
 	fab?: boolean;
 	input?: boolean;

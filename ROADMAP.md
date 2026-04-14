@@ -106,7 +106,7 @@ deadline or ETA
 - [x] client: clicking on front goes to member edit page
 - [x] client: add note to front
 - [x] client: edit front start datetime
-- [ ] client: replace front member
+- [x] client: replace front member
 - [ ] client: show front list (history table)
 - [ ] client: edit front end datetime
 - [ ] client: delete front

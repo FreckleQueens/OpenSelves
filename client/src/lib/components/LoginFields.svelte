@@ -5,10 +5,10 @@
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import { BlockTitle, List, ListInput } from "konsta/svelte";
 
-	let { formState }: { formState: AuthFormData } = $props();
+	let { formState = $bindable() }: { formState: AuthFormData } = $props();
 </script>
 
-<AuthFields {formState}>
+<AuthFields bind:formState>
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput

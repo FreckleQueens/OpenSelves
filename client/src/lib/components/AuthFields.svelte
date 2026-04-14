@@ -4,7 +4,8 @@
 	import { Card } from "konsta/svelte";
 	import { type Snippet, onMount } from "svelte";
 
-	let { children, formState }: { children: Snippet; formState: AuthFormData } = $props();
+	let { children, formState = $bindable() }: { children: Snippet; formState: AuthFormData } =
+		$props();
 
 	let inputsContainer: HTMLElement;
 	onMount(() => {

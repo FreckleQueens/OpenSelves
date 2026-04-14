@@ -5,11 +5,13 @@
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
+	import SelectMemberSheet from "$lib/components/SelectMemberSheet.svelte";
 	import AddNoteIcon from "$lib/components/icons/AddNoteIcon.svelte";
 	import DateTimeInputIcon from "$lib/components/icons/DateTimeInputIcon.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
+	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
@@ -23,10 +25,7 @@
 		Dialog,
 		List,
 		ListInput,
-		Navbar,
 		Preloader,
-		Searchbar,
-		Sheet,
 	} from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 	import { onMount } from "svelte";
@@ -61,25 +60,6 @@
 				return 0;
 			}),
 	);
-	let memberSearch: string = $state("");
-	let selectableMembers = $derived(
-		members.records
-			.filter(
-				(member) =>
-					!member.isArchived &&
-					!currentFronts.find((front) => front.memberId === member.id) &&
-					member.name.includes(memberSearch),
-			)
-			.sort((a, b) => {
-				if (a.name < b.name) {
-					return -1;
-				}
-				if (a.name > b.name) {
-					return 1;
-				}
-				return 0;
-			}),
-	);
 	let frontInputMap: Record<string, HTMLInputElement> = $state({});
 	let pageContent: HTMLDivElement | undefined = $state();
 	let showMemberSelectSheet = $state(false);
@@ -95,22 +75,38 @@
 		return idb.front;
 	}, fronts);
 
+	let selectMemberAction: "createFront" | "replaceFrontMember" | null = null;
+	let replaceMemberFrontId: string | undefined = undefined;
 	async function selectMember(member: Member) {
 		const storage = await Storage.getStorage();
 		const idb = await IDB.getClient();
 
-		const now = new Date();
-		const front: Omit<Front, "userId"> = {
-			id: "",
-			memberId: member.id,
-			startedAt: now,
-			endedAt: null,
-			note: null,
-			createdAt: now,
-			updatedAt: now,
-		};
-		await idb.front.saveSynced(storage.getKey(), front);
-		showMemberSelectSheet = false;
+		if (selectMemberAction === "createFront") {
+			const now = new Date();
+			const front: Omit<Front, "userId"> = {
+				id: "",
+				memberId: member.id,
+				startedAt: now,
+				endedAt: null,
+				note: null,
+				createdAt: now,
+				updatedAt: now,
+			};
+			await idb.front.saveSynced(storage.getKey(), front);
+			showMemberSelectSheet = false;
+		} else if (selectMemberAction === "replaceFrontMember") {
+			await idb.front.saveSynced(
+				storage.getKey(),
+				{
+					id: replaceMemberFrontId || "",
+					memberId: member.id,
+				},
+				true,
+			);
+			showMemberSelectSheet = false;
+		} else {
+			throw new Error("No select member action selected");
+		}
 	}
 
 	async function endFront(frontId: string) {
@@ -176,6 +172,7 @@
 				id: "add-front",
 				icon: PlusIcon,
 				action: () => {
+					selectMemberAction = "createFront";
 					showMemberSelectSheet = true;
 				},
 			},
@@ -251,6 +248,20 @@
 								raised
 								onclick={(ev) => {
 									ev.stopPropagation();
+									selectMemberAction = "replaceFrontMember";
+									replaceMemberFrontId = front.id;
+									showMemberSelectSheet = true;
+								}}
+							>
+								<ReplaceMemberIcon button />
+							</Button>
+							<Button
+								class="p-2"
+								inline
+								tonal
+								raised
+								onclick={(ev) => {
+									ev.stopPropagation();
 									addNoteToFrontId = front.id;
 								}}
 							>
@@ -309,29 +320,15 @@
 	</Block>
 </AppPage>
 
-<Sheet
-	class="pb-safe flex flex-col"
-	style="height: calc(100vh - 72px)"
+<SelectMemberSheet
+	title={t("Select fronter")}
 	opened={showMemberSelectSheet}
-	onBackdropClick={() => (showMemberSelectSheet = false)}
->
-	<Navbar title="Select fronter" bgClass="bg-transparent">
-		{#snippet subnavbar()}
-			<Searchbar
-				placeholder={t("Search by name...")}
-				class="p-4 rounded-3xl"
-				clearButton
-				bind:value={memberSearch}
-				onClear={() => (memberSearch = "")}
-			/>
-		{/snippet}
-	</Navbar>
-	<Block class="overflow-y-auto">
-		{#each selectableMembers as member (member.id)}
-			<MemberCard {member} onClick={() => selectMember(member)} small />
-		{/each}
-	</Block>
-</Sheet>
+	onCancel={() => {
+		showMemberSelectSheet = false;
+	}}
+	onSelect={selectMember}
+	excludedMembers={currentFronts.map((front) => front.member)}
+/>
 
 <Dialog opened={showClearFrontDialog} onBackdropClick={() => (showClearFrontDialog = false)}>
 	{#snippet title()}
