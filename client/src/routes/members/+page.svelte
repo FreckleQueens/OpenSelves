@@ -71,27 +71,29 @@
 </Dialog>
 
 <AppPage title="" activeMenuItem={MenuItem.MEMBERS} bind:pageContent>
-	<FabMenu
-		menuItems={[
-			{
-				id: "create-member",
-				icon: PlusIcon,
-				action: addMemberButtonOnClick,
-			},
-			{
-				id: "open-member-filters",
-				icon: FilterIcon,
-				action: () => {
-					showFilterDialog = true;
-				},
-			},
-		]}
-		bind:pageContent
-	/>
-
 	<div class="p-4">
 		{#each shownMembers as member (member.id)}
 			<MemberCard {member} onClick={() => goto(resolve(`/members/edit/${member.id}`))} />
 		{/each}
 	</div>
+
+	{#snippet bottomNav()}
+		<FabMenu
+			menuItems={[
+				{
+					id: "create-member",
+					icon: PlusIcon,
+					action: addMemberButtonOnClick,
+				},
+				{
+					id: "open-member-filters",
+					icon: FilterIcon,
+					action: () => {
+						showFilterDialog = true;
+					},
+				},
+			]}
+			bind:pageContent
+		/>
+	{/snippet}
 </AppPage>

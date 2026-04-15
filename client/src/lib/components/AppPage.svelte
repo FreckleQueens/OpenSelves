@@ -16,6 +16,7 @@
 		Panel,
 		Preloader,
 	} from "konsta/svelte";
+	import type { Snippet } from "svelte";
 
 	import { transformErrorToReadable } from "../../hooks.client.ts";
 
@@ -24,6 +25,7 @@
 
 	let {
 		children,
+		bottomNav,
 		showMenu = true,
 		activeMenuItem = undefined,
 		navbar = undefined,
@@ -34,6 +36,19 @@
 		title = "OpenSelves",
 		loading = false,
 		pageContent = $bindable(),
+	}: {
+		children: Snippet;
+		bottomNav?: Snippet;
+		showMenu?: boolean;
+		activeMenuItem?: MenuItem;
+		navbar?: Snippet;
+		navbarLeft?: Snippet;
+		navbarRight?: Snippet;
+		subnavbar?: Snippet;
+		transparentNavbar?: boolean;
+		title?: string;
+		loading?: boolean;
+		pageContent?: HTMLDivElement | undefined;
 	} = $props();
 </script>
 
@@ -83,26 +98,31 @@
 	</Page>
 </Panel>
 
-<div class="app-page-content" bind:this={pageContent}>
-	{#if title || navbarLeft || navbarRight || navbar || showMenu || subnavbar}
-		<Navbar {title} right={navbarRight} {subnavbar} transparent={transparentNavbar}>
-			{#if !loading && navbar}
-				{@render navbar()}
+{#if title || navbarLeft || navbarRight || navbar || showMenu || subnavbar}
+	<Navbar
+		{title}
+		right={navbarRight || ""}
+		subnavbar={subnavbar || ""}
+		transparent={transparentNavbar}
+	>
+		{#if !loading && navbar}
+			{@render navbar()}
+		{/if}
+
+		{#snippet left()}
+			{#if showMenu}
+				<Link onClick={() => (openMenu = true)}>
+					<MenuIcon button />
+				</Link>
 			{/if}
+			{#if navbarLeft}
+				{@render navbarLeft()}
+			{/if}
+		{/snippet}
+	</Navbar>
+{/if}
 
-			{#snippet left()}
-				{#if showMenu}
-					<Link onClick={() => (openMenu = true)}>
-						<MenuIcon button />
-					</Link>
-				{/if}
-				{#if navbarLeft}
-					{@render navbarLeft()}
-				{/if}
-			{/snippet}
-		</Navbar>
-	{/if}
-
+<div class="app-page-content flex-1 overflow-y-auto" bind:this={pageContent}>
 	{#if loading}
 		<Preloader />
 	{:else}
@@ -110,9 +130,14 @@
 	{/if}
 </div>
 
+<div class="app-bottom-nav bottom-0 left-0 w-full">
+	{#if bottomNav}
+		{@render bottomNav()}
+	{/if}
+</div>
+
 <style lang="scss">
-	.app-page-content {
-		height: 100%;
-		overflow-y: auto;
+	:global .app-bottom-nav:has(.pb-safe:last-child) .mb-safe {
+		margin-bottom: 0;
 	}
 </style>

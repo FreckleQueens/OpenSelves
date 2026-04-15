@@ -3,6 +3,7 @@
 	import { Icon } from "konsta/svelte";
 
 	let {
+		children,
 		secondaryIcon = undefined,
 		button = false,
 		fab = false,
@@ -35,6 +36,7 @@
 </script>
 
 <Icon class={classes} {...restProps}>
+	{@render children?.()}
 	{#if secondaryIcon}
 		<div class="secondary-icon">
 			{@render secondaryIcon()}

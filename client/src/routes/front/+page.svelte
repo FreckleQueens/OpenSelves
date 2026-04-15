@@ -30,6 +30,9 @@
 	import type { Front, Member } from "openselves-common/db";
 	import { onMount } from "svelte";
 
+	import FrontTabbar from "./FrontTabbar.svelte";
+	import { FrontTab } from "./tabs";
+
 	let members: { loaded?: boolean; records: Member[] } = $state({
 		records: [],
 	});
@@ -166,27 +169,6 @@
 </script>
 
 <AppPage title="" bind:pageContent activeMenuItem={MenuItem.FRONT}>
-	<FabMenu
-		menuItems={[
-			{
-				id: "add-front",
-				icon: PlusIcon,
-				action: () => {
-					selectMemberAction = "createFront";
-					showMemberSelectSheet = true;
-				},
-			},
-			{
-				id: "reset-front",
-				icon: DeleteSweepIcon,
-				action: () => {
-					showClearFrontDialog = true;
-				},
-			},
-		]}
-		bind:pageContent
-	/>
-
 	<BlockTitle medium>Currently fronting</BlockTitle>
 	<Block id="current-fronting-members" class="pt-2 pb-2">
 		{#each currentFronts as front (front.id)}
@@ -301,6 +283,30 @@
 			{/if}
 		{/each}
 	</Block>
+
+	{#snippet bottomNav()}
+		<FabMenu
+			menuItems={[
+				{
+					id: "add-front",
+					icon: PlusIcon,
+					action: () => {
+						selectMemberAction = "createFront";
+						showMemberSelectSheet = true;
+					},
+				},
+				{
+					id: "reset-front",
+					icon: DeleteSweepIcon,
+					action: () => {
+						showClearFrontDialog = true;
+					},
+				},
+			]}
+			bind:pageContent
+		/>
+		<FrontTabbar activeTab={FrontTab.CURRENT} />
+	{/snippet}
 </AppPage>
 
 <SelectMemberSheet

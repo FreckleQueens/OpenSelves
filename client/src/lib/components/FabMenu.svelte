@@ -52,13 +52,13 @@
 	const transitionDuration = 150;
 </script>
 
-<div>
-	{#if !scrolling}
-		<div
-			class="absolute right-safe-4 bottom-safe-4 z-20 flex flex-col items-center"
-			transition:fly={{ y: 150, opacity: 1, duration: transitionDuration }}
-		>
-			{#if showFabMenu}
+{#if !scrolling}
+	<div
+		class="relative ml-safe mb-safe mr-safe z-20"
+		transition:fly={{ y: 150, opacity: 1, duration: transitionDuration }}
+	>
+		{#if showFabMenu}
+			<div class="absolute bottom-0 right-0 m-4 flex flex-col items-center">
 				{#each [...menuItems.slice(1)].reverse() as item, i (item.id)}
 					<div transition:fly|global={{ y: (i + 1) * 50, duration: transitionDuration }}>
 						<div transition:scale|global={{ duration: transitionDuration }}>
@@ -91,24 +91,24 @@
 						{/snippet}
 					</Fab>
 				</div>
-			{:else}
-				<div
-					class="absolute bottom-0 right-0"
-					in:receive={{ key: "main" }}
-					out:send={{ key: "main" }}
+			</div>
+		{:else}
+			<div
+				class="absolute bottom-0 right-0 m-4"
+				in:receive={{ key: "main" }}
+				out:send={{ key: "main" }}
+			>
+				<Fab
+					id="open-fab-menu-button"
+					class="k-color-brand-primary size-10"
+					onclick={openFabMenu}
+					oncontextmenu={openFabMenu}
 				>
-					<Fab
-						id="open-fab-menu-button"
-						class="k-color-brand-primary size-10"
-						onclick={openFabMenu}
-						oncontextmenu={openFabMenu}
-					>
-						{#snippet icon()}
-							<VerticalMenuIcon fab />
-						{/snippet}
-					</Fab>
-				</div>
-			{/if}
-		</div>
-	{/if}
-</div>
+					{#snippet icon()}
+						<VerticalMenuIcon fab />
+					{/snippet}
+				</Fab>
+			</div>
+		{/if}
+	</div>
+{/if}
