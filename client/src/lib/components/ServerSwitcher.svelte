@@ -6,7 +6,7 @@
 <List nested>
 	<ListInput
 		label={t("Server")}
-		type="text"
+		type="url"
 		name="server"
 		required
 		onChange={(ev) => setServerUrl(ev.target.value)}

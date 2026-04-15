@@ -19,14 +19,14 @@ export const apiState = $state({
 
 const SERVER_URL_STORAGE_KEY = "serverUrl";
 const client = await Storage.getStorage();
-const storedUrl = await client.get(SERVER_URL_STORAGE_KEY);
+const storedUrl = await client.getRaw(SERVER_URL_STORAGE_KEY);
 if (storedUrl) {
 	apiState.url = storedUrl;
 }
 
 export async function setServerUrl(newUrl: string) {
 	apiState.url = newUrl;
-	await client.set(SERVER_URL_STORAGE_KEY, newUrl);
+	await client.setRaw(SERVER_URL_STORAGE_KEY, newUrl);
 }
 
 export type CallOptions = {

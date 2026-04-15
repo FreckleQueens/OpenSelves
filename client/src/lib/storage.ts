@@ -50,13 +50,13 @@ export abstract class Storage {
 		return this.getRaw(absolute ? path : `${this.key}.${path}`);
 	}
 
-	protected abstract getRaw(path: string): Promise<string | undefined>;
+	public abstract getRaw(path: string): Promise<string | undefined>;
 
 	public async set(path: string, value: string, absolute: boolean = false): Promise<void> {
 		await this.setRaw(absolute ? path : `${this.key}.${path}`, value);
 	}
 
-	protected abstract setRaw(path: string, value: string): Promise<void>;
+	public abstract setRaw(path: string, value: string): Promise<void>;
 }
 
 class LocalStorage extends Storage {
@@ -75,11 +75,11 @@ class LocalStorage extends Storage {
 		return this.persistent;
 	}
 
-	protected async getRaw(path: string): Promise<string | undefined> {
+	public async getRaw(path: string): Promise<string | undefined> {
 		return localStorage.getItem(path) || undefined;
 	}
 
-	protected async setRaw(path: string, value: string): Promise<void> {
+	public async setRaw(path: string, value: string): Promise<void> {
 		localStorage.setItem(path, value);
 	}
 }
