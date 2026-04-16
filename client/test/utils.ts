@@ -48,7 +48,7 @@ export async function createMember(page: Page) {
 	await page.locator('input[name="pronouns"]').fill(member.pronouns);
 	await page.locator('textarea[name="description"]').fill(member.description);
 
-	await page.locator("#save-member-button").click();
+	await page.locator("#save-record-button").click();
 	await page.waitForURL("/members");
 
 	return member;

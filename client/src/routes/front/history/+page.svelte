@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
 	import SortAscIcon from "$lib/components/icons/SortAscIcon.svelte";
 	import SortDescIcon from "$lib/components/icons/SortDescIcon.svelte";
@@ -10,6 +13,7 @@
 	import {
 		Block,
 		BlockTitle,
+		Button,
 		Table,
 		TableBody,
 		TableCell,
@@ -118,6 +122,7 @@
 							{/if}
 						</div>
 					</TableCell>
+					<TableCell header>Actions</TableCell>
 				</TableRow>
 			</TableHead>
 			<TableBody>
@@ -142,6 +147,16 @@
 							{:else}
 								{"" + "-"}
 							{/if}
+						</TableCell>
+						<TableCell>
+							<Button
+								small
+								class="edit-front-button p-2"
+								inline
+								onClick={() => goto(resolve(`/front/edit/${front.id}`))}
+							>
+								<EditIcon />
+							</Button>
 						</TableCell>
 					</TableRow>
 				{:else}

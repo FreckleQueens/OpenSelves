@@ -6,7 +6,7 @@
 	"Application error": "Erreur de l'application",
 	"Archive member": "Archiver le.a membre",
 	"Archived reason": "Raison d'archivage",
-	"Are you sure you want to delete this member? This action cannot be reverted.": "Êtes vous sûr.e de vouloir supprimer ce.tte membre ? Cette action est irréversible.",
+	"Are you sure you want to delete this {thingName}? This action cannot be reverted.": "Êtes vous sûr.e de vouloir supprimer ce.tte {thingName} ? Cette action est irréversible.",
 	"Authorization": "Autorisation",
 	"Cancel": "Annuler",
 	"Change language": "Changer la langue",
@@ -20,8 +20,8 @@
 	"Currently fronting": "Présences actuelles",
 	"Danger zone": "Zone dangereuse",
 	"Delete": "Supprimer",
-	"Delete member": "Supprimer le.a membre",
-	"Delete member (irreversible)": "Supprimer le.a membre (irréversible)",
+	"Delete {thingName}": "Supprimer le.a {thingName}",
+	"Delete {thingName} (irreversible)": "Supprimer le.a {thingName} (irréversible)",
 	"Description": "Description",
 	"Discard": "Abandonner",
 	"Discard changes?": "Abandonner les changements ?",
@@ -65,7 +65,10 @@
 	"This is provided by the website's administrator. It may be required to be allowed to create a new account.": "Cette valeur est fournie par l'administrateur.ice du site. Elle est peut-être nécessaire pour pouvoir créer un compte.",
 	"This will mark all front entries as ended.": "Cela marquera toutes les présences comme terminées.",
 	"Unknown": "Inconnu.e",
+	"Unknown member": "Membre inconnu.e",
 	"What language do you prefer?": "Quelle langue préférez-vous ?",
 	"You are logged in as user #{user.id}, {user.email}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email}",
-	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte."
+	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte.",
+	"front": "présence",
+	"member": "membre"
 }

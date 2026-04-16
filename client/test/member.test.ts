@@ -19,7 +19,7 @@ test("update member no change", async ({ page }) => {
 
 	const previousLogsCount = await getLogsCount(page);
 	await getMemberEntry(page, member).locator(".member-card").click();
-	await page.locator("#save-member-button").click();
+	await page.locator("#save-record-button").click();
 
 	await page.waitForURL("/members");
 

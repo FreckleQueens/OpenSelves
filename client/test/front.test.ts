@@ -26,8 +26,8 @@ test("create front then delete member", async ({ page }) => {
 	await page.goto("/members");
 	await getMemberEntry(page, member).locator(".member-card").click();
 	await page.locator("#settings-tab-button").click();
-	await page.locator("#delete-member-button").click();
-	await page.locator("#delete-member-confirm-button").click();
+	await page.locator("#delete-record-button").click();
+	await page.locator("#delete-record-confirm-button").click();
 	await page.waitForURL("/members");
 
 	await expect(getMemberEntry(page, member)).toHaveCount(0);

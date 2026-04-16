@@ -3,6 +3,7 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import DateTimeInput from "$lib/components/DateTimeInput.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import SelectMemberSheet from "$lib/components/SelectMemberSheet.svelte";
@@ -63,7 +64,7 @@
 				return 0;
 			}),
 	);
-	let frontInputMap: Record<string, HTMLInputElement> = $state({});
+	let frontInputMap: Record<string, () => void> = $state({});
 	let pageContent: HTMLDivElement | undefined = $state();
 	let showMemberSelectSheet = $state(false);
 	let showClearFrontDialog = $state(false);
@@ -189,18 +190,7 @@
 							id: "change-start-date",
 							icon: DateTimeInputIcon,
 							onClick: () => {
-								// In Firefox desktop, datetime-local currently fails to display a time picker
-								// See https://bugzilla.mozilla.org/show_bug.cgi?id=1726107
-								const userAgent = navigator.userAgent.toLowerCase();
-								if (
-									userAgent.includes("firefox") &&
-									!userAgent.includes("mobile") &&
-									!userAgent.includes("android")
-								) {
-									frontInputMap[front.id]?.classList.remove("hidden");
-									frontInputMap[front.id]?.focus();
-								}
-								frontInputMap[front.id]?.showPicker();
+								frontInputMap[front.id]?.();
 							},
 						},
 						{
@@ -249,28 +239,18 @@
 								/>
 							</List>
 						{/if}
-						<!-- onblur is part of the firefox desktop datetime picker bug workaround -->
-						<input
-							class="hidden"
-							type="datetime-local"
+
+						<DateTimeInput
+							hidden
 							name="startedAt"
-							onclick={(ev) => ev.stopPropagation()}
-							oninput={(ev) => {
-								const value = ev.currentTarget?.value;
-								if (!value) return;
-								return setFrontStartDate(front.id, new Date(value));
+							onInput={(date) => {
+								if (date) {
+									return setFrontStartDate(front.id, date);
+								}
 							}}
-							onblur={(ev) => ev.currentTarget?.classList.add("hidden")}
-							value={new Date(
-								front.startedAt.getTime() -
-									front.startedAt.getTimezoneOffset() * 60 * 1000,
-							)
-								.toISOString()
-								.slice(0, 16)}
-							bind:this={frontInputMap[front.id]}
-							max={new Date(Date.now() - new Date().getTimezoneOffset() * 60 * 1000)
-								.toISOString()
-								.slice(0, 16)}
+							max={new Date()}
+							bind:value={front.startedAt}
+							bind:open={frontInputMap[front.id]}
 						/>
 					{/snippet}
 				</MemberCard>
