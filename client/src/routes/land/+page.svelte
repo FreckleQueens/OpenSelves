@@ -3,7 +3,7 @@
 	import { resolve } from "$app/paths";
 	import { USER_LANDED_STORAGE_KEY } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
+	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
 	import { Storage } from "$lib/storage";
 	import { Block, BlockTitle, Button } from "konsta/svelte";

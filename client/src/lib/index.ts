@@ -2,15 +2,6 @@
 
 export const USER_LANDED_STORAGE_KEY = "userLanded";
 
-export type AuthFormData = {
-	name: string;
-	errors: Record<string, string>;
-	generalError: string;
-	endpoint: string;
-	data: Record<string, string>;
-	onSuccess: (result: object) => Promise<unknown> | unknown;
-};
-
 export enum MenuItem {
 	HOME,
 	FRONT,

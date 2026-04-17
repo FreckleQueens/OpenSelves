@@ -4,7 +4,7 @@
 	import { MenuItem } from "$lib";
 	import { CallResult, call, handleLogout } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
+	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
 	import { Storage } from "$lib/storage";
 	import { Block, BlockTitle, Button, Preloader } from "konsta/svelte";

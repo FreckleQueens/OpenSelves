@@ -1,15 +1,15 @@
 <script lang="ts">
-	import type { AuthFormData } from "$lib";
-	import AuthFields from "$lib/components/AuthFields.svelte";
+	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
+	import type { AuthFormData } from "$lib/forms";
 	import { BlockTitle, List, ListInput } from "konsta/svelte";
 
 	let { formState = $bindable() }: { formState: AuthFormData } = $props();
 </script>
 
-<AuthFields bind:formState>
+<FormFields bind:formState>
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput
@@ -66,4 +66,4 @@
 			{/snippet}
 		</ListInput>
 	</List>
-</AuthFields>
+</FormFields>

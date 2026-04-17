@@ -1,9 +1,11 @@
 <script lang="ts" generics="TabId extends string">
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
+	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
 	import DiscardIcon from "$lib/components/icons/DiscardIcon.svelte";
 	import SaveIcon from "$lib/components/icons/SaveIcon.svelte";
+	import type { FormValidationState } from "$lib/forms";
 	import { Button, Dialog, DialogButton, Link, Segmented, SegmentedButton } from "konsta/svelte";
 	import { type Component, type Snippet, onMount } from "svelte";
 
@@ -16,6 +18,7 @@
 		onDelete,
 		onDiscard,
 		ready = true,
+		formState = $bindable(),
 		activeTab = $bindable(),
 		// eslint-disable-next-line no-useless-assignment
 		deleteRecordButton = $bindable(),
@@ -32,10 +35,12 @@
 		onDelete: () => Promise<void> | void;
 		onDiscard?: () => Promise<void> | void;
 		ready?: boolean;
+		formState: FormValidationState;
 		activeTab?: TabId;
 		deleteRecordButton?: Snippet | null;
 	} = $props();
 
+	let form: HTMLFormElement | null = $state(null);
 	let showSaveConfirmDialog = $state(false);
 	let showDiscardChangesDialog = $state(false);
 	let openDeleteMemberDialog = $state(false);
@@ -50,6 +55,13 @@
 			showSaveConfirmDialog = true;
 		} else {
 			await discardChanges();
+		}
+	}
+
+	async function submitForm(event?: SubmitEvent) {
+		event?.preventDefault();
+		if (form?.checkValidity()) {
+			await saveChanges();
 		}
 	}
 
@@ -84,7 +96,7 @@
 		{/if}
 	{/snippet}
 	{#snippet navbarRight()}
-		<Link id="save-record-button" onClick={saveChanges}>
+		<Link id="save-record-button" onClick={() => submitForm()}>
 			<SaveIcon button />
 		</Link>
 	{/snippet}
@@ -105,7 +117,11 @@
 		</Segmented>
 	{/snippet}
 
-	{@render children?.()}
+	<form bind:this={form} onsubmit={submitForm}>
+		<FormFields bind:formState>
+			{@render children?.()}
+		</FormFields>
+	</form>
 </AppPage>
 
 <Dialog opened={showSaveConfirmDialog} onBackdropClick={() => (showSaveConfirmDialog = false)}>
@@ -115,7 +131,13 @@
 
 	{#snippet buttons()}
 		<DialogButton onClick={() => (showSaveConfirmDialog = false)}>Cancel</DialogButton>
-		<DialogButton strong onClick={saveChanges}>
+		<DialogButton
+			strong
+			onClick={() => {
+				submitForm();
+				showSaveConfirmDialog = false;
+			}}
+		>
 			<SaveIcon button before />
 			Save
 		</DialogButton>

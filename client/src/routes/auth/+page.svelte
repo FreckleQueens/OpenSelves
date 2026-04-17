@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { type AuthFormData } from "$lib";
 	import { apiState } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LoginFields from "$lib/components/LoginFields.svelte";
-	import RegisterFields from "$lib/components/RegisterFields.svelte";
+	import LoginFields from "$lib/components/forms/LoginFields.svelte";
+	import RegisterFields from "$lib/components/forms/RegisterFields.svelte";
 	import LoginIcon from "$lib/components/icons/LoginIcon.svelte";
 	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
+	import type { AuthFormData } from "$lib/forms";
 	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
 	import { Storage } from "$lib/storage";
 	import {

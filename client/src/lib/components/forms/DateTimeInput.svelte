@@ -3,7 +3,7 @@
 	import { ListInput } from "konsta/svelte";
 	import type { FormEventHandler, HTMLAttributes } from "svelte/elements";
 
-	import type { Props as ListInputProps } from "../../../../node_modules/konsta/svelte/types/ListInput";
+	import type { Props as ListInputProps } from "../../../../../node_modules/konsta/svelte/types/ListInput";
 
 	type Props = {
 		hidden?: Hidden;
@@ -23,8 +23,8 @@
 		onInput = $bindable(),
 		// eslint-disable-next-line no-useless-assignment
 		open = $bindable(),
-		min,
-		max,
+		min = $bindable(),
+		max = $bindable(),
 		...rest
 	}: Props & Omit<CompProps, keyof Props> = $props();
 
@@ -55,13 +55,25 @@
 	}
 
 	let minDate = $derived(
-		min ? new Date(Date.now() - min.getTimezoneOffset() * 60 * 1000) : undefined,
+		min
+			? new Date(min.getTime() - min.getTimezoneOffset() * 60 * 1000)
+					.toISOString()
+					.slice(0, 16)
+			: undefined,
 	);
 	let maxDate = $derived(
-		max ? new Date(Date.now() - max.getTimezoneOffset() * 60 * 1000) : undefined,
+		max
+			? new Date(max.getTime() - max.getTimezoneOffset() * 60 * 1000)
+					.toISOString()
+					.slice(0, 16)
+			: undefined,
 	);
 	let val = $derived(
-		value ? new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000) : undefined,
+		value
+			? new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000)
+					.toISOString()
+					.slice(0, 16)
+			: undefined,
 	);
 
 	function isInputProps(props: unknown): props is HTMLAttributes<HTMLInputElement> {
@@ -80,10 +92,9 @@
 		class="hidden"
 		type="datetime-local"
 		{name}
-		value={val ? val.toISOString().slice(0, 16) : undefined}
-		min={minDate ? minDate.toISOString().slice(0, 16) : undefined}
-		max={maxDate ? maxDate.toISOString().slice(0, 16) : undefined}
-		onclick={(ev) => ev.stopPropagation()}
+		value={val}
+		min={minDate}
+		max={maxDate}
 		oninput={localOnInput}
 		onblur={(ev) => ev.currentTarget?.classList.add("hidden")}
 		{...rest}
@@ -92,10 +103,9 @@
 	<ListInput
 		type="datetime-local"
 		{name}
-		value={val ? val.toISOString().slice(0, 16) : undefined}
-		min={minDate ? minDate.toISOString().slice(0, 16) : undefined}
-		max={maxDate ? maxDate.toISOString().slice(0, 16) : undefined}
-		onclick={(ev) => ev.stopPropagation()}
+		bind:value={val}
+		bind:min={minDate}
+		bind:max={maxDate}
 		onInput={localOnInput}
 		{onClear}
 		{...rest}

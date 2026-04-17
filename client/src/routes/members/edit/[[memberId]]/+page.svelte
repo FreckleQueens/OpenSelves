@@ -1,12 +1,13 @@
 <script lang="ts">
-	import EditPage from "$lib/components/EditPage.svelte";
-	import EditPageDangerZone from "$lib/components/EditPageDangerZone.svelte";
+	import EditPage from "$lib/components/forms/EditPage.svelte";
+	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
 	import PronounsInputIcon from "$lib/components/icons/PronounsInputIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
+	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
 	import { Storage } from "$lib/storage";
 	import { Block, List, ListInput, ListItem, Toggle } from "konsta/svelte";
@@ -30,6 +31,10 @@
 		updatedAt: new Date(),
 	});
 	let originalMember: MemberData | null = $state(null);
+	let formState: FormValidationState = $state({
+		errors: {},
+		generalError: "",
+	});
 	let activeTab: "info" | "settings" = $state("info");
 	let deleteRecordButton: Snippet | null = $state(null);
 
@@ -85,84 +90,87 @@
 	hasRecordChanged={hasMemberChanged}
 	onSave={saveMember}
 	onDelete={deleteMember}
+	bind:formState
 	bind:activeTab
 	bind:deleteRecordButton
 >
-	<form onsubmit={(e) => e.preventDefault()}>
-		<div class:hidden={activeTab !== "info"}>
-			<List>
-				<ListInput
-					name="name"
-					label={t("Name")}
-					floatingLabel
-					required
-					bind:value={member.name}
-				>
-					{#snippet media()}
-						<NameInputIcon input />
-					{/snippet}
-				</ListInput>
-				<ListInput
-					name="pronouns"
-					label={t("Pronouns")}
-					floatingLabel
-					bind:value={member.pronouns}
-				>
-					{#snippet media()}
-						<PronounsInputIcon input />
-					{/snippet}
-				</ListInput>
-				<ListInput
-					name="description"
-					label={t("Description")}
-					floatingLabel
-					type="textarea"
-					autocomplete="off"
-					inputClass="min-h-20"
-					bind:value={member.description}
-				>
-					{#snippet media()}
-						<DescriptionInputIcon input />
-					{/snippet}
-				</ListInput>
-			</List>
-		</div>
+	<div class:hidden={activeTab !== "info"}>
+		<List>
+			<ListInput
+				name="name"
+				label={t("Name")}
+				floatingLabel
+				required
+				bind:value={member.name}
+				error={formState.errors["name"] || ""}
+			>
+				{#snippet media()}
+					<NameInputIcon input />
+				{/snippet}
+			</ListInput>
+			<ListInput
+				name="pronouns"
+				label={t("Pronouns")}
+				floatingLabel
+				bind:value={member.pronouns}
+				error={formState.errors["pronouns"] || ""}
+			>
+				{#snippet media()}
+					<PronounsInputIcon input />
+				{/snippet}
+			</ListInput>
+			<ListInput
+				name="description"
+				label={t("Description")}
+				floatingLabel
+				type="textarea"
+				autocomplete="off"
+				inputClass="min-h-20"
+				bind:value={member.description}
+				error={formState.errors["description"] || ""}
+			>
+				{#snippet media()}
+					<DescriptionInputIcon input />
+				{/snippet}
+			</ListInput>
+		</List>
+	</div>
 
-		<div class:hidden={activeTab !== "settings"}>
-			{#if member.id}
-				<Block>
-					<List>
-						<ListItem label title={t("Archive member")}>
-							{#snippet after()}
-								<Toggle
-									name="isArchived"
-									checked={!!member.isArchived}
-									onChange={() => (member.isArchived = !member.isArchived)}
-								/>
+	<div class:hidden={activeTab !== "settings"}>
+		{#if member.id}
+			<Block>
+				<List>
+					<ListItem label title={t("Archive member")}>
+						{#snippet after()}
+							<Toggle
+								name="isArchived"
+								checked={!!member.isArchived}
+								onChange={() => (member.isArchived = !member.isArchived)}
+							/>
+						{/snippet}
+					</ListItem>
+					<div class:hidden={!member.isArchived}>
+						<ListInput
+							name="archivedReason"
+							label={t("Archived reason")}
+							floatingLabel
+							type="textarea"
+							autocomplete="off"
+							inputClass="min-h-6"
+							bind:value={member.archivedReason}
+							error={formState.errors["archivedReason"] || ""}
+						>
+							{#snippet media()}
+								<ArchiveInputIcon input />
 							{/snippet}
-						</ListItem>
-						<div class:hidden={!member.isArchived}>
-							<ListInput
-								name="archivedReason"
-								label={t("Archived reason")}
-								floatingLabel
-								type="textarea"
-								autocomplete="off"
-								inputClass="min-h-6"
-								bind:value={member.archivedReason}
-							>
-								{#snippet media()}
-									<ArchiveInputIcon input />
-								{/snippet}
-							</ListInput>
-						</div>
-					</List>
-				</Block>
+						</ListInput>
+					</div>
+				</List>
+			</Block>
 
-				<EditPageDangerZone>
-					{@render deleteRecordButton?.()}
-				</EditPageDangerZone>
-			{/if}
-		</div>
-	</form>
+			<EditPageDangerZone>
+				{@render deleteRecordButton?.()}
+			</EditPageDangerZone>
+		{/if}
+	</div>
 </EditPage>

@@ -3,10 +3,10 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import DateTimeInput from "$lib/components/DateTimeInput.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
-	import SelectMemberSheet from "$lib/components/SelectMemberSheet.svelte";
+	import DateTimeInput from "$lib/components/forms/DateTimeInput.svelte";
+	import SelectMemberSheet from "$lib/components/forms/SelectMemberSheet.svelte";
 	import AddNoteIcon from "$lib/components/icons/AddNoteIcon.svelte";
 	import DateTimeInputIcon from "$lib/components/icons/DateTimeInputIcon.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
@@ -251,6 +251,7 @@
 							max={new Date()}
 							bind:value={front.startedAt}
 							bind:open={frontInputMap[front.id]}
+							onclick={(ev) => ev.stopPropagation()}
 						/>
 					{/snippet}
 				</MemberCard>

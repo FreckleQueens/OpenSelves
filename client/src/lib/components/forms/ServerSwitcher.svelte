@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { apiState, setServerUrl } from "$lib/api.svelte";
+	import { apiState, setServerUrl } from "$lib/api.svelte.js";
 	import { List, ListInput } from "konsta/svelte";
 </script>
 

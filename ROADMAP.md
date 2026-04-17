@@ -111,7 +111,7 @@ deadline or ETA
 - [x] client: edit front end datetime
 - [x] client: delete front
 - [x] client: show current fronts
-- [ ] client: validate form fields with native html validation in member edit and front edit pages
+- [x] client: validate form fields with native html validation in member edit and front edit pages
 - [ ] client: don't show network errors, simply put the app in offline mode
 - [ ] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
 

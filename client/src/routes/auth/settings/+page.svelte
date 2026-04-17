@@ -1,8 +1,8 @@
 <script lang="ts">
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
-	import LanguageSwitcher from "$lib/components/LanguageSwitcher.svelte";
-	import ServerSwitcher from "$lib/components/ServerSwitcher.svelte";
+	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
+	import ServerSwitcher from "$lib/components/forms/ServerSwitcher.svelte";
 	import { Block, BlockTitle } from "konsta/svelte";
 </script>
 
