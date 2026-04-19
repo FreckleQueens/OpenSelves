@@ -1,4 +1,5 @@
 import { call } from "$lib/api.svelte";
+import { appNetworkStatus } from "$lib/app-network-status.svelte";
 import { IDB } from "$lib/idb/idb";
 import { Storage } from "$lib/storage";
 
@@ -26,9 +27,10 @@ export class SyncWorker {
 	private _hasPushBacklog: boolean = true;
 	private syncTimeout: number | undefined = undefined;
 	private syncing: boolean = false;
-	public error: unknown = $state(null);
+	private _online: boolean = false;
 
-	protected constructor(private online: boolean) {
+	protected constructor(online: boolean) {
+		this.online = online;
 		if (this.online) {
 			this.resume();
 		} else {
@@ -76,7 +78,16 @@ export class SyncWorker {
 	}
 
 	public clearError() {
-		this.error = null;
+		appNetworkStatus.syncWorkerError = null;
+	}
+
+	private get online() {
+		return this._online;
+	}
+
+	private set online(online: boolean) {
+		this._online = online;
+		appNetworkStatus.syncWorkerOnline = online;
 	}
 
 	private scheduleSync(delay: number = 1000) {
@@ -89,7 +100,7 @@ export class SyncWorker {
 			this.syncing = true;
 			this.sync()
 				.catch((err) => {
-					this.error = err;
+					appNetworkStatus.syncWorkerError = err;
 					console.error(err);
 				})
 				.finally(() => {

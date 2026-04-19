@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
+	import { appNetworkStatus } from "$lib/app-network-status.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
+	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
 	import HomeIcon from "$lib/components/icons/HomeIcon.svelte";
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
-	import { SyncWorker } from "$lib/idb/SyncWorker.svelte.js";
+	import { SyncWorker } from "$lib/idb/SyncWorker.js";
 	import {
+		Block,
 		BlockTitle,
 		Link,
 		MenuList,
@@ -16,12 +19,10 @@
 		Panel,
 		Preloader,
 	} from "konsta/svelte";
-	import type { Snippet } from "svelte";
+	import { type Snippet } from "svelte";
+	import { fly } from "svelte/transition";
 
 	import { transformErrorToReadable } from "../../hooks.client.ts";
-
-	let openMenu = $state(false);
-	let syncWorkerError: unknown = $derived(SyncWorker.getInstance().error);
 
 	let {
 		children,
@@ -50,6 +51,9 @@
 		loading?: boolean;
 		pageContent?: HTMLDivElement | undefined;
 	} = $props();
+
+	let openMenu = $state(false);
+	let syncWorkerError: unknown = $derived(appNetworkStatus.syncWorkerError);
 </script>
 
 <ErrorDialog
@@ -95,6 +99,19 @@
 				{/snippet}
 			</MenuListItem>
 		</MenuList>
+
+		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />
+		<Block class="">
+			<div class="flex items-center">
+				{#if !appNetworkStatus.storageOnline}
+					Exclusive offline mode
+				{:else if appNetworkStatus.syncWorkerOnline}
+					Sync active (online)
+				{:else}
+					<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
+				{/if}
+			</div>
+		</Block>
 	</Page>
 </Panel>
 
@@ -133,6 +150,14 @@
 <div class="app-bottom-nav bottom-0 left-0 w-full">
 	{#if bottomNav}
 		{@render bottomNav()}
+	{/if}
+	{#if appNetworkStatus.storageOnline && !appNetworkStatus.syncWorkerOnline}
+		<div
+			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
+			transition:fly={{ duration: 150, y: 16 }}
+		>
+			<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
+		</div>
 	{/if}
 </div>
 

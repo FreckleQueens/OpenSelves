@@ -9,7 +9,7 @@
 	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { AuthFormData } from "$lib/forms";
-	import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
+	import { SyncWorker } from "$lib/idb/SyncWorker.js";
 	import { Storage } from "$lib/storage";
 	import {
 		Block,

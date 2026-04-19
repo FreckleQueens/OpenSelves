@@ -6,7 +6,7 @@ import {
 	PUBLIC_DEFAULT_API_URL_DEV,
 	PUBLIC_TEST_ENVIRONMENT,
 } from "$env/static/public";
-import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
+import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { Storage } from "$lib/storage";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 

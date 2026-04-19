@@ -113,7 +113,7 @@ deadline or ETA
 - [x] client: show current fronts
 - [x] client: validate form fields with native html validation in member edit and front edit pages
 - [x] client: don't show network errors, simply put the app in offline mode
-- [ ] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
+- [x] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
 
 ## 0.5.0
 - [ ] client: switch to a better md3 library

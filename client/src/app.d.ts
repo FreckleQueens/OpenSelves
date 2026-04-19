@@ -3,7 +3,7 @@
 import "../auto-imports";
 
 import { IDB } from "$lib/idb";
-import type { SyncWorker } from "$lib/idb/SyncWorker.svelte";
+import type { SyncWorker } from "$lib/idb/SyncWorker.js";
 import type { Storage } from "$lib/storage";
 
 declare global {

@@ -1,6 +1,6 @@
 import type { ClientLog } from "$lib/idb/IDBLog";
 import { IDBModel } from "$lib/idb/IDBModel";
-import { SyncWorker } from "$lib/idb/SyncWorker.svelte";
+import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
 import { createId } from "@paralleldrive/cuid2";
 import { type ColumnType } from "drizzle-orm/column-builder";

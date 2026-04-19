@@ -1,3 +1,5 @@
+import { appNetworkStatus } from "$lib/app-network-status.svelte";
+
 const OFFLINE_KEY = "offline";
 const CURRENT_KEY_KEY = "currentKey";
 
@@ -12,7 +14,7 @@ export abstract class Storage {
 		return this.storage;
 	}
 
-	private key: string = OFFLINE_KEY;
+	private _key: string = OFFLINE_KEY;
 
 	public async init(): Promise<void> {
 		this.key = (await this.getRaw(CURRENT_KEY_KEY)) || OFFLINE_KEY;
@@ -57,6 +59,15 @@ export abstract class Storage {
 	}
 
 	public abstract setRaw(path: string, value: string): Promise<void>;
+
+	private get key() {
+		return this._key;
+	}
+
+	private set key(key: string) {
+		this._key = key;
+		appNetworkStatus.storageOnline = !this.isOffline();
+	}
 }
 
 class LocalStorage extends Storage {
