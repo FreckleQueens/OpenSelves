@@ -5,6 +5,7 @@ A free and open source, local-first app for system mapping and front tracking
 
 ## 📝 Current features
 - 🗺 System mapping **in very basic, demo state** (not meant for real-world use for now)
+- 👥 Front tracking
 - 📶 Connectivity drop resilience (local-first sync)
 - ℹ️ Local-first: your data is always saved to your device first. If connected with an account, it is then synchronized
 when there is connectivity
@@ -14,7 +15,6 @@ when there is connectivity
 
 ## 🚧 Planned features
 - 🗺 Fully featured system mapping
-- 👥 Front tracking
 - ⬇️ Simply plural data importing
 - 📶 Exclusive-offline mode (and ability to add account)
 - 📈 Front history chronological graph

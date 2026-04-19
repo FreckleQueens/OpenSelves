@@ -90,7 +90,11 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.4.0
+## ✅ 0.4.0
+
+<details>
+  <summary>dev todo</summary>
+
 - [x] client: offline icons
 - [x] client: improve service worker's ability to start from offline
 - [x] db: fronts
@@ -115,7 +119,9 @@ deadline or ETA
 - [x] client: don't show network errors, simply put the app in offline mode
 - [x] client: show a banner on all pages when the app is in offline mode (server unreachable, network offline...)
 
-## 0.5.0
+</details>
+
+## 🚧 0.5.0
 - [ ] client: switch to a better md3 library
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers 
 - [ ] show proper language names in language switcher
