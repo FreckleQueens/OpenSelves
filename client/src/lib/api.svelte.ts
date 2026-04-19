@@ -29,20 +29,34 @@ export async function setServerUrl(newUrl: string) {
 	await client.setRaw(SERVER_URL_STORAGE_KEY, newUrl);
 }
 
-export type CallOptions = {
+export type CallOptions<RawResponse extends true | false> = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	data?: Record<string, unknown>;
 	dontRefreshAuthOnUnauthorized?: boolean;
+	returnRawResponse?: RawResponse;
 };
 
 export enum CallResult {
 	AUTH_FAILED,
+	API_UNREACHABLE,
 }
 
-export async function call(
+export async function callRaw(
 	path: string,
-	options?: CallOptions,
-): Promise<CallResult | Record<string, unknown>> {
+	options: CallOptions<true>,
+): Promise<CallResult | Response>;
+export async function callRaw(
+	path: string,
+	options?: CallOptions<false>,
+): Promise<CallResult | Record<string, unknown>>;
+export async function callRaw(
+	path: string,
+	options?: CallOptions<true | false>,
+): Promise<CallResult | Response | Record<string, unknown>>;
+export async function callRaw(
+	path: string,
+	options?: CallOptions<true | false>,
+): Promise<CallResult | Response | Record<string, unknown>> {
 	const headers: Record<string, string> = {
 		Accept: "application/json",
 	};
@@ -58,13 +72,38 @@ export async function call(
 	};
 
 	const tryFetch = async () => await fetch(`${apiState.url}${path}`, fetchInit);
-	let response: Response;
+	let response: Response | undefined = undefined;
 	let responseBody: Record<string, unknown> | undefined = undefined;
 
 	for (let attempt = 0; attempt < 3; attempt++) {
-		response = await tryFetch();
-		responseBody = await response.json();
-		if (!responseBody) {
+		try {
+			response = await tryFetch();
+			if (!options?.returnRawResponse) {
+				responseBody = await response.json();
+			}
+		} catch (error) {
+			console.debug(
+				"attempt",
+				attempt,
+				"got error",
+				error,
+				"with response",
+				response,
+				responseBody,
+			);
+		}
+
+		if (options?.returnRawResponse) {
+			if (!response) {
+				continue;
+			}
+			return response;
+		}
+
+		if (!response || !(response instanceof Response) || !responseBody) {
+			if (!(await isApiReachable())) {
+				return CallResult.API_UNREACHABLE;
+			}
 			continue;
 		}
 
@@ -93,6 +132,57 @@ export async function call(
 	return responseBody;
 }
 
+export async function call(path: string, options: CallOptions<true>): Promise<Response>;
+export async function call(
+	path: string,
+	options?: CallOptions<false>,
+): Promise<Record<string, unknown> | undefined>;
+export async function call(
+	path: string,
+	options?: CallOptions<true | false>,
+): Promise<Record<string, unknown> | Response | undefined>;
+export async function call(
+	path: string,
+	options?: CallOptions<true | false>,
+): Promise<Record<string, unknown> | Response | undefined> {
+	const result = await callRaw(path, options);
+
+	if (options?.returnRawResponse && result instanceof Response) {
+		return result;
+	}
+
+	switch (result) {
+		case CallResult.AUTH_FAILED:
+			await handleLogout();
+			return undefined;
+		case CallResult.API_UNREACHABLE:
+			handleApiUnreachable();
+			return undefined;
+		default:
+			return result;
+	}
+}
+
+async function isApiReachable(): Promise<boolean> {
+	const debugData: unknown[] = [];
+	try {
+		const response = await fetch(`${apiState.url}/status`);
+		if (response.ok) {
+			const responseBody = await response.json();
+			if (responseBody.ready === true) {
+				console.debug("online");
+				return true;
+			}
+			debugData.push(responseBody);
+		}
+		debugData.push(response);
+	} catch (error) {
+		debugData.push(error);
+	}
+	console.debug("offline", debugData);
+	return false;
+}
+
 async function refreshAuth(): Promise<boolean> {
 	const response = await fetch(`${apiState.url}/auth/refresh`, {
 		method: "POST",
@@ -102,8 +192,37 @@ async function refreshAuth(): Promise<boolean> {
 }
 
 export async function handleLogout() {
+	clearTimeout(onlineCheckTimeout);
 	await SyncWorker.getInstance().shutdown();
 	const storage = await Storage.getStorage();
 	await storage.setOffline();
 	await goto(resolve("/"));
+}
+
+let onlineCheckTimeout: number | undefined = undefined;
+export function handleApiUnreachable() {
+	SyncWorker.getInstance().pause();
+	scheduleOnlineCheck();
+}
+
+function scheduleOnlineCheck() {
+	clearTimeout(onlineCheckTimeout);
+
+	onlineCheckTimeout = window.setTimeout(async () => {
+		console.debug("Checking for api reachability");
+		let reachable = false;
+		try {
+			if (await isApiReachable()) {
+				reachable = true;
+				const storage = await Storage.getStorage();
+				if (!storage.isOffline()) {
+					SyncWorker.getInstance().resume();
+				}
+			}
+		} finally {
+			if (!reachable) {
+				scheduleOnlineCheck();
+			}
+		}
+	}, 5000);
 }

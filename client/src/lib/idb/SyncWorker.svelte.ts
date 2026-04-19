@@ -80,7 +80,7 @@ export class SyncWorker {
 	}
 
 	private scheduleSync(delay: number = 1000) {
-		if (this.syncing) {
+		if (this.syncing || !this.online) {
 			return;
 		}
 
@@ -110,12 +110,15 @@ export class SyncWorker {
 
 	private async sync() {
 		console.debug("Sync start");
-		await this.push();
-		await this.pull();
+		if (await this.push()) {
+			await this.pull();
+		} else {
+			console.debug("skipping pull");
+		}
 		console.debug("Sync end");
 	}
 
-	private async push() {
+	private async push(): Promise<boolean> {
 		console.debug("Push start");
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
@@ -141,9 +144,13 @@ export class SyncWorker {
 					logs: formattedLogs,
 				},
 			});
-			if (typeof response === "object") {
-				await idb.log.delete(formattedLogs.map((log) => log.id));
+
+			if (!response || typeof response !== "object") {
+				console.debug("push failed with response", response);
+				return false;
 			}
+
+			await idb.log.delete(formattedLogs.map((log) => log.id));
 		}
 
 		if ((await idb.log.getAll(userId)).length === 0) {
@@ -151,9 +158,10 @@ export class SyncWorker {
 		}
 
 		console.debug("Push end");
+		return true;
 	}
 
-	private async pull() {
+	private async pull(): Promise<void> {
 		console.debug("Pull start");
 		const storage = await Storage.getStorage();
 		const userId = storage.getKey();
@@ -168,6 +176,11 @@ export class SyncWorker {
 				timestamp: reqTimestamp,
 			},
 		});
+
+		if (!response || typeof response !== "object") {
+			console.debug("pull failed with response", response);
+			return;
+		}
 
 		const logs = response["logs"];
 		console.debug("Logs to apply:", logs);

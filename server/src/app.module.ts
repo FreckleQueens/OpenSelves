@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { AuthModule } from "./auth/auth.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
+import { StatusController } from "./status.controller.js";
 import { SyncModule } from "./sync/sync.module.js";
 
 @Module({
@@ -18,6 +19,7 @@ import { SyncModule } from "./sync/sync.module.js";
 		DbModule,
 		SyncModule,
 	],
+	controllers: [StatusController],
 })
 export class AppModule {}
 

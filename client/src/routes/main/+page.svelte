@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
-	import { CallResult, call, handleLogout } from "$lib/api.svelte";
+	import { call, handleLogout } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
@@ -35,9 +35,7 @@
 		}
 
 		const response = await call(`/user/${storage.getKey()}`);
-		if (response === CallResult.AUTH_FAILED) {
-			await handleLogout();
-		} else {
+		if (response) {
 			if (!("id" in response && "email" in response)) {
 				throw new Error("Bad server response");
 			}
@@ -52,7 +50,7 @@
 		const result = await call("/auth/logout", {
 			method: "POST",
 		});
-		if (typeof result === "object") {
+		if (result && typeof result === "object") {
 			await handleLogout();
 		}
 	};

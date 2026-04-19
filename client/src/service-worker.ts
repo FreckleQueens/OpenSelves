@@ -43,10 +43,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
 	console.debug("fetch");
 
-	if (event.request.method === "GET") {
+	const url = new URL(event.request.url);
+	if (event.request.method === "GET" && url.pathname !== "/status") {
 		event.respondWith(
 			(async () => {
-				const url = new URL(event.request.url);
 				const cache = await self.caches.open(CACHE);
 
 				if (
@@ -80,6 +80,9 @@ self.addEventListener("fetch", (event) => {
 					if (response) {
 						console.log("fallback cache hit", url.pathname);
 						return response;
+					} else {
+						console.log("fallback cache miss");
+						console.error(error);
 					}
 
 					throw error;

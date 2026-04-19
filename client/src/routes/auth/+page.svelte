@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { apiState } from "$lib/api.svelte";
+	import { call } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LoginFields from "$lib/components/forms/LoginFields.svelte";
 	import RegisterFields from "$lib/components/forms/RegisterFields.svelte";
@@ -61,11 +61,11 @@
 	async function submitActiveForm() {
 		let response: Response;
 		try {
-			response = await fetch(`${apiState.url}${forms[activeForm].endpoint}`, {
+			response = await call(forms[activeForm].endpoint, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(forms[activeForm].data),
-				credentials: "include",
+				data: forms[activeForm].data,
+				dontRefreshAuthOnUnauthorized: true,
+				returnRawResponse: true,
 			});
 		} catch (error) {
 			console.trace(error);
