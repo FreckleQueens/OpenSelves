@@ -58,7 +58,7 @@
 />
 
 <Panel side="left" opened={openMenu} onBackdropClick={() => (openMenu = false)}>
-	<Page>
+	<Page class="pt-safe pb-safe pl-safe flex flex-col">
 		<BlockTitle class="justify-start text-2xl mt-2 mb-2">
 			<img
 				src="/logo_trans.svg"
@@ -70,7 +70,7 @@
 			OpenSelves
 		</BlockTitle>
 
-		<MenuList>
+		<MenuList class="flex-1">
 			<MenuListItem title={t("Home")} active={activeMenuItem === MenuItem.HOME} href="/main">
 				{#snippet media()}
 					<HomeIcon class="text-xl" />
