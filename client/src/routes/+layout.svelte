@@ -1,7 +1,6 @@
 <script lang="ts">
 	import "../app.css";
 
-	import favicon from "$lib/assets/favicon.svg";
 	import { App, Page } from "konsta/svelte";
 
 	let { children } = $props();
@@ -23,8 +22,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
-
 	<!-- Roboto font for web -->
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />

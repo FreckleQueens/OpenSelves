@@ -6,13 +6,21 @@
 		{
 			"src": "/app-icon.png",
 			"sizes": "4096x4096",
-			"type": "image/png"
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/app-icon_x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
 		}
 	],
 	"background_color": "#fff2e9",
 	"theme_color": "#df6800",
 	"display": "standalone",
+	"display_override": ["minimal-ui"],
 	"orientation": "portrait",
 	"start_url": "/",
-	"id": "/?pwa_version=3"
+	"id": "/?pwa_version=4"
 }
