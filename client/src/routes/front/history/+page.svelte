@@ -10,6 +10,7 @@
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
+	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
 		BlockTitle,
@@ -65,14 +66,10 @@
 	let sortBy: keyof ArrayElement<typeof sortedFronts> = $state("startedAt");
 	let direction: "asc" | "desc" = $state("desc");
 
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.member;
-	}, members);
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.front;
-	}, fronts);
+	requireAuth();
+	const idb = IDB.getInstance();
+	subscribeToModel(idb.member, members);
+	subscribeToModel(idb.front, fronts);
 
 	function setSortBy(value: typeof sortBy) {
 		direction = sortBy === value && direction === "asc" ? "desc" : "asc";

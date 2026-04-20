@@ -1,34 +1,39 @@
 import { IDBFront } from "$lib/idb/IDBFront";
 import { IDBLog } from "$lib/idb/IDBLog";
 import { IDBMember } from "$lib/idb/IDBMember";
+import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
 
-const IDB_VERSION = 3;
+const IDB_VERSION = 4;
 
-export type ModelBase = {
+export type ModelBase = object;
+export type SyncedModelBase = ModelBase & {
 	userId: string;
 	id: string;
-};
-export type SyncedModelBase = ModelBase & {
 	createdAt: Date;
 	updatedAt: Date;
 };
 
 export class IDB {
-	private static client: IDB;
+	private static instance: IDB;
 
-	public static async getClient(): Promise<IDB> {
-		if (!this.client) {
-			this.client = await this.createClient();
+	public static getInstance(): IDB {
+		if (!this.instance) {
+			throw new Error("IDB not initialized.");
 		}
-		return this.client;
+		return this.instance;
 	}
 
-	private static async createClient() {
+	public static async init() {
+		if (this.instance) {
+			throw new Error("IDB already initialized.");
+		}
+
 		const idb = new IDB();
 		await idb.init();
-		return idb;
+		this.instance = idb;
 	}
 
+	public readonly storageEntry: IDBStorageEntry = new IDBStorageEntry(this);
 	public readonly log: IDBLog = new IDBLog(this);
 	public readonly member: IDBMember = new IDBMember(this);
 	public readonly front: IDBFront = new IDBFront(this);
@@ -100,6 +105,17 @@ export class IDB {
 					logsStore.createIndex("frontId", "frontId");
 				}
 
+				if (event.oldVersion < 4) {
+					const storageEntriesStore = this.db.createObjectStore("storageEntries", {
+						keyPath: "key",
+					});
+					storageEntriesStore.createIndex("key", "key", { unique: true });
+					trackTransaction(storageEntriesStore.transaction);
+
+					const logsStore = dbRequest.transaction.objectStore("logs");
+					logsStore.createIndex("userId", "userId");
+				}
+
 				Promise.all(promises).then(() => {
 					resolve();
 				});
@@ -107,16 +123,16 @@ export class IDB {
 		});
 	}
 
-	public async transaction<StoreTypes extends string, ReturningType>(
+	public async transaction<Model extends ModelBase, StoreTypes extends string, ReturningType>(
 		storeNames: StoreTypes | StoreTypes[],
-		callback: (transaction: IDBTransactionWrapper<StoreTypes>) => Promise<ReturningType>,
+		callback: (transaction: IDBTransactionWrapper<Model, StoreTypes>) => Promise<ReturningType>,
 	): Promise<ReturningType> {
 		if (!this.db) {
 			throw new Error("this.db is undefined");
 		}
 
 		const nativeTransaction = this.db.transaction(storeNames, "readwrite");
-		const transaction = new IDBTransactionWrapper(nativeTransaction);
+		const transaction = new IDBTransactionWrapper<Model, StoreTypes>(nativeTransaction);
 
 		try {
 			const results = await Promise.all([
@@ -171,17 +187,17 @@ export class IDB {
 	}
 }
 
-export class IDBTransactionWrapper<StoreTypes extends string> {
+export class IDBTransactionWrapper<Model extends ModelBase, StoreTypes extends string> {
 	constructor(private readonly nativeTransaction: IDBTransaction) {}
 
 	public async get(
 		storeName: StoreTypes,
 		query: IDBValidKey | IDBKeyRange,
-	): Promise<ModelBase | undefined> {
+	): Promise<Model | undefined> {
 		return this.wrapRequest(storeName, (store) => store.get(query));
 	}
 
-	public async getAll(storeName: StoreTypes): Promise<ModelBase[]> {
+	public async getAll(storeName: StoreTypes): Promise<Model[]> {
 		return this.wrapRequest(storeName, (store) => store.getAll());
 	}
 
@@ -190,11 +206,11 @@ export class IDBTransactionWrapper<StoreTypes extends string> {
 		index: string,
 		query: IDBValidKey | IDBKeyRange | null = null,
 		direction?: IDBCursorDirection,
-	): Promise<ModelBase[]> {
+	): Promise<Model[]> {
 		return new Promise((resolve, reject) => {
 			const store = this.nativeTransaction.objectStore(storeName);
 			const request = store.index(index).openCursor(query, direction);
-			const records: ModelBase[] = [];
+			const records: Model[] = [];
 			request.onerror = () => {
 				reject(request.error);
 			};
@@ -210,7 +226,7 @@ export class IDBTransactionWrapper<StoreTypes extends string> {
 		});
 	}
 
-	public async put(storeName: StoreTypes, data: ModelBase): Promise<IDBValidKey> {
+	public async put(storeName: StoreTypes, data: Model): Promise<IDBValidKey> {
 		return this.wrapRequest(storeName, (store) => store.put(data));
 	}
 

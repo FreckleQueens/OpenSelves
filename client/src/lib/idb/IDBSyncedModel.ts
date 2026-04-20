@@ -1,7 +1,7 @@
 import type { ClientLog } from "$lib/idb/IDBLog";
 import { IDBModel } from "$lib/idb/IDBModel";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
+import { IDB, IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
 import { createId } from "@paralleldrive/cuid2";
 import { type ColumnType } from "drizzle-orm/column-builder";
 import type { Log } from "openselves-common/db";
@@ -24,9 +24,13 @@ export class IDBSyncedModelEvent<Model extends SyncedModelBase> {
 	) {}
 }
 
-export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBModel<Model> {
+export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBModel<Model, "id"> {
 	private readonly subscriptions: Set<(event: IDBSyncedModelEvent<Model>) => void> = new Set();
 	private readonly cascadeDeletes: CascadeDelete<never>[] = [];
+
+	protected constructor(idb: IDB, storeName: string) {
+		super(idb, storeName, "id");
+	}
 
 	public subscribe(callback: (event: IDBSyncedModelEvent<Model>) => void) {
 		this.subscriptions.add(callback);
@@ -54,7 +58,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 
 		saveData.updatedAt = new Date();
 
-		const finalRecord: Model = await this.idb.transaction(
+		const finalRecord: Model = await this.idb.transaction<Model | ClientLog, string, Model>(
 			["logs", this.storeName],
 			async (transaction) => {
 				let originalRecord: ModelBase | undefined;
@@ -143,7 +147,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 			(cascadeDelete) => cascadeDelete.model.storeName,
 		);
 
-		await this.idb.transaction(
+		await this.idb.transaction<Model | ClientLog, string, void>(
 			["logs", this.storeName, ...additionalStores],
 			async (transaction) => {
 				for (const recordId of recordIds) {
@@ -184,7 +188,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 		recordId: string,
 		recordData: Partial<Model> | null,
 		operationType: "create" | "update" | "delete",
-		transaction: IDBTransactionWrapper<string>,
+		transaction: IDBTransactionWrapper<Model | ClientLog, string>,
 	) {
 		const logIdKey = this.getLogIdKey();
 		if (logIdKey) {

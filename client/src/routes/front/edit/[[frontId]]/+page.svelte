@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import DateTimeInput from "$lib/components/forms/DateTimeInput.svelte";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
@@ -11,7 +12,7 @@
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
-	import { Storage } from "$lib/storage";
+	import { requireAuth } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 	import { type Snippet, onMount } from "svelte";
@@ -46,18 +47,17 @@
 	let deleteRecordButton: Snippet | null = $state(null);
 	let showSelectMemberSheet = $state(false);
 
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.member;
-	}, members);
+	requireAuth();
+	const storage = PersistentStorage.getInstance();
+	const idb = IDB.getInstance();
+	subscribeToModel(idb.member, members);
 
 	onMount(async () => {
 		if (!params.frontId) {
 			throw new Error("frontId route param is required");
 		}
 
-		const idb = await IDB.getClient();
-		front = await idb.front.getById(params.frontId);
+		front = await idb.front.getByPrimaryKey(params.frontId);
 		originalFront = { ...front };
 		mounted = true;
 	});
@@ -65,9 +65,7 @@
 	const hasFrontChanged = () => JSON.stringify(front) !== JSON.stringify(originalFront);
 
 	async function saveFront() {
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
+		const userId = storage.getUserId();
 		front = await idb.front.saveSynced(
 			userId,
 			{
@@ -84,9 +82,7 @@
 			throw new Error("Front not loaded");
 		}
 
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
+		const userId = storage.getUserId();
 		await idb.front.deleteSynced(userId, [front.id]);
 	}
 </script>

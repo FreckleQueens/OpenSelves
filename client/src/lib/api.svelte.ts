@@ -6,8 +6,9 @@ import {
 	PUBLIC_DEFAULT_API_URL_DEV,
 	PUBLIC_TEST_ENVIRONMENT,
 } from "$env/static/public";
+import { PersistentStorage } from "$lib/PersistentStorage";
+import { appState } from "$lib/appState.svelte.js";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { Storage } from "$lib/storage";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
 export const apiState = $state({
@@ -17,16 +18,11 @@ export const apiState = $state({
 			: PUBLIC_DEFAULT_API_URL,
 });
 
-const SERVER_URL_STORAGE_KEY = "serverUrl";
-const client = await Storage.getStorage();
-const storedUrl = await client.getRaw(SERVER_URL_STORAGE_KEY);
-if (storedUrl) {
-	apiState.url = storedUrl;
-}
+export const SERVER_URL_STORAGE_KEY = "serverUrl";
 
 export async function setServerUrl(newUrl: string) {
 	apiState.url = newUrl;
-	await client.setRaw(SERVER_URL_STORAGE_KEY, newUrl);
+	await PersistentStorage.getInstance().setRaw(SERVER_URL_STORAGE_KEY, newUrl);
 }
 
 export type CallOptions<RawResponse extends true | false> = {
@@ -194,8 +190,7 @@ async function refreshAuth(): Promise<boolean> {
 export async function handleLogout() {
 	clearTimeout(onlineCheckTimeout);
 	await SyncWorker.getInstance().shutdown();
-	const storage = await Storage.getStorage();
-	await storage.setOffline();
+	await PersistentStorage.getInstance().setOffline();
 	await goto(resolve("/"));
 }
 
@@ -214,8 +209,7 @@ function scheduleOnlineCheck() {
 		try {
 			if (await isApiReachable()) {
 				reachable = true;
-				const storage = await Storage.getStorage();
-				if (!storage.isOffline()) {
+				if (appState.isAuthenticated) {
 					SyncWorker.getInstance().resume();
 				}
 			}

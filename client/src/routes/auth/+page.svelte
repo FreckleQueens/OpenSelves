@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { call } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LoginFields from "$lib/components/forms/LoginFields.svelte";
@@ -10,7 +11,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { AuthFormData } from "$lib/forms";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
-	import { Storage } from "$lib/storage";
+	import { requireGuest } from "$lib/routing-utils";
 	import {
 		Block,
 		BlockTitle,
@@ -24,6 +25,8 @@
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
 
+	const storage = PersistentStorage.getInstance();
+
 	const forms: Record<string, AuthFormData> = $state({
 		login: {
 			name: "login",
@@ -35,8 +38,7 @@
 				if (!("userId" in result && result.userId)) {
 					throw new Error("Bad response from server");
 				}
-				const storage = await Storage.getStorage();
-				await storage.setKey(`${result.userId}`);
+				await storage.setUserId(`${result.userId}`);
 				SyncWorker.getInstance().resume();
 				await goto(resolve("/"));
 			},
@@ -96,12 +98,7 @@
 		return submitActiveForm();
 	}
 
-	const load = (async () => {
-		const storage = await Storage.getStorage();
-		if (!storage.isOffline()) {
-			await goto(resolve("/"));
-		}
-	})();
+	const load = requireGuest();
 	let loaded = $state(false);
 	onMount(async () => {
 		await load;
@@ -155,7 +152,7 @@
 		>
 			{#if activeForm === "login"}
 				<form class="login" onsubmit={onSubmit} transition:fly={{ x: -200 }}>
-					<LoginFields formState={forms.login} />
+					<LoginFields bind:formState={forms.login} />
 
 					<Block class="mt-0">
 						<Button type="submit" tonal>Login</Button>
@@ -163,7 +160,7 @@
 				</form>
 			{:else if activeForm === "register"}
 				<form class="register" onsubmit={onSubmit} transition:fly={{ x: 200 }}>
-					<RegisterFields formState={forms.register} />
+					<RegisterFields bind:formState={forms.register} />
 
 					<Block class="mt-0">
 						<Button type="submit" tonal>Register</Button>

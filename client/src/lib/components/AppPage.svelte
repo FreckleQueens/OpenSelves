@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
-	import { appNetworkStatus } from "$lib/app-network-status.svelte";
+	import { appState } from "$lib/appState.svelte.js";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
@@ -53,7 +53,7 @@
 	} = $props();
 
 	let openMenu = $state(false);
-	let syncWorkerError: unknown = $derived(appNetworkStatus.syncWorkerError);
+	let syncWorkerError: unknown = $derived(appState.syncWorkerError);
 </script>
 
 <ErrorDialog
@@ -103,9 +103,9 @@
 		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />
 		<Block class="">
 			<div class="flex items-center">
-				{#if !appNetworkStatus.storageOnline}
+				{#if !appState.isAuthenticated}
 					Exclusive offline mode
-				{:else if appNetworkStatus.syncWorkerOnline}
+				{:else if appState.syncWorkerOnline}
 					Sync active (online)
 				{:else}
 					<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
@@ -151,7 +151,7 @@
 	{#if bottomNav}
 		{@render bottomNav()}
 	{/if}
-	{#if appNetworkStatus.storageOnline && !appNetworkStatus.syncWorkerOnline}
+	{#if appState.isAuthenticated && !appState.syncWorkerOnline}
 		<div
 			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
 			transition:fly={{ duration: 150, y: 16 }}

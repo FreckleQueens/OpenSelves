@@ -6,7 +6,7 @@ import { type Front, type Log, fronts } from "openselves-common/db";
 
 export class IDBFront extends IDBSyncedModel<Front> {
 	public constructor(idb: IDB) {
-		super(idb, "fronts", "id");
+		super(idb, "fronts");
 	}
 
 	protected generateUniquePrimaryKey(): Front["id"] {

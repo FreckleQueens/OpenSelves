@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
@@ -9,7 +10,7 @@
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
-	import { Storage } from "$lib/storage";
+	import { requireAuth } from "$lib/routing-utils";
 	import { Dialog, List, ListItem, Toggle } from "konsta/svelte";
 	import { type Member } from "openselves-common/db";
 	import { onMount } from "svelte";
@@ -36,13 +37,12 @@
 	let showFilterDialog: boolean = $state(false);
 	let pageContent: HTMLDivElement | undefined = $state();
 
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.member;
-	}, members);
+	requireAuth();
+	const storage = PersistentStorage.getInstance();
+	const idb = IDB.getInstance();
+	subscribeToModel(idb.member, members);
 
 	onMount(async () => {
-		const storage = await Storage.getStorage();
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
 	});
 
@@ -52,7 +52,6 @@
 
 	async function toggleShowArchivedMembers() {
 		showArchivedMembers = !showArchivedMembers;
-		const storage = await Storage.getStorage();
 		await storage.set("showArchivedMembers", showArchivedMembers ? "on" : "");
 	}
 </script>

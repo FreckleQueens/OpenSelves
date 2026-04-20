@@ -42,10 +42,7 @@
 			}),
 	);
 
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.member;
-	}, members);
+	subscribeToModel(IDB.getInstance().member, members);
 </script>
 
 <Sheet

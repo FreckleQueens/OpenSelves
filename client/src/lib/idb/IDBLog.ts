@@ -8,7 +8,7 @@ export type ClientLog = Omit<Log, "deletedId" | "pushedAt" | "memberId" | "front
 	frontId?: string;
 };
 
-export class IDBLog extends IDBModel<ClientLog> {
+export class IDBLog extends IDBModel<ClientLog, "id"> {
 	public constructor(idb: IDB) {
 		super(idb, "logs", "id");
 	}

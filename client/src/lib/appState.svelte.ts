@@ -1,9 +1,9 @@
-export const appNetworkStatus: {
-	storageOnline: boolean;
+export const appState: {
+	isAuthenticated: boolean;
 	syncWorkerOnline: boolean;
 	syncWorkerError: never | null;
 } = $state({
-	storageOnline: false,
+	isAuthenticated: false,
 	syncWorkerOnline: false,
 	syncWorkerError: null,
 });

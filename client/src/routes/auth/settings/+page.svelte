@@ -3,7 +3,10 @@
 	import BackLink from "$lib/components/BackLink.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import ServerSwitcher from "$lib/components/forms/ServerSwitcher.svelte";
+	import { requireGuest } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
+
+	requireGuest();
 </script>
 
 <AppPage title="" showMenu={false}>

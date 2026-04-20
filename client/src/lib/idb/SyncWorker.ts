@@ -1,7 +1,7 @@
+import { PersistentStorage } from "$lib/PersistentStorage";
 import { call } from "$lib/api.svelte";
-import { appNetworkStatus } from "$lib/app-network-status.svelte";
+import { appState } from "$lib/appState.svelte.js";
 import { IDB } from "$lib/idb/idb";
-import { Storage } from "$lib/storage";
 
 import type { IDBFront } from "./IDBFront";
 import type { IDBMember } from "./IDBMember";
@@ -78,7 +78,7 @@ export class SyncWorker {
 	}
 
 	public clearError() {
-		appNetworkStatus.syncWorkerError = null;
+		appState.syncWorkerError = null;
 	}
 
 	private get online() {
@@ -87,7 +87,7 @@ export class SyncWorker {
 
 	private set online(online: boolean) {
 		this._online = online;
-		appNetworkStatus.syncWorkerOnline = online;
+		appState.syncWorkerOnline = online;
 	}
 
 	private scheduleSync(delay: number = 1000) {
@@ -100,7 +100,7 @@ export class SyncWorker {
 			this.syncing = true;
 			this.sync()
 				.catch((err) => {
-					appNetworkStatus.syncWorkerError = err;
+					appState.syncWorkerError = err;
 					console.error(err);
 				})
 				.finally(() => {
@@ -131,11 +131,11 @@ export class SyncWorker {
 
 	private async push(): Promise<boolean> {
 		console.debug("Push start");
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
+		const storage = PersistentStorage.getInstance();
+		const idb = IDB.getInstance();
 
-		const idb = await IDB.getClient();
-		const pendingLogs = await idb.log.getAll(userId);
+		const userId = storage.getUserId();
+		const pendingLogs = await idb.log.getByField("userId", userId);
 		const formattedLogs = pendingLogs
 			.map((log) => {
 				const newLog = { ...log };
@@ -164,7 +164,7 @@ export class SyncWorker {
 			await idb.log.delete(formattedLogs.map((log) => log.id));
 		}
 
-		if ((await idb.log.getAll(userId)).length === 0) {
+		if ((await idb.log.getByField("userId", userId)).length === 0) {
 			this._hasPushBacklog = false;
 		}
 
@@ -174,10 +174,11 @@ export class SyncWorker {
 
 	private async pull(): Promise<void> {
 		console.debug("Pull start");
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
+		const storage = PersistentStorage.getInstance();
+		const idb = IDB.getInstance();
+
+		const userId = storage.getUserId();
 		const currentTimestamp = Number(await storage.get("timestamp"));
-		const idb = await IDB.getClient();
 		const reqTimestamp =
 			currentTimestamp && Number.isFinite(currentTimestamp) ? currentTimestamp : "init";
 		console.debug("timestamp:", currentTimestamp, reqTimestamp);

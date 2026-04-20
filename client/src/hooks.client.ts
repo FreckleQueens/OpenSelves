@@ -1,4 +1,5 @@
-import type { HandleClientError } from "@sveltejs/kit";
+import { initApp } from "$lib/init";
+import type { ClientInit, HandleClientError } from "@sveltejs/kit";
 
 export function transformErrorToReadable(error: unknown) {
 	return {
@@ -18,4 +19,8 @@ export const handleError: HandleClientError = async ({ error, event, status, mes
 		event,
 		error: transformErrorToReadable(error),
 	};
+};
+
+export const init: ClientInit = async () => {
+	await initApp();
 };

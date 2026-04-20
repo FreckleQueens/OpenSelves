@@ -2,9 +2,9 @@
 // for information about these interfaces
 import "../auto-imports";
 
+import type { PersistentStorage } from "$lib/PersistentStorage.ts";
 import { IDB } from "$lib/idb";
 import type { SyncWorker } from "$lib/idb/SyncWorker.js";
-import type { Storage } from "$lib/storage";
 
 declare global {
 	function t(key: string, ...args: string[]): string;
@@ -20,7 +20,7 @@ declare global {
 	interface Window {
 		openselves: {
 			IDB: typeof IDB;
-			Storage: typeof Storage;
+			PersistentStorage: typeof PersistentStorage;
 			SyncWorker: typeof SyncWorker;
 		};
 	}

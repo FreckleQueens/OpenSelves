@@ -2,19 +2,19 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { USER_LANDED_STORAGE_KEY } from "$lib";
-	import { Storage } from "$lib/storage";
+	import { PersistentStorage } from "$lib/PersistentStorage";
+	import { appState } from "$lib/appState.svelte.js";
 	import { Block, Preloader } from "konsta/svelte";
 
 	(async () => {
-		const storage = await Storage.getStorage();
-		if (storage.isOffline()) {
-			if (await storage.get(USER_LANDED_STORAGE_KEY)) {
+		if (appState.isAuthenticated) {
+			await goto(resolve("/main"));
+		} else {
+			if (await PersistentStorage.getInstance().getRaw(USER_LANDED_STORAGE_KEY)) {
 				await goto(resolve("/auth"));
 			} else {
 				await goto(resolve("/land"));
 			}
-		} else {
-			await goto(resolve("/main"));
 		}
 	})();
 </script>

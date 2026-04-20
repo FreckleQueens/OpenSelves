@@ -1,10 +1,11 @@
+import { PersistentStorage } from "$lib/PersistentStorage";
+import { appState } from "$lib/appState.svelte";
 import { type IDBSyncedModel, IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
 import { type SyncedModelBase } from "$lib/idb/idb";
-import { Storage } from "$lib/storage";
 import { onDestroy, onMount } from "svelte";
 
 export function subscribeToModel<T extends SyncedModelBase>(
-	getModel: () => Promise<IDBSyncedModel<T>>,
+	model: IDBSyncedModel<T>,
 	state: {
 		loaded?: boolean;
 		records: T[];
@@ -14,9 +15,12 @@ export function subscribeToModel<T extends SyncedModelBase>(
 
 	let subscription: (event: IDBSyncedModelEvent<T>) => void;
 	onMount(async () => {
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const model = await getModel();
+		if (!appState.isAuthenticated) {
+			return;
+		}
+
+		const storage = PersistentStorage.getInstance();
+		const userId = storage.getUserId();
 
 		subscription = model.subscribe((event) => {
 			for (const front of event.savedRecords) {
@@ -40,7 +44,8 @@ export function subscribeToModel<T extends SyncedModelBase>(
 	});
 
 	onDestroy(async () => {
-		const model = await getModel();
-		model.unsubscribe(subscription);
+		if (subscription) {
+			model.unsubscribe(subscription);
+		}
 	});
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
@@ -9,7 +10,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
-	import { Storage } from "$lib/storage";
+	import { requireAuth } from "$lib/routing-utils";
 	import { Block, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 	import { type Snippet, onMount } from "svelte";
@@ -38,10 +39,13 @@
 	let activeTab: "info" | "settings" = $state("info");
 	let deleteRecordButton: Snippet | null = $state(null);
 
+	requireAuth();
+	const storage = PersistentStorage.getInstance();
+	const idb = IDB.getInstance();
+
 	onMount(async () => {
-		const idb = await IDB.getClient();
 		if (params.memberId) {
-			member = await idb.member.getById(params.memberId);
+			member = await idb.member.getByPrimaryKey(params.memberId);
 		}
 		originalMember = { ...member };
 		mounted = true;
@@ -50,9 +54,7 @@
 	const hasMemberChanged = () => JSON.stringify(member) !== JSON.stringify(originalMember);
 
 	async function saveMember() {
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
+		const userId = storage.getUserId();
 		member = await idb.member.saveSynced(
 			userId,
 			{
@@ -65,9 +67,7 @@
 	}
 
 	async function deleteMember() {
-		const storage = await Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await IDB.getClient();
+		const userId = storage.getUserId();
 		await idb.member.deleteSynced(userId, [member.id]);
 	}
 </script>

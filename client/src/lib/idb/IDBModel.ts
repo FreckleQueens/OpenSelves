@@ -7,26 +7,19 @@ export type DBColumn = {
 	enumValues: string[] | undefined;
 };
 
-export abstract class IDBModel<Model extends ModelBase> {
+export abstract class IDBModel<Model extends ModelBase, PrimaryKey extends keyof Model & string> {
 	protected constructor(
 		protected readonly idb: IDB,
 		public readonly storeName: string,
-		public readonly primaryKey: string,
+		public readonly primaryKey: PrimaryKey,
 	) {}
 
-	public async getById(id: string): Promise<Model> {
-		const record = await this.idb.get(this.storeName, id);
+	public async getByPrimaryKey(value: string): Promise<Model> {
+		const record = await this.idb.get(this.storeName, value);
 		if (!record) {
-			throw new Error(`Record not found: ${this.storeName}#${id}`);
+			throw new Error(`Record not found: ${this.storeName}#${value}`);
 		}
 		return this.parseModel(record);
-	}
-
-	public async getAll(userId: string): Promise<Model[]> {
-		const records = (await this.idb.getAll(this.storeName)).filter(
-			(record) => record.userId === userId,
-		);
-		return this.parseModels(records);
 	}
 
 	public async getByField<Field extends keyof Model & string>(
@@ -35,6 +28,17 @@ export abstract class IDBModel<Model extends ModelBase> {
 	): Promise<Model[]> {
 		const records = await this.idb.getByIndex(this.storeName, field, IDBKeyRange.only(value));
 		return this.parseModels(records);
+	}
+
+	public async put(primaryKeyValue: string, data: Omit<Model, PrimaryKey>) {
+		const modelData = this.parseModel({
+			...data,
+			[this.primaryKey]: primaryKeyValue,
+		});
+		await this.idb.transaction(this.storeName, async (tx) => {
+			await tx.put(this.storeName, modelData);
+		});
+		return modelData;
 	}
 
 	public async delete(recordIds: string[]): Promise<void> {
@@ -58,7 +62,9 @@ export abstract class IDBModel<Model extends ModelBase> {
 	public parseModel(record: Partial<ModelBase>): Model {
 		const out: Partial<Model> = {};
 		const keys: string[] = [];
-		for (const [key, column] of Object.entries(this.getDrizzleModel())) {
+		const drizzleModel = this.getDrizzleModel();
+		for (const key of Object.keys(drizzleModel)) {
+			const column = drizzleModel[key];
 			keys.push(key);
 
 			if (!(key in record) || record[key] === null) {

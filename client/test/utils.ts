@@ -56,9 +56,9 @@ export async function createMember(page: Page) {
 
 export async function getLogsCount(page: Page) {
 	return await page.evaluate(async () => {
-		const storage = await window.openselves.Storage.getStorage();
-		const userId = storage.getKey();
-		const idb = await window.openselves.IDB.getClient();
-		return (await idb.log.getAll(userId)).length;
+		const storage = window.openselves.PersistentStorage.getInstance();
+		const userId = storage.getUserId();
+		const idb = window.openselves.IDB.getInstance();
+		return (await idb.log.getByField("userId", userId)).length;
 	});
 }

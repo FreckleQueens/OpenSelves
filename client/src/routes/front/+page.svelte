@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
@@ -16,7 +17,7 @@
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { subscribeToModel } from "$lib/idb/component-utils";
-	import { Storage } from "$lib/storage";
+	import { requireAuth } from "$lib/routing-utils";
 	import humanizeDuration from "humanize-duration";
 	import {
 		Block,
@@ -70,21 +71,16 @@
 	let showClearFrontDialog = $state(false);
 	let addNoteToFrontId: string | undefined = $state();
 
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.member;
-	}, members);
-	subscribeToModel(async () => {
-		const idb = await IDB.getClient();
-		return idb.front;
-	}, fronts);
+	requireAuth();
+
+	const storage = PersistentStorage.getInstance();
+	const idb = IDB.getInstance();
+	subscribeToModel(idb.member, members);
+	subscribeToModel(idb.front, fronts);
 
 	let selectMemberAction: "createFront" | "replaceFrontMember" | null = null;
 	let replaceMemberFrontId: string | undefined = undefined;
 	async function selectMember(member: Member) {
-		const storage = await Storage.getStorage();
-		const idb = await IDB.getClient();
-
 		if (selectMemberAction === "createFront") {
 			const now = new Date();
 			const front: Omit<Front, "userId"> = {
@@ -96,11 +92,11 @@
 				createdAt: now,
 				updatedAt: now,
 			};
-			await idb.front.saveSynced(storage.getKey(), front);
+			await idb.front.saveSynced(storage.getUserId(), front);
 			showMemberSelectSheet = false;
 		} else if (selectMemberAction === "replaceFrontMember") {
 			await idb.front.saveSynced(
-				storage.getKey(),
+				storage.getUserId(),
 				{
 					id: replaceMemberFrontId || "",
 					memberId: member.id,
@@ -114,11 +110,8 @@
 	}
 
 	async function endFront(frontId: string) {
-		const storage = await Storage.getStorage();
-		const idb = await IDB.getClient();
-
 		await idb.front.saveSynced(
-			storage.getKey(),
+			storage.getUserId(),
 			{
 				id: frontId,
 				endedAt: new Date(),
@@ -136,10 +129,8 @@
 
 	async function setFrontNote(frontId: string, value: string) {
 		addNoteToFrontId = frontId;
-		const storage = await Storage.getStorage();
-		const idb = await IDB.getClient();
 		await idb.front.saveSynced(
-			storage.getKey(),
+			storage.getUserId(),
 			{
 				id: frontId,
 				note: value ? value : null,
@@ -149,10 +140,8 @@
 	}
 
 	async function setFrontStartDate(frontId: string, value: Date) {
-		const storage = await Storage.getStorage();
-		const idb = await IDB.getClient();
 		await idb.front.saveSynced(
-			storage.getKey(),
+			storage.getUserId(),
 			{
 				id: frontId,
 				startedAt: value,
@@ -249,7 +238,7 @@
 								}
 							}}
 							max={new Date()}
-							bind:value={front.startedAt}
+							value={front.startedAt}
 							bind:open={frontInputMap[front.id]}
 							onclick={(ev) => ev.stopPropagation()}
 						/>

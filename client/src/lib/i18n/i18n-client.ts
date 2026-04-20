@@ -1,14 +1,11 @@
-import { DEFAULT_LOCALE, localeState } from "$lib/i18n/i18n";
-import { Storage } from "$lib/storage";
+import { PersistentStorage } from "$lib/PersistentStorage";
+import { localeState } from "$lib/i18n/i18n";
 
-const LOCALE_STORAGE_KEY = "locale";
-const storage = await Storage.getStorage();
-await setLocale((await storage.get(LOCALE_STORAGE_KEY)) || DEFAULT_LOCALE, false);
+export const LOCALE_STORAGE_KEY = "locale";
 
 export async function setLocale(newLocale: string, reload: boolean = true) {
 	localeState.locale = newLocale;
-	const storage = await Storage.getStorage();
-	await storage.set(LOCALE_STORAGE_KEY, newLocale);
+	await PersistentStorage.getInstance().setRaw(LOCALE_STORAGE_KEY, newLocale);
 	if (reload) {
 		window.location.reload();
 	}

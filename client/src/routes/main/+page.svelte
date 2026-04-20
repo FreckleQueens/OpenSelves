@@ -1,18 +1,17 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
-	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
+	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { call, handleLogout } from "$lib/api.svelte";
-	import { appNetworkStatus } from "$lib/app-network-status.svelte";
+	import { appState } from "$lib/appState.svelte.js";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
-	import { Storage } from "$lib/storage";
+	import { requireAuth } from "$lib/routing-utils";
 	import { Block, BlockTitle, Button, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
-	let storage: Storage | undefined = $state();
-	let storageKey: string | undefined = $derived(storage?.getKey());
+	let storage: PersistentStorage | undefined = $state();
+	let userId: string | undefined = $derived(storage?.getUserId());
 	let user:
 		| {
 				id: string;
@@ -20,19 +19,15 @@
 		  }
 		| undefined = $state();
 
-	onMount(async () => {
-		storage = await Storage.getStorage();
-		if (storage.isOffline()) {
-			await goto(resolve("/"));
-		}
+	requireAuth();
+	onMount(() => {
+		storage = PersistentStorage.getInstance();
 	});
 
 	$effect(() => {
-		let online = appNetworkStatus.syncWorkerOnline;
-		let userId = storageKey;
-		(async () => {
-			if (online && userId) {
-				const response = await call(`/user/${userId}`);
+		let online = appState.syncWorkerOnline;
+		if (online && userId) {
+			call(`/user/${userId}`).then((response) => {
 				if (response) {
 					if (!("id" in response && "email" in response)) {
 						throw new Error("Bad server response");
@@ -42,8 +37,8 @@
 						email: `${response.email}`,
 					};
 				}
-			}
-		})();
+			});
+		}
 	});
 
 	const logoutButtonOnclick = async () => {
@@ -68,10 +63,10 @@
 
 	<BlockTitle medium>Status</BlockTitle>
 	<Block strong>
-		{#if appNetworkStatus.syncWorkerOnline && user}
+		{#if appState.syncWorkerOnline && user}
 			<p>{t("You are logged in as user #{user.id}, {user.email}", user.id, user.email)}</p>
-		{:else if !appNetworkStatus.syncWorkerOnline && storageKey}
-			<p>{t("Offline - #{user.id}", storageKey)}</p>
+		{:else if !appState.syncWorkerOnline && userId}
+			<p>{t("Offline - #{user.id}", userId)}</p>
 		{:else}
 			<Preloader />
 		{/if}
