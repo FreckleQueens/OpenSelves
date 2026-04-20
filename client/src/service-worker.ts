@@ -79,11 +79,22 @@ self.addEventListener("fetch", (event) => {
 					const response = await cache.match(event.request);
 
 					if (response) {
-						console.log("fallback cache hit", url.pathname);
+						console.debug("fallback cache hit", url.pathname);
 						return response;
 					} else {
-						console.log("fallback cache miss");
+						console.debug("fallback cache miss", url.pathname);
 						console.error(error);
+					}
+
+					if (!/\.(.+)$/.test(url.pathname)) {
+						const originalUrl = url.toString();
+						const fallbackResponse = await cache.match(
+							originalUrl.slice(0, originalUrl.length - url.pathname.length) + "/",
+						);
+						if (fallbackResponse) {
+							console.debug("fallback to /", url.pathname);
+							return fallbackResponse;
+						}
 					}
 
 					throw error;

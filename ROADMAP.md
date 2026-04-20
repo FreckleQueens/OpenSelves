@@ -124,7 +124,7 @@ deadline or ETA
 ## 🚧 0.4.1
 - [x] bug: members/records are saved with userId "offline"
 - [x] bug: some pages (i.e. /front) don't redirect when userId is lost
-- [ ] PWA: fallback to "/" response if no response found for svelte routes
+- [x] PWA: fallback to "/" response if no response found for svelte routes
 - [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
 - [ ] fab menus: don't user fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
 
