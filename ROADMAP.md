@@ -121,17 +121,23 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.4.1
+## ✅ 0.4.1
+
+<details>
+  <summary>dev todo</summary>
+
 - [x] bug: members/records are saved with userId "offline"
 - [x] bug: some pages (i.e. /front) don't redirect when userId is lost
 - [x] PWA: fallback to "/" response if no response found for svelte routes
-- [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
-- [ ] fab menus: don't user fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
+
+</details>
 
 ## 🚧 0.5.0
 - [ ] client: switch to a better md3 library
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers 
 - [ ] show proper language names in language switcher
+- [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
+- [ ] fab menus: don't user fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
 
 ## 0.6.0
 - [ ] add version checks on /push and /pull endpoints
