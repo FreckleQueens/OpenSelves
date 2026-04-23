@@ -132,6 +132,10 @@ deadline or ETA
 
 </details>
 
+## 🚧 0.4.2
+- [x] partial IndexedDB upgrades hang indefinitely
+- [ ] server: serve all delete logs on initial sync to account for lost timestamp edgecase
+
 ## 🚧 0.5.0
 - [ ] client: switch to a better md3 library
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers 

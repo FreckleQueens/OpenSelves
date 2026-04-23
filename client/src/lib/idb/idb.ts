@@ -3,7 +3,7 @@ import { IDBLog } from "$lib/idb/IDBLog";
 import { IDBMember } from "$lib/idb/IDBMember";
 import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
 
-const IDB_VERSION = 4;
+const IDB_NAME = "openselves";
 
 export type ModelBase = object;
 export type SyncedModelBase = ModelBase & {
@@ -40,87 +40,136 @@ export class IDB {
 	private db?: IDBDatabase;
 
 	private async init() {
-		return new Promise<void>((resolve, reject) => {
-			const dbRequest = window.indexedDB.open("openselves", IDB_VERSION);
-			dbRequest.onerror = () => {
-				reject(dbRequest.error);
-			};
-			dbRequest.onsuccess = () => {
-				this.db = dbRequest.result;
-				resolve();
-			};
-			dbRequest.onupgradeneeded = (event) => {
-				this.db = dbRequest.result;
-				if (!this.db) {
-					throw new Error("this.db is undefined");
-				}
-
-				const promises: Promise<void>[] = [];
-				function trackTransaction(tx: IDBTransaction) {
-					promises.push(
-						new Promise<void>((resolve) => {
-							tx.oncomplete = () => resolve();
+		async function openDb(
+			version?: number,
+			forUpgrade: boolean = false,
+			forVersion: boolean = false,
+		): Promise<IDBDatabase> {
+			return new Promise((resolve, reject) => {
+				const request = window.indexedDB.open(IDB_NAME, version);
+				request.onupgradeneeded = () => {
+					if (forUpgrade) {
+						resolve(request.result);
+					} else if (!forVersion) {
+						reject(new Error("Tried to open database that needs an upgrade"));
+					}
+				};
+				request.onsuccess = () => {
+					if (!forUpgrade || forVersion) {
+						resolve(request.result);
+					}
+				};
+				request.onblocked = (event) => {
+					reject(
+						new Error(`Couldn't open IDB with version ${version} (blocked)`, {
+							cause: event,
 						}),
 					);
-				}
-				if (!dbRequest.transaction) {
-					throw new Error("IDBOpenDBRequest has no transaction");
-				}
-				trackTransaction(dbRequest.transaction);
+				};
+				request.onerror = (event) => {
+					reject(
+						new Error(`Couldn't open IDB with version ${version} (error)`, {
+							cause: event,
+						}),
+					);
+				};
+			});
+		}
 
-				if (event.newVersion !== IDB_VERSION) {
-					return reject(new Error("Wrong newVersion"));
-				}
+		async function getCurrentIdbVersion() {
+			const databases = await window.indexedDB.databases();
+			if (!databases.find((dbInfo) => dbInfo.name === IDB_NAME)) {
+				return 0;
+			}
 
-				if (event.oldVersion < 1) {
-					const membersStore = this.db.createObjectStore("members", { keyPath: "id" });
-					membersStore.createIndex("id", "id", { unique: true });
-					membersStore.createIndex("userId", "userId");
-					trackTransaction(membersStore.transaction);
-				}
+			const db = await openDb(undefined, false, true);
+			const version = db.version;
+			db.close();
+			return version;
+		}
 
-				if (event.oldVersion === 1) {
-					this.db.deleteObjectStore("changelog");
-				}
-
-				if (event.oldVersion < 2) {
-					const logsStore = this.db.createObjectStore("logs", {
-						keyPath: "id",
-					});
-					logsStore.createIndex("id", "id", { unique: true });
-					logsStore.createIndex("memberId", "memberId");
-					trackTransaction(logsStore.transaction);
-				}
-
-				if (event.oldVersion < 3) {
-					const frontsStore = this.db.createObjectStore("fronts", {
-						keyPath: "id",
-					});
-					frontsStore.createIndex("id", "id", { unique: true });
-					frontsStore.createIndex("userId", "userId");
-					frontsStore.createIndex("memberId", "memberId");
-					trackTransaction(frontsStore.transaction);
-
-					const logsStore = dbRequest.transaction.objectStore("logs");
-					logsStore.createIndex("frontId", "frontId");
-				}
-
-				if (event.oldVersion < 4) {
-					const storageEntriesStore = this.db.createObjectStore("storageEntries", {
-						keyPath: "key",
-					});
-					storageEntriesStore.createIndex("key", "key", { unique: true });
-					trackTransaction(storageEntriesStore.transaction);
-
-					const logsStore = dbRequest.transaction.objectStore("logs");
-					logsStore.createIndex("userId", "userId");
-				}
-
-				Promise.all(promises).then(() => {
-					resolve();
+		function makeMigration(
+			getTransaction: (db: IDBDatabase) => IDBTransaction,
+		): (version: number) => Promise<void> {
+			return async (version: number) => {
+				const db = await openDb(version, true);
+				const transaction = getTransaction(db);
+				return new Promise<void>((resolve, reject) => {
+					transaction.onerror = (event) => {
+						reject(new Error("Error in migration transaction", { cause: event }));
+					};
+					transaction.onabort = (event) => {
+						reject(new Error("Migration transaction aborted", { cause: event }));
+					};
+					transaction.oncomplete = () => {
+						resolve();
+					};
+				}).finally(() => {
+					db.close();
 				});
 			};
-		});
+		}
+
+		const currentVersion = await getCurrentIdbVersion();
+		console.log("Current IDB version:", currentVersion);
+
+		const migrations = [
+			makeMigration((db) => {
+				const membersStore = db.createObjectStore("members", { keyPath: "id" });
+				membersStore.createIndex("id", "id", { unique: true });
+				membersStore.createIndex("userId", "userId");
+				return membersStore.transaction;
+			}),
+			makeMigration((db) => {
+				const logsStore = db.createObjectStore("logs", {
+					keyPath: "id",
+				});
+				logsStore.createIndex("id", "id", { unique: true });
+				logsStore.createIndex("memberId", "memberId");
+				return logsStore.transaction;
+			}),
+			makeMigration((db) => {
+				const frontsStore = db.createObjectStore("fronts", {
+					keyPath: "id",
+				});
+				frontsStore.createIndex("id", "id", { unique: true });
+				frontsStore.createIndex("userId", "userId");
+				frontsStore.createIndex("memberId", "memberId");
+
+				const logsStore = frontsStore.transaction.objectStore("logs");
+				logsStore.createIndex("frontId", "frontId");
+
+				return frontsStore.transaction;
+			}),
+			makeMigration((db) => {
+				const storageEntriesStore = db.createObjectStore("storageEntries", {
+					keyPath: "key",
+				});
+				storageEntriesStore.createIndex("key", "key", { unique: true });
+
+				const logsStore = storageEntriesStore.transaction.objectStore("logs");
+				logsStore.createIndex("userId", "userId");
+
+				return storageEntriesStore.transaction;
+			}),
+		];
+		const targetVersion = migrations.length;
+		console.log("Target IDB version:", targetVersion);
+
+		if (currentVersion < targetVersion) {
+			console.log("Running migrations...");
+			for (let i = currentVersion; i < targetVersion; i++) {
+				const migration = migrations[i];
+				const version = i + 1;
+				console.log("Running migration " + version + "...");
+				await migration(version);
+				console.log("Done!");
+			}
+		} else {
+			console.log("IDB is up-to-date");
+		}
+
+		this.db = await openDb(targetVersion);
 	}
 
 	public async transaction<Model extends ModelBase, StoreTypes extends string, ReturningType>(
