@@ -134,7 +134,7 @@ deadline or ETA
 
 ## 🚧 0.4.2
 - [x] partial IndexedDB upgrades hang indefinitely
-- [ ] server: serve all delete logs on initial sync to account for lost timestamp edgecase
+- [x] server: serve all delete logs on initial sync to account for lost timestamp edgecase
 
 ## 🚧 0.5.0
 - [ ] client: switch to a better md3 library

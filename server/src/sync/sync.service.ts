@@ -540,6 +540,7 @@ export class SyncService {
 			with: {
 				members: true,
 				fronts: true,
+				logs: true,
 			},
 			extras: {
 				queryTime: sql`CURRENT_TIMESTAMP`,
@@ -576,6 +577,8 @@ export class SyncService {
 			});
 			logs.push(...records);
 		}
+
+		logs.push(...user.logs.filter((log) => log.operationType === "delete"));
 
 		return {
 			timestamp: returnedTimestamp.getTime(),

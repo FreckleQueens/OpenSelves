@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from "@jest/globals";
+import { eq } from "drizzle-orm";
 import { type Log, type LogCreate, type Member, members, models } from "openselves-common/db";
 import request from "supertest";
 
@@ -9,6 +10,7 @@ const pullEndpoint = "/sync/pull";
 describe("/sync/pull", () => {
 	let env: TestEnv;
 	let members1: Member[];
+	let deletedMember1: Member;
 	let members2: Member[];
 	let logs1: Log[];
 	setupTestSuite((testEnv) => (env = testEnv));
@@ -36,6 +38,23 @@ describe("/sync/pull", () => {
 				},
 			])
 			.returning();
+		deletedMember1 = (
+			await env.db
+				.insert(members)
+				.values([
+					{
+						userId: env.users.user.id,
+						name: "Dex",
+						pronouns: "they/them",
+						description: "a deleted member of our& system",
+						createdAt: date,
+						updatedAt: date,
+					},
+				])
+				.returning()
+		)[0];
+		await env.db.delete(members).where(eq(members.id, deletedMember1.id));
+
 		members2 = await env.db
 			.insert(members)
 			.values([
@@ -82,6 +101,14 @@ describe("/sync/pull", () => {
 					data: {
 						description: "a new description",
 					},
+					executedAt: new Date(),
+					pushedAt: new Date(),
+				},
+				{
+					userId: env.users.user.id,
+					deletedId: `members.${deletedMember1.id}`,
+					operationType: "delete",
+					data: null,
 					executedAt: new Date(),
 					pushedAt: new Date(),
 				},
@@ -174,8 +201,8 @@ describe("/sync/pull", () => {
 
 			const logs = await callPullAndGetLogs("init", 200, env.users.cookies);
 
-			expect(logs.length).toBe(2);
-			for (let i = 0; i < logs.length; i++) {
+			expect(logs.length).toBe(members1.length + 1);
+			for (let i = 0; i < members1.length; i++) {
 				const log: Log = logs[i] as Log;
 				const member = members1[i];
 				expect(log).toMatchObject({
@@ -200,6 +227,12 @@ describe("/sync/pull", () => {
 				expect(log.userId).toBeUndefined();
 				expect(log.deletedId).toBeUndefined();
 			}
+
+			expect(logs[logs.length - 1]).toMatchObject({
+				memberId: deletedMember1.id,
+				operationType: "delete",
+				data: null,
+			});
 		});
 
 		test("serves all logs after timestamp 200", async () => {
@@ -214,8 +247,17 @@ describe("/sync/pull", () => {
 				expect(expectedSentLog).toBeDefined();
 				const { userId, deletedId, executedAt, pushedAt, ...expectedLog }: Log =
 					expectedSentLog as Log;
+				let transformedExpectedLog = expectedLog;
+				if (expectedLog.operationType === "delete") {
+					const memberId = expectedSentLog?.deletedId?.split(".")[1];
+					expect(memberId).toBeDefined();
+					transformedExpectedLog = {
+						...expectedLog,
+						memberId: typeof memberId === "string" ? memberId : null,
+					};
+				}
 				expect(log).toStrictEqual({
-					...expectedLog,
+					...transformedExpectedLog,
 					executedAt: executedAt.toISOString(),
 				});
 			}
