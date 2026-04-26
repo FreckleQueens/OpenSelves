@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_APP_VERSION } from "$env/static/public";
+	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
@@ -24,8 +24,5 @@
 		<ServerSwitcher />
 	</Block>
 
-	<BlockTitle>App info</BlockTitle>
-	<Block>
-		<p>{t("OpenSelves client version {PUBLIC_APP_VERSION}", PUBLIC_APP_VERSION)}</p>
-	</Block>
+	<AppInfo />
 </AppPage>

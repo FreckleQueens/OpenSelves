@@ -3,6 +3,7 @@
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { call, handleLogout } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
+	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
@@ -57,6 +58,8 @@
 	<Block strong>
 		<LanguageSwitcher />
 	</Block>
+
+	<AppInfo />
 
 	<BlockTitle large>Account settings</BlockTitle>
 
