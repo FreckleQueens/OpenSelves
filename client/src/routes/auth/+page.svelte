@@ -2,7 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { call } from "$lib/api.svelte";
+	import { apiState, call, scheduleOnlineCheck } from "$lib/api.svelte";
+	import { appState } from "$lib/appState.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LoginFields from "$lib/components/forms/LoginFields.svelte";
 	import RegisterFields from "$lib/components/forms/RegisterFields.svelte";
@@ -19,6 +20,7 @@
 		Dialog,
 		DialogButton,
 		Link,
+		Preloader,
 		Segmented,
 		SegmentedButton,
 	} from "konsta/svelte";
@@ -55,6 +57,15 @@
 	let activeForm = $state(forms.login.name);
 	let registerSuccessDialogOpen = $state(false);
 
+	const load = requireGuest();
+	let loaded = $state(false);
+	onMount(async () => {
+		await load;
+		loaded = true;
+
+		scheduleOnlineCheck(0);
+	});
+
 	const onSubmit = async (e: SubmitEvent) => {
 		e.preventDefault();
 		return submitActiveForm();
@@ -69,6 +80,12 @@
 				dontRefreshAuthOnUnauthorized: true,
 				returnRawResponse: true,
 			});
+
+			if (!response) {
+				appState.isApiReachable = false;
+				scheduleOnlineCheck();
+				return;
+			}
 		} catch (error) {
 			console.trace(error);
 			if (
@@ -97,13 +114,6 @@
 		registerSuccessDialogOpen = false;
 		return submitActiveForm();
 	}
-
-	const load = requireGuest();
-	let loaded = $state(false);
-	onMount(async () => {
-		await load;
-		loaded = true;
-	});
 </script>
 
 <AppPage title="" showMenu={false} loading={!loaded} transparentNavbar>
@@ -124,51 +134,60 @@
 		OpenSelves
 	</BlockTitle>
 
-	<Block>
-		<Segmented strong rounded class="text-4xl">
-			<SegmentedButton
-				active={activeForm === "login"}
-				onclick={() => (activeForm = forms.login.name)}
+	{#if appState.isApiReachable}
+		<Block>
+			<Segmented strong rounded class="text-4xl">
+				<SegmentedButton
+					active={activeForm === "login"}
+					onclick={() => (activeForm = forms.login.name)}
+				>
+					<LoginIcon button before />
+					Login
+				</SegmentedButton>
+				<SegmentedButton
+					active={activeForm === "register"}
+					onclick={() => (activeForm = forms.register.name)}
+				>
+					<RegisterIcon button before />
+					Register
+				</SegmentedButton>
+			</Segmented>
+		</Block>
+
+		<Block class="overflow-hidden">
+			<div
+				class={{
+					relative: true,
+					[activeForm]: true,
+				}}
 			>
-				<LoginIcon button before />
-				Login
-			</SegmentedButton>
-			<SegmentedButton
-				active={activeForm === "register"}
-				onclick={() => (activeForm = forms.register.name)}
-			>
-				<RegisterIcon button before />
-				Register
-			</SegmentedButton>
-		</Segmented>
-	</Block>
+				{#if activeForm === "login"}
+					<form class="login" onsubmit={onSubmit} transition:fly={{ x: -200 }}>
+						<LoginFields bind:formState={forms.login} />
 
-	<Block class="overflow-hidden">
-		<div
-			class={{
-				relative: true,
-				[activeForm]: true,
-			}}
-		>
-			{#if activeForm === "login"}
-				<form class="login" onsubmit={onSubmit} transition:fly={{ x: -200 }}>
-					<LoginFields bind:formState={forms.login} />
+						<Block class="mt-0">
+							<Button type="submit" tonal>Login</Button>
+						</Block>
+					</form>
+				{:else if activeForm === "register"}
+					<form class="register" onsubmit={onSubmit} transition:fly={{ x: 200 }}>
+						<RegisterFields bind:formState={forms.register} />
 
-					<Block class="mt-0">
-						<Button type="submit" tonal>Login</Button>
-					</Block>
-				</form>
-			{:else if activeForm === "register"}
-				<form class="register" onsubmit={onSubmit} transition:fly={{ x: 200 }}>
-					<RegisterFields bind:formState={forms.register} />
-
-					<Block class="mt-0">
-						<Button type="submit" tonal>Register</Button>
-					</Block>
-				</form>
-			{/if}
-		</div>
-	</Block>
+						<Block class="mt-0">
+							<Button type="submit" tonal>Register</Button>
+						</Block>
+					</form>
+				{/if}
+			</div>
+		</Block>
+	{:else}
+		<Block class="text-center">
+			<div class="m-8">
+				{t("Waiting for {apiState.url}...", apiState.url)}
+			</div>
+			<Preloader />
+		</Block>
+	{/if}
 
 	<Dialog opened={registerSuccessDialogOpen}>
 		{#snippet title()}

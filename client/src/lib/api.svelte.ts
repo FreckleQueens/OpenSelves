@@ -136,7 +136,7 @@ export async function callRaw(
 	}
 
 	if (!responseBody) {
-		throw new Error("Could not obtain response body");
+		return CallResult.API_UNREACHABLE;
 	}
 
 	return responseBody;
@@ -214,11 +214,12 @@ export async function handleLogout() {
 
 let onlineCheckTimeout: number | undefined = undefined;
 export function handleApiUnreachable() {
+	appState.isApiReachable = false;
 	SyncWorker.getInstance().pause();
 	scheduleOnlineCheck();
 }
 
-function scheduleOnlineCheck() {
+export function scheduleOnlineCheck(delay: number = 5000) {
 	clearTimeout(onlineCheckTimeout);
 
 	onlineCheckTimeout = window.setTimeout(async () => {
@@ -227,14 +228,16 @@ function scheduleOnlineCheck() {
 		try {
 			if (await isApiReachable()) {
 				reachable = true;
+				appState.isApiReachable = true;
 				if (appState.isAuthenticated) {
 					SyncWorker.getInstance().resume();
 				}
 			}
 		} finally {
 			if (!reachable) {
+				appState.isApiReachable = false;
 				scheduleOnlineCheck();
 			}
 		}
-	}, 5000);
+	}, delay);
 }
