@@ -1,4 +1,10 @@
-import { type INestApplication, Module, ValidationPipe } from "@nestjs/common";
+import {
+	type INestApplication,
+	type MiddlewareConsumer,
+	Module,
+	type NestModule,
+	ValidationPipe,
+} from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 
@@ -8,6 +14,7 @@ import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
 import { StatusController } from "./status.controller.js";
 import { SyncModule } from "./sync/sync.module.js";
+import { VersionMiddleware } from "./version.middleware.js";
 
 @Module({
 	imports: [
@@ -21,8 +28,13 @@ import { SyncModule } from "./sync/sync.module.js";
 		SyncModule,
 	],
 	controllers: [StatusController],
+	providers: [VersionMiddleware],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(VersionMiddleware).forRoutes("*");
+	}
+}
 
 export function configureApp(app: INestApplication) {
 	const configService = app.get(ConfigService<ConfigData>);

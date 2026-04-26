@@ -1,7 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
 import type { FrontCreate, Log, Member, MemberCreate } from "openselves-common/db";
-import request from "supertest";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
 
@@ -76,7 +75,7 @@ describe(pushEndpoint, () => {
 		expect: number = 200,
 		cookies: string = env.users.cookies,
 	) {
-		return await request(env.server)
+		return env.request
 			.put(pushEndpoint)
 			.send({
 				logs: logs,
@@ -119,7 +118,7 @@ describe(pushEndpoint, () => {
 	}
 
 	async function getSyncFrom(timestamp: number | "init", cookies: string = env.users.cookies) {
-		const response = await request(env.server)
+		const response = await env.request
 			.post(pullEndpoint)
 			.send({
 				timestamp: timestamp,
@@ -165,31 +164,31 @@ describe(pushEndpoint, () => {
 	setupTestSuite((testEnv) => (env = testEnv));
 
 	test("GET 404", async () => {
-		await request(env.server).get(pushEndpoint).expect(404);
+		await env.request.get(pushEndpoint).expect(404);
 	});
 
 	test("POST 404", async () => {
-		await request(env.server).post(pushEndpoint).send({}).expect(404);
+		await env.request.post(pushEndpoint).send({}).expect(404);
 	});
 
 	test("PATCH 404", async () => {
-		await request(env.server).patch(pushEndpoint).send({}).expect(404);
+		await env.request.patch(pushEndpoint).send({}).expect(404);
 	});
 
 	test("DELETE 404", async () => {
-		await request(env.server).delete(pushEndpoint).send({}).expect(404);
+		await env.request.delete(pushEndpoint).send({}).expect(404);
 	});
 
 	describe("PUT", () => {
 		test("empty request body 400", async () => {
-			await request(env.server)
+			await env.request
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
 				.send({})
 				.expect(400);
 		});
 		test("empty logs array 400", async () => {
-			await request(env.server)
+			await env.request
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
 				.send({ logs: [] })

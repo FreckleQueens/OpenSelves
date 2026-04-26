@@ -4,10 +4,14 @@ import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { createId } from "@paralleldrive/cuid2";
 import { inArray } from "drizzle-orm";
+import methods from "methods";
 import { type User, users } from "openselves-common/db";
+import type { ValueFromArray } from "rxjs";
 import request, { type Response } from "supertest";
+import type TestAgent from "supertest/lib/agent.js";
 import type { App } from "supertest/types.js";
 
+import rootPackage from "../../package.json" with { type: "json" };
 import { AppModule, configureApp } from "../src/app.module.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
@@ -16,7 +20,7 @@ import type { DB } from "../src/db/drizzle.js";
 type CreateUsersEnv = {
 	db: DB;
 	registrationPassword: string;
-	server: App;
+	request: TestAgent;
 };
 export type TestEnvUsers = {
 	userPassword: string;
@@ -39,7 +43,7 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	const userPassword = "12345678";
 	async function createAndLoginUser() {
 		const user = (
-			await request(env.server)
+			await env.request
 				.post("/user")
 				.send({
 					email: createId() + "@example.com",
@@ -48,7 +52,7 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 				})
 				.expect(201)
 		).body;
-		const response = await request(env.server)
+		const response = await env.request
 			.post("/auth/login")
 			.send({ email: user.email, password: userPassword })
 			.expect(200);
@@ -83,10 +87,26 @@ export function setupTestSuite(
 		await app.init();
 		const server: App = app.getHttpServer();
 
+		function isMethod(val: string): val is ValueFromArray<typeof methods> {
+			return !!methods.find((method) => method === val);
+		}
+
 		const createUsersEnv: CreateUsersEnv = {
 			db: app.get(DBClass),
 			registrationPassword,
-			server,
+			get request() {
+				const testAgent = request(server);
+				return new Proxy(testAgent, {
+					get(target, name, receiver) {
+						if (typeof name === "string" && isMethod(name)) {
+							return (url: string) =>
+								target[name](url).set("X-OpenSelves-Version", rootPackage.version);
+						} else {
+							return Reflect.get(target, name, receiver) as unknown;
+						}
+					},
+				});
+			},
 		};
 
 		env = {

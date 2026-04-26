@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, test } from "@jest/globals";
 import { eq } from "drizzle-orm";
 import { type Log, type LogCreate, type Member, members, models } from "openselves-common/db";
-import request from "supertest";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
 
@@ -142,24 +141,24 @@ describe("/sync/pull", () => {
 	});
 
 	test("GET 404", async () => {
-		await request(env.server).get(pullEndpoint).expect(404);
+		await env.request.get(pullEndpoint).expect(404);
 	});
 
 	test("PUT 404", async () => {
-		await request(env.server).put(pullEndpoint).send({}).expect(404);
+		await env.request.put(pullEndpoint).send({}).expect(404);
 	});
 
 	test("PATCH 404", async () => {
-		await request(env.server).patch(pullEndpoint).send({}).expect(404);
+		await env.request.patch(pullEndpoint).send({}).expect(404);
 	});
 
 	test("DELETE 404", async () => {
-		await request(env.server).delete(pullEndpoint).send({}).expect(404);
+		await env.request.delete(pullEndpoint).send({}).expect(404);
 	});
 
 	describe("POST", () => {
 		test("empty request body 400", async () => {
-			const response = await request(env.server)
+			const response = await env.request
 				.post(pullEndpoint)
 				.send({})
 				.set("Cookie", env.users.cookies)
@@ -169,7 +168,7 @@ describe("/sync/pull", () => {
 		});
 
 		async function callPull(timestamp: number | "init", expectCode: number, cookies: string) {
-			return await request(env.server)
+			return env.request
 				.post(pullEndpoint)
 				.send({
 					timestamp: timestamp,

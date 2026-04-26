@@ -144,7 +144,7 @@ deadline or ETA
 
 ## 🚧 0.5.0 - Member profile picture
 - [ ] ~~client: switch to a better md3 library~~ (canceled)
-- [ ] add version checks on /push and /pull endpoints
+- [x] add version checks on /push and /pull endpoints
 - [ ] member profile picture
 - [ ] member color
 

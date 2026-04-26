@@ -2,6 +2,7 @@ import { dev } from "$app/environment";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import {
+	PUBLIC_APP_VERSION,
 	PUBLIC_DEFAULT_API_URL,
 	PUBLIC_DEFAULT_API_URL_DEV,
 	PUBLIC_TEST_ENVIRONMENT,
@@ -35,7 +36,13 @@ export type CallOptions<RawResponse extends true | false> = {
 export enum CallResult {
 	AUTH_FAILED,
 	API_UNREACHABLE,
+	WRONG_VERSION,
 }
+
+const baseApiRequestHeaders = {
+	Accept: "application/json",
+	"X-OpenSelves-Version": PUBLIC_APP_VERSION,
+};
 
 export async function callRaw(
 	path: string,
@@ -53,9 +60,7 @@ export async function callRaw(
 	path: string,
 	options?: CallOptions<true | false>,
 ): Promise<CallResult | Response | Record<string, unknown>> {
-	const headers: Record<string, string> = {
-		Accept: "application/json",
-	};
+	const headers: Record<string, string> = { ...baseApiRequestHeaders };
 	if (options?.data) {
 		headers["Content-Type"] = "application/json";
 	}
@@ -89,6 +94,11 @@ export async function callRaw(
 			);
 		}
 
+		if (response && response.headers.get("X-OpenSelves-Version") !== PUBLIC_APP_VERSION) {
+			console.debug(response.headers);
+			return CallResult.WRONG_VERSION;
+		}
+
 		if (options?.returnRawResponse) {
 			if (!response) {
 				continue;
@@ -113,6 +123,10 @@ export async function callRaw(
 			}
 
 			return CallResult.AUTH_FAILED;
+		}
+
+		if (response.status === 406 && typeof responseBody.expectedVersion === "string") {
+			return CallResult.WRONG_VERSION;
 		}
 
 		throw new Error(
@@ -152,6 +166,7 @@ export async function call(
 			await handleLogout();
 			return undefined;
 		case CallResult.API_UNREACHABLE:
+		case CallResult.WRONG_VERSION:
 			handleApiUnreachable();
 			return undefined;
 		default:
@@ -162,10 +177,12 @@ export async function call(
 async function isApiReachable(): Promise<boolean> {
 	const debugData: unknown[] = [];
 	try {
-		const response = await fetch(`${apiState.url}/status`);
+		const response = await fetch(`${apiState.url}/status`, {
+			headers: baseApiRequestHeaders,
+		});
 		if (response.ok) {
 			const responseBody = await response.json();
-			if (responseBody.ready === true) {
+			if (responseBody.ready === true && responseBody.version === PUBLIC_APP_VERSION) {
 				console.debug("online");
 				return true;
 			}
@@ -183,6 +200,7 @@ async function refreshAuth(): Promise<boolean> {
 	const response = await fetch(`${apiState.url}/auth/refresh`, {
 		method: "POST",
 		credentials: "include",
+		headers: baseApiRequestHeaders,
 	});
 	return response.ok;
 }

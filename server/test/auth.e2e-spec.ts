@@ -51,7 +51,7 @@ describe("Auth (e2e)", () => {
 	describe("/auth", () => {
 		describe("/login", () => {
 			test("POST 200", async () => {
-				const response = await request(env.server)
+				const response = await env.request
 					.post("/auth/login")
 					.send({ email: env.users.user.email, password: env.users.userPassword })
 					.expect(200)
@@ -143,7 +143,7 @@ describe("Auth (e2e)", () => {
 				},
 			]) {
 				test(testName, async () => {
-					await request(env.server)
+					await env.request
 						.post("/auth/login")
 						.send(data())
 						.expect(status)
@@ -155,7 +155,7 @@ describe("Auth (e2e)", () => {
 
 		describe("/refresh", () => {
 			async function testAuthRefreshFails(cookies: string, status: number) {
-				const response = await request(env.server)
+				const response = await env.request
 					.post("/auth/refresh")
 					.set("Cookie", cookies)
 					.expect(status)
@@ -166,7 +166,7 @@ describe("Auth (e2e)", () => {
 			}
 
 			test("POST 200", async () => {
-				const response = await request(env.server)
+				const response = await env.request
 					.post("/auth/refresh")
 					.set("Cookie", env.users.cookies)
 					.expect(200)
@@ -211,7 +211,7 @@ describe("Auth (e2e)", () => {
 				);
 				expect(newRefreshToken).not.toBe(oldRefreshToken);
 
-				await request(env.server)
+				await env.request
 					.get("/user/" + env.users.user.id)
 					.set("Cookie", newCookies)
 					.expect(200);
@@ -220,7 +220,7 @@ describe("Auth (e2e)", () => {
 				await testAuthRefreshFails(env.users.cookies, 401);
 
 				// New refresh token must work
-				await request(env.server)
+				await env.request
 					.post("/auth/refresh")
 					.set("Cookie", newCookies)
 					.expect(200)
@@ -232,10 +232,7 @@ describe("Auth (e2e)", () => {
 			});
 
 			test("POST 401 revoked token", async () => {
-				await request(env.server)
-					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
-					.expect(200);
+				await env.request.post("/auth/logout").set("Cookie", env.users.cookies).expect(200);
 				await testAuthRefreshFails(env.users.cookies, 401);
 			});
 
@@ -255,7 +252,7 @@ describe("Auth (e2e)", () => {
 
 		describe("/logout", () => {
 			test("POST 200", async () => {
-				const response = await request(env.server)
+				const response = await env.request
 					.post("/auth/logout")
 					.set("Cookie", env.users.cookies)
 					.expect(200)
@@ -279,13 +276,13 @@ describe("Auth (e2e)", () => {
 
 			test("POST 401 revoked token", async () => {
 				// Access token works
-				await request(env.server)
+				await env.request
 					.get(`/user/${env.users.user.id}`)
 					.set("Cookie", env.users.cookies)
 					.expect(200)
 					.expect("Content-Type", /json/);
 
-				const response = await request(env.server)
+				const response = await env.request
 					.post("/auth/logout")
 					.set("Cookie", env.users.cookies)
 					.expect(200)
@@ -293,14 +290,14 @@ describe("Auth (e2e)", () => {
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
 				// Access token removed from cookies
-				await request(env.server)
+				await env.request
 					.get(`/user/${env.users.user.id}`)
 					.set("Cookie", newCookies)
 					.expect(401)
 					.expect("Content-Type", /json/);
 
 				// Refresh token revoked
-				await request(env.server)
+				await env.request
 					.post("/auth/refresh")
 					.set("Cookie", env.users.cookies)
 					.expect(401)
@@ -310,7 +307,7 @@ describe("Auth (e2e)", () => {
 			test("POST 401 expired token", async () => {
 				await makeRefreshTokenExpired();
 
-				await request(env.server)
+				await env.request
 					.post("/auth/logout")
 					.set("Cookie", env.users.cookies)
 					.expect(401)
@@ -319,13 +316,13 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("Access tokens expire", async () => {
-			await request(env.server)
+			await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
 			const accessToken = extractCookie("accessToken", env.users.cookies);
 			const expiredAccessToken = await makeExpiredAccessToken(accessToken);
-			const response = await request(env.server)
+			const response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", `accessToken=${expiredAccessToken}`)
 				.expect(401)
@@ -336,7 +333,7 @@ describe("Auth (e2e)", () => {
 
 	describe("/user", () => {
 		test("POST 201", async () => {
-			const response = await request(env.server)
+			const response = await env.request
 				.post("/user")
 				.send({
 					email: createId() + "@example.com",
@@ -355,7 +352,7 @@ describe("Auth (e2e)", () => {
 			{ test: "Missing email", password: "12345678" },
 		]) {
 			test(`POST ${testCase.test} 400`, async () => {
-				await request(env.server)
+				await env.request
 					.post("/user")
 					.send({ registrationPassword: env.registrationPassword, ...testCase })
 					.expect(400)
@@ -365,7 +362,7 @@ describe("Auth (e2e)", () => {
 
 		test("POST existing email address 409", async () => {
 			const email = createId() + "@example.com";
-			await request(env.server)
+			await env.request
 				.post("/user")
 				.send({
 					email: email,
@@ -373,7 +370,7 @@ describe("Auth (e2e)", () => {
 					registrationPassword: env.registrationPassword,
 				})
 				.expect(201);
-			await request(env.server)
+			await env.request
 				.post("/user")
 				.send({
 					email: email,
@@ -385,7 +382,7 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("POST authenticated 401", async () => {
-			await request(env.server)
+			await env.request
 				.post("/user")
 				.set("Cookie", env.users.cookies)
 				.send({
@@ -398,7 +395,7 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("POST without general registration password 401", async () => {
-			await request(env.server)
+			await env.request
 				.post("/user")
 				.send({ email: "john@example.com", password: "12345678" })
 				.expect(401)
@@ -406,7 +403,7 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("GET 200", async () => {
-			const response = await request(env.server)
+			const response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200)
@@ -419,14 +416,14 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("GET unauthenticated 401", async () => {
-			await request(env.server)
+			await env.request
 				.get("/user/" + env.users.user.id)
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
 
 		test("GET other user 401", async () => {
-			await request(env.server)
+			await env.request
 				.get("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies)
 				.expect(401)
@@ -435,11 +432,11 @@ describe("Auth (e2e)", () => {
 
 		test("PUT 404", async () => {
 			const newEmail = "new.jane@example.org";
-			await request(env.server)
+			await env.request
 				.put("/user/" + env.users.user.id)
 				.send({ email: newEmail })
 				.expect(404);
-			const response = await request(env.server)
+			const response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
@@ -450,12 +447,12 @@ describe("Auth (e2e)", () => {
 		test("PATCH email 200", async () => {
 			const newEmail = "new.jane@example.org";
 
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ email: newEmail })
 				.expect(200);
-			const response = await request(env.server)
+			const response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
@@ -465,7 +462,7 @@ describe("Auth (e2e)", () => {
 
 		test("PATCH unauthenticated 401", async () => {
 			const newEmail = "new.jane@example.org";
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.send({ email: newEmail })
 				.expect(401)
@@ -474,7 +471,7 @@ describe("Auth (e2e)", () => {
 
 		test("PATCH other user 401", async () => {
 			const newEmail = "new.jane@example.org";
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies)
 				.send({ email: newEmail })
@@ -484,12 +481,12 @@ describe("Auth (e2e)", () => {
 
 		test("PATCH bad email 400", async () => {
 			const newEmail = "not an email address";
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ email: newEmail })
 				.expect(400);
-			const response = await request(env.server)
+			const response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
@@ -500,7 +497,7 @@ describe("Auth (e2e)", () => {
 		test("PATCH password 200", async () => {
 			const oldPassword = env.users.userPassword;
 			const newPassword = "87654321";
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ oldPassword, newPassword })
@@ -508,7 +505,7 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("PATCH missing oldPassword 400", async () => {
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ newPassword: "87654321" })
@@ -516,7 +513,7 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("PATCH missing newPassword 400", async () => {
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ oldPassword: env.users.userPassword })
@@ -526,7 +523,7 @@ describe("Auth (e2e)", () => {
 		test("PATCH wrong old password 401", async () => {
 			const oldPassword = "wrong old password";
 			const newPassword = "87654321";
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ oldPassword, newPassword })
@@ -536,7 +533,7 @@ describe("Auth (e2e)", () => {
 		test("PATCH bad new password 400", async () => {
 			const oldPassword = env.users.userPassword;
 			const newPassword = "short"; // Less than 8 characters
-			await request(env.server)
+			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.send({ oldPassword, newPassword })
@@ -544,25 +541,25 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("DELETE 200", async () => {
-			await request(env.server)
+			await env.request
 				.delete("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
-			await request(env.server)
+			await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(404);
 		});
 
 		test("DELETE unauthenticated fails", async () => {
-			await request(env.server)
+			await env.request
 				.delete("/user/" + env.users.user.id)
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
 
 		test("DELETE other user 401", async () => {
-			await request(env.server)
+			await env.request
 				.delete("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies)
 				.expect(401)
