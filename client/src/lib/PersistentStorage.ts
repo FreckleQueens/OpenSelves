@@ -28,11 +28,15 @@ export abstract class PersistentStorage {
 	}
 
 	public getUserId(): string {
-		const userId = this.userId;
+		const userId = this.getUserIdOptional();
 		if (!userId) {
 			throw new Error("SessionStorage userId not set.");
 		}
 		return userId;
+	}
+
+	public getUserIdOptional(): string | undefined {
+		return this.userId;
 	}
 
 	/**
@@ -64,6 +68,10 @@ export abstract class PersistentStorage {
 
 	public async set(path: string, value: string, absolute: boolean = false): Promise<void> {
 		await this.setRaw(absolute ? path : `${this.getUserId()}.${path}`, value);
+	}
+
+	public async setForUser(userId: string, path: string, value: string) {
+		return this.set(`${userId}.${path}`, value, true);
 	}
 
 	public abstract setRaw(path: string, value: string | undefined): Promise<void>;

@@ -3,6 +3,7 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
+	import { appState } from "$lib/appState.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
@@ -43,6 +44,10 @@
 	subscribeToModel(idb.member, members);
 
 	onMount(async () => {
+		if (!appState.isAuthenticated) {
+			return;
+		}
+
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
 	});
 

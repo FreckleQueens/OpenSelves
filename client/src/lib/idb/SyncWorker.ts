@@ -59,7 +59,7 @@ export class SyncWorker {
 	}
 
 	public async shutdown(): Promise<void> {
-		this.unscheduleSync();
+		this.pause();
 		for (let attempts = 0; attempts < 3; attempts++) {
 			if (!this._hasPushBacklog) {
 				break;
@@ -134,7 +134,11 @@ export class SyncWorker {
 		const storage = PersistentStorage.getInstance();
 		const idb = IDB.getInstance();
 
-		const userId = storage.getUserId();
+		const userId = storage.getUserIdOptional();
+		if (!userId) {
+			return false;
+		}
+
 		const pendingLogs = await idb.log.getByField("userId", userId);
 		const formattedLogs = pendingLogs
 			.map((log) => {
@@ -177,7 +181,11 @@ export class SyncWorker {
 		const storage = PersistentStorage.getInstance();
 		const idb = IDB.getInstance();
 
-		const userId = storage.getUserId();
+		const userId = storage.getUserIdOptional();
+		if (!userId) {
+			return;
+		}
+
 		const currentTimestamp = Number(await storage.get("timestamp"));
 		const reqTimestamp =
 			currentTimestamp && Number.isFinite(currentTimestamp) ? currentTimestamp : "init";
@@ -236,7 +244,7 @@ export class SyncWorker {
 
 		const timestamp = response["timestamp"];
 		if (typeof timestamp === "number") {
-			await storage.set("timestamp", timestamp.toString());
+			await storage.setForUser(userId, "timestamp", timestamp.toString());
 		}
 
 		console.debug("Pull end");

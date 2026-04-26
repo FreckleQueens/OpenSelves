@@ -11,7 +11,7 @@
 	import { onMount } from "svelte";
 
 	let storage: PersistentStorage | undefined = $state();
-	let userId: string | undefined = $derived(storage?.getUserId());
+	let userId: string | undefined = $derived(storage?.getUserIdOptional());
 	let user:
 		| {
 				id: string;
@@ -25,8 +25,7 @@
 	});
 
 	$effect(() => {
-		let online = appState.syncWorkerOnline;
-		if (online && userId) {
+		if (appState.syncWorkerOnline && userId) {
 			call(`/user/${userId}`).then((response) => {
 				if (response) {
 					if (!("id" in response && "email" in response)) {
