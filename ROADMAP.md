@@ -142,46 +142,53 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.5.0
-- [ ] client: switch to a better md3 library
-- [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers 
-- [ ] show proper language names in language switcher
-- [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
-- [ ] fab menus: don't user fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
-
-## 0.6.0
+## 🚧 0.5.0 - Member profile picture
+- [ ] ~~client: switch to a better md3 library~~ (canceled)
 - [ ] add version checks on /push and /pull endpoints
 - [ ] member profile picture
+- [ ] member color
+
+## 0.6.0 - Basic account features
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
 - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
 
-## 0.7.0
+## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
-## 0.8.0
+## 0.8.0 - Optimizations
 - [ ] Sync engine optimizations
     - [ ] client
         - [ ] drop prior unsynced create and update operations when deleting a record
-        - [ ] purge logs that don't have an effect anymore (where pushedAt is not null)
         - [ ] leverage @capacitor/background-runner
         - [ ] leverage Background Sync API when available
     - [ ] server
         - [ ] purge logs that don't have an effect anymore
-        - [ ] /sync/pull batch (limit 500?, return last pushedAt timestamp)
-        - [ ] /sync/push batch (limit 50?)
 
-## 1.0.0
+## 0.9.0 - Exclusive-offline mode
+- [ ] add data export to json
+- [ ] add data import from json
+- [ ] add an option to use the app without an account
+- [ ] warn the user that using the app in this mode has potential data loss risks and that they should backup their data regularly
+- [ ] add data backup reminder
+- [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
+- 
+## 0.10.0 - UI tweaks
+- [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
+- [ ] show proper language names in language switcher
+- [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
+- [ ] fab menus: don't use fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
+- [ ] ListInput: make the text field focus when clicking anywhere inside the whole visible box (+ cursor change)
+
+## 1.0.0 - Official release
 - [ ] email verification
 - [ ] public registrations with captcha
 - [ ] general UI/UX accessibility check
-- [ ] data export to json
 - [ ] review [private launch items](./private%20launch%20items.md) (not accessible publicly)
 
-## 2.0.0
-- [ ] Member color
+## 1.1.0
 - [ ] groups (folders) (created_at, name, description, custom emoji, color)
 - [ ] Member front history tab
 - [ ] Beautiful front history chronological graph
@@ -189,8 +196,12 @@ deadline or ETA
 - [ ] PluralKit manual synchronization (all members)
 - [ ] simply plural data vault updater
 
-## 3.0.0
+## 1.2.0
 - [ ] Useful links page
+- [ ] Better default dark theme colors (monochrome?)
+- [ ] switch between light theme, dark theme and system theme manually
+- [ ] add primary color theme options
+- [ ] add monochrome and vibrant colors toggles
 
 ---
 
@@ -213,7 +224,7 @@ deadline or ETA
 - [ ] Notification history
 - [ ] Member message board tab (authored messages, notification on switch in)
 - [ ] Member notes tab (authorless messages)
-- [ ] Analytics
+- [ ] System "analytics" (as in graphs and stats for users, not in the traditional usage data collection/tracking)
 - [ ] Polls
 - [ ] Internal chat
 - [ ] Third-party integration API with access tokens
@@ -221,8 +232,6 @@ deadline or ETA
 - [ ] Hide plural features toggle (for singlets), off by default, choice at registration
 - [ ] Show system member count
 - [ ] Show group member count
-- [ ] switch between light theme, dark theme and system theme manually
-- [ ] more app themes
 - [ ] android adaptive icon
 
 ---
