@@ -1,3 +1,4 @@
+import { APP_VERSION } from "$lib";
 import { IDBStorage, PersistentStorage } from "$lib/PersistentStorage";
 import { SERVER_URL_STORAGE_KEY, apiState } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
@@ -7,6 +8,8 @@ import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker";
 
 export async function initApp() {
+	console.log("OpenSelves client version", APP_VERSION);
+
 	// IDB
 	await IDB.init();
 

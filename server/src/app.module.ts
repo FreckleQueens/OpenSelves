@@ -2,6 +2,7 @@ import { type INestApplication, Module, ValidationPipe } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 
+import rootPackage from "../../package.json" with { type: "json" };
 import { AuthModule } from "./auth/auth.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
@@ -25,6 +26,9 @@ export class AppModule {}
 
 export function configureApp(app: INestApplication) {
 	const configService = app.get(ConfigService<ConfigData>);
+
+	configService.set("_APP_VERSION", rootPackage.version);
+
 	app.useGlobalPipes(
 		new ValidationPipe({
 			transform: true,

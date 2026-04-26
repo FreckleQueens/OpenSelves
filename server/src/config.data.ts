@@ -16,6 +16,8 @@ export interface ConfigData {
 	REFRESH_TOKEN_SIZE: number;
 
 	REGISTRATION_PASSWORD: string;
+
+	_APP_VERSION: string;
 }
 
 interface ExtendedJoi extends Joi.Root {
@@ -64,4 +66,5 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set REGISTER_PASSWORD environment variable to secure random string",
 		"any.required": "Please set REGISTER_PASSWORD environment variable to secure random string",
 	}),
+	_APP_VERSION: Joi.forbidden(),
 });
