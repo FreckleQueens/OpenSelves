@@ -11,6 +11,7 @@
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
 	import PronounsInputIcon from "$lib/components/icons/PronounsInputIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
+	import UploadIcon from "$lib/components/icons/UploadIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
 	import { requireAuth } from "$lib/routing-utils";
@@ -45,6 +46,8 @@
 	});
 	let activeTab: "info" | "settings" = $state("info");
 	let editImageUrl = $state(false);
+	let imageFiles: FileList | undefined = $state();
+	let imageFileInputEl: HTMLInputElement | undefined = $state();
 	let deleteRecordButton: Snippet | null = $state(null);
 
 	requireAuth();
@@ -57,6 +60,36 @@
 		}
 		originalMember = { ...member };
 		mounted = true;
+	});
+
+	$effect(() => {
+		if (!imageFiles) {
+			return;
+		}
+
+		const file = imageFiles.item(0);
+		if (!file) {
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			const result = reader.result?.toString() || "";
+			if (result) {
+				if (result.length <= 8192) {
+					member.image = result;
+					formState.errors["image"] = "";
+				} else {
+					formState.errors["image"] = t("This file is too big! (max 8kB)");
+				}
+			} else {
+				formState.errors["image"] = t("Error while loading file {file.name}", file.name);
+			}
+		};
+		reader.onerror = () => {
+			formState.errors["image"] = t("Error while loading file {file.name}", file.name);
+		};
+		reader.readAsDataURL(file);
 	});
 
 	const hasMemberChanged = () => JSON.stringify(member) !== JSON.stringify(originalMember);
@@ -155,6 +188,29 @@
 					<ImageIcon input />
 				{/snippet}
 			</ListInput>
+
+			<li class="m-4 text-center">
+				<Button
+					inline
+					tonal
+					type="button"
+					onclick={() => {
+						imageFileInputEl?.click();
+					}}
+				>
+					<UploadIcon button before />
+					Load from file
+				</Button>
+
+				<input
+					bind:this={imageFileInputEl}
+					type="file"
+					name="_image_file"
+					accept="image/*"
+					bind:files={imageFiles}
+					class="hidden"
+				/>
+			</li>
 		</List>
 
 		<List>

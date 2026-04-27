@@ -147,7 +147,7 @@ deadline or ETA
 - [x] add version checks on /push and /pull endpoints
 - [ ] member profile picture
   - [x] simple URL field with reasonable length limit (allow data urls)
-  - [ ] allow "upload" of image by converting it to a data url
+  - [x] allow "upload" of image by converting it to a data url
   - [ ] cache images in IDB as data urls
   - [ ] upload larger image files to s3-compatible private object storage
 - [ ] member color
