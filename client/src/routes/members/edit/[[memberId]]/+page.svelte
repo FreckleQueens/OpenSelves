@@ -5,6 +5,7 @@
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
+	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import ImageIcon from "$lib/components/icons/ImageIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
@@ -14,9 +15,10 @@
 	import { IDB } from "$lib/idb";
 	import { requireAuth } from "$lib/routing-utils";
 	import isUrl from "is-url";
-	import { Block, List, ListInput, ListItem, Toggle } from "konsta/svelte";
+	import { Block, Button, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 	import { type Snippet, onMount } from "svelte";
+	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";
 
 	import type { PageProps } from "./$types";
@@ -42,6 +44,7 @@
 		generalError: "",
 	});
 	let activeTab: "info" | "settings" = $state("info");
+	let editImageUrl = $state(false);
 	let deleteRecordButton: Snippet | null = $state(null);
 
 	requireAuth();
@@ -124,10 +127,21 @@
 	bind:activeTab
 	bind:deleteRecordButton
 >
-	<Block class={`${activeTab !== "info" ? "hidden " : ""}flex flex-col items-stretch`}>
-		<MemberImage {member} class="w-6/12 self-center" />
+	<Block class={"flex flex-col items-stretch" + (activeTab !== "info" ? " hidden" : "")}>
+		<MemberImage {member} class="w-6/12 self-center relative">
+			<div class="absolute bottom-2 right-2" transition:fly={{ y: 50, duration: 150 }}>
+				<Button
+					id="edit-image-url-button"
+					class="p-2"
+					type="button"
+					onclick={() => (editImageUrl = !editImageUrl)}
+				>
+					<EditIcon button />
+				</Button>
+			</div>
+		</MemberImage>
 
-		<List>
+		<List class={editImageUrl ? "" : "hidden"}>
 			<ListInput
 				type="url"
 				name="image"
