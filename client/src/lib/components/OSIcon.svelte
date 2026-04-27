@@ -3,8 +3,11 @@
 	import { Icon } from "konsta/svelte";
 
 	let {
-		children,
-		secondaryIcon = undefined,
+		material: MaterialIcon = undefined,
+		ios: IosIcon = undefined,
+		all: AllIcon = undefined,
+		secondary: SecondaryIcon = undefined,
+		iconProps = {},
 		button = false,
 		fab = false,
 		input = false,
@@ -28,7 +31,7 @@
 		if (classNames) {
 			vals.push(classNames);
 		}
-		if (secondaryIcon) {
+		if (SecondaryIcon) {
 			vals.push("has-secondary-icon");
 		}
 		return vals.join(" ");
@@ -36,12 +39,31 @@
 </script>
 
 <Icon class={classes} {...restProps}>
-	{@render children?.()}
-	{#if secondaryIcon}
+	{#if SecondaryIcon}
 		<div class="secondary-icon">
-			{@render secondaryIcon()}
+			<SecondaryIcon />
 		</div>
 	{/if}
+
+	{#snippet material()}
+		{#if MaterialIcon}
+			<MaterialIcon {...iconProps} />
+		{/if}
+
+		{#if AllIcon}
+			<AllIcon {...iconProps} />
+		{/if}
+	{/snippet}
+
+	{#snippet ios()}
+		{#if IosIcon}
+			<IosIcon {...iconProps} />
+		{/if}
+
+		{#if AllIcon}
+			<AllIcon {...iconProps} />
+		{/if}
+	{/snippet}
 </Icon>
 
 <style lang="scss">

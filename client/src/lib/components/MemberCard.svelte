@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ClickEventHandler } from "$lib";
+	import MemberImage from "$lib/components/MemberImage.svelte";
 	import ArchivedIcon from "$lib/components/icons/ArchivedIcon.svelte";
-	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
 	import { Button, Card } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 	import type { Component, Snippet } from "svelte";
@@ -44,8 +44,11 @@
 	<div class="flex-1">
 		<!-- TODO: touch ripple -->
 		<Card raised class="member-card my-4 mx-0! cursor-pointer" onclick={onLinkClick}>
-			<div class="flex items-center">
-				<PersonIcon class={(small ? "text-xl" : "text-3xl") + " mr-2"} />
+			<div class={`flex items-center ${small ? "h-5" : "h-10"}`}>
+				<div class="self-stretch mr-2 flex-0">
+					<MemberImage class="h-full" {member} />
+				</div>
+
 				<div class="flex-1">
 					<p>{member.name}</p>
 					{#if !small}

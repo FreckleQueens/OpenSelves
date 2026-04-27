@@ -3,14 +3,18 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsBoolean,
+	IsDataURI,
 	IsDate,
 	IsIn,
 	IsNumber,
 	IsOptional,
 	IsString,
+	IsUrl,
+	MaxLength,
 	ValidateIf,
 	ValidateNested,
 } from "class-validator";
+import type { PartialBy } from "openselves-common";
 import type { Front, Log, Member } from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
@@ -47,7 +51,10 @@ class PushRecordUpdateDto {
 	public readonly updatedAt?: Date;
 }
 
-export class PushCreateMemberDto extends PushRecordCreateDto implements OmitBaseFields<Member> {
+export class PushCreateMemberDto
+	extends PushRecordCreateDto
+	implements PartialBy<OmitBaseFields<Member>, "image">
+{
 	@IsString()
 	public readonly name!: string;
 
@@ -56,6 +63,28 @@ export class PushCreateMemberDto extends PushRecordCreateDto implements OmitBase
 
 	@IsString()
 	public readonly description!: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(8 * 1024) // 8kB
+	@IsUrl(
+		{
+			allow_fragments: false,
+			validate_length: false,
+		},
+		{
+			validateIf(object, value) {
+				return typeof value === "string" && !value.startsWith("data:");
+			},
+		},
+	)
+	@IsDataURI({
+		validateIf(object, value) {
+			return typeof value === "string" && value.startsWith("data:");
+		},
+	})
+	@ValidateIf((object, value) => value !== null)
+	public readonly image?: string | null;
 
 	@IsBoolean()
 	public readonly isArchived!: boolean;
@@ -96,6 +125,7 @@ export class PushUpdateMemberDto
 			"name",
 			"pronouns",
 			"description",
+			"image",
 			"isArchived",
 			"archivedReason",
 			"createdAt",
@@ -117,6 +147,28 @@ export class PushUpdateMemberDto
 	@IsOptional()
 	@IsString()
 	public readonly description?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(8 * 1024) // 8kB
+	@IsUrl(
+		{
+			allow_fragments: false,
+			validate_length: false,
+		},
+		{
+			validateIf(object, value) {
+				return typeof value === "string" && !value.startsWith("data:");
+			},
+		},
+	)
+	@IsDataURI({
+		validateIf(object, value) {
+			return typeof value === "string" && value.startsWith("data:");
+		},
+	})
+	@ValidateIf((object, value) => value !== null)
+	public readonly image?: string | null;
 
 	@IsOptional()
 	@IsBoolean()

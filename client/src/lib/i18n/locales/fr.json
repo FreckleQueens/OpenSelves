@@ -36,6 +36,9 @@
 	"Front history": "Historique de présences",
 	"History": "Historique",
 	"Home": "Accueil",
+	"Image url": "Url de l'image",
+	"Image url must be a valid data uri": "L'url de l'image doit être une data uri valide",
+	"Image url must be a valid url": "L'url de l'image doit être une url valide",
 	"Info": "Info",
 	"Language": "Langue",
 	"Login": "Connexion",
@@ -77,5 +80,6 @@
 	"You are logged in as user #{user.id}, {user.email}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email}",
 	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte.",
 	"front": "présence",
-	"member": "membre"
+	"member": "membre",
+	"{member.name}'s profile picture": "Image de profil appartenant à {member.name}"
 }

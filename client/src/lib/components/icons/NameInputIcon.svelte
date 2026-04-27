@@ -5,11 +5,4 @@
 	let props: Omit<OSIconProps, "material" | "ios"> = $props();
 </script>
 
-<OSIcon {...props}>
-	{#snippet material()}
-		<IconIcRoundDriveFileRenameOutline />
-	{/snippet}
-	{#snippet ios()}
-		<IconF7SquarePencil />
-	{/snippet}
-</OSIcon>
+<OSIcon material={IconIcRoundDriveFileRenameOutline} ios={IconF7SquarePencil} {...props} />

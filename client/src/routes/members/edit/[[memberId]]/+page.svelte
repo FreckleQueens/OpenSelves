@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { PersistentStorage } from "$lib/PersistentStorage";
+	import MemberImage from "$lib/components/MemberImage.svelte";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
+	import ImageIcon from "$lib/components/icons/ImageIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
 	import PronounsInputIcon from "$lib/components/icons/PronounsInputIcon.svelte";
@@ -11,9 +13,11 @@
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
 	import { requireAuth } from "$lib/routing-utils";
+	import isUrl from "is-url";
 	import { Block, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 	import { type Snippet, onMount } from "svelte";
+	import { isDataURI } from "validator";
 
 	import type { PageProps } from "./$types";
 
@@ -26,6 +30,7 @@
 		name: "",
 		pronouns: "",
 		description: "",
+		image: null,
 		isArchived: false,
 		archivedReason: null,
 		createdAt: new Date(),
@@ -55,10 +60,35 @@
 
 	async function saveMember() {
 		const userId = storage.getUserId();
+
+		const image = member.image ? member.image : null;
+		if (image) {
+			if (image.startsWith("data:")) {
+				if (!isDataURI(image)) {
+					formState.errors["image"] = t("Image url must be a valid data uri");
+					return false;
+				}
+			} else {
+				let isValidUrl: boolean;
+				try {
+					new URL(image);
+					isValidUrl = isUrl(image);
+				} catch {
+					isValidUrl = false;
+				}
+
+				if (!isValidUrl) {
+					formState.errors["image"] = t("Image url must be a valid url");
+					return false;
+				}
+			}
+		}
+
 		member = await idb.member.saveSynced(
 			userId,
 			{
 				...member,
+				image,
 			},
 			!!member.id,
 		);
@@ -94,7 +124,25 @@
 	bind:activeTab
 	bind:deleteRecordButton
 >
-	<div class:hidden={activeTab !== "info"}>
+	<Block class={`${activeTab !== "info" ? "hidden " : ""}flex flex-col items-stretch`}>
+		<MemberImage {member} class="w-6/12 self-center" />
+
+		<List>
+			<ListInput
+				type="url"
+				name="image"
+				label={t("Image url")}
+				floatingLabel
+				maxlength="8192"
+				bind:value={member.image}
+				error={formState.errors["image"] || ""}
+			>
+				{#snippet media()}
+					<ImageIcon input />
+				{/snippet}
+			</ListInput>
+		</List>
+
 		<List>
 			<ListInput
 				name="name"
@@ -134,7 +182,7 @@
 				{/snippet}
 			</ListInput>
 		</List>
-	</div>
+	</Block>
 
 	<div class:hidden={activeTab !== "settings"}>
 		{#if member.id}

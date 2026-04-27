@@ -146,6 +146,10 @@ deadline or ETA
 - [ ] ~~client: switch to a better md3 library~~ (canceled)
 - [x] add version checks on /push and /pull endpoints
 - [ ] member profile picture
+  - [x] simple URL field with reasonable length limit (allow data urls)
+  - [ ] allow "upload" of image by converting it to a data url
+  - [ ] cache images in IDB as data urls
+  - [ ] upload larger image files to s3-compatible private object storage
 - [ ] member color
 
 ## 0.6.0 - Basic account features
@@ -153,6 +157,11 @@ deadline or ETA
 - [ ] change password
 - [ ] change email
 - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
+- [ ] turn on Secure flag on cookies (except in dev and test mode)
+- [ ] add a warning about data being accessible even after a logout
+- [ ] add ability to wipe IDB from auth settings menu
+- [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
+a short-lived one 
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)

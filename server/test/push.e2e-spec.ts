@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
 import type { FrontCreate, Log, Member, MemberCreate } from "openselves-common/db";
@@ -13,14 +14,20 @@ type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId" | "fr
 };
 type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt">;
 
+const TEST_IMAGE_DATA_URL =
+	"data:image/png;base64," + fs.readFileSync("test/test_image_32x32.png").toString("base64");
+const TEST_IMAGE_LONG_DATA_URL =
+	"data:image/png;base64," + fs.readFileSync("test/test_image_512x512.png").toString("base64");
+
 describe(pushEndpoint, () => {
 	let env: TestEnv;
 
-	function makeMemberWithLog(date: Date) {
+	function makeMemberWithLog(date: Date = new Date(), image: string | null = null) {
 		const member: Omit<MemberCreate, "userId" | "id"> = {
 			name: "Alice",
 			pronouns: "she/her",
 			description: "a member of our& system",
+			image,
 			isArchived: false,
 			archivedReason: null,
 			createdAt: date,
@@ -86,7 +93,7 @@ describe(pushEndpoint, () => {
 	}
 
 	async function createMember() {
-		const { member, createLog } = makeMemberWithLog(new Date());
+		const { member, createLog } = makeMemberWithLog();
 		const response = await putLog(createLog);
 		expect(response.body.logs).not.toBeDefined();
 		await checkLogIsServed(createLog);
@@ -161,6 +168,83 @@ describe(pushEndpoint, () => {
 		);
 	}
 
+	async function checkLogIsNotServed(logToCheck: ClientLog) {
+		const response = await getSyncFrom(0);
+		const pulledLogs = response.body.logs as Array<unknown>;
+		const pulledLog = pulledLogs.find(
+			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
+		);
+		expect(pulledLog).not.toBeDefined();
+	}
+
+	function testImage(testFn: (image: string | null | undefined) => Promise<ClientLog>) {
+		describe("image", () => {
+			for (const { testName, image, expect, isServed } of [
+				{
+					testName: "valid http url 200",
+					image: "http://example.com/image.png",
+					expect: 200,
+					isServed: true,
+				},
+				{
+					testName: "data url (<8kB) 200",
+					image: TEST_IMAGE_DATA_URL,
+					expect: 200,
+					isServed: true,
+				},
+				{
+					testName: "undefined 200",
+					image: undefined,
+					expect: 200,
+					isServed: true,
+				},
+				{
+					testName: "null 200",
+					image: null,
+					expect: 200,
+					isServed: true,
+				},
+				{
+					testName: "data url too long (>8kB) 400",
+					image: TEST_IMAGE_LONG_DATA_URL,
+					expect: 400,
+					isServed: false,
+				},
+				{
+					testName: "invalid data url 400",
+					image: "data:notavaliddataurl",
+					expect: 400,
+					isServed: false,
+				},
+				{
+					testName: "empty string 400",
+					image: "",
+					expect: 400,
+					isServed: false,
+				},
+				{
+					testName: "invalid url 400",
+					image: "invalid url",
+					expect: 400,
+					isServed: false,
+				},
+			]) {
+				test(testName, async () => {
+					const log = await testFn(image);
+					if (log.data && typeof log.data === "object" && image === undefined) {
+						delete log.data["image"];
+					}
+					await putLog(log, expect);
+					if (isServed) {
+						await checkLogIsServed(log);
+					} else {
+						await checkLogIsNotServed(log);
+					}
+				});
+			}
+		});
+	}
+
 	setupTestSuite((testEnv) => (env = testEnv));
 
 	test("GET 404", async () => {
@@ -195,7 +279,7 @@ describe(pushEndpoint, () => {
 				.expect(400);
 		});
 		test("log with non-null pushedAt 400", async () => {
-			const { createLog, date } = makeMemberWithLog(new Date());
+			const { createLog, date } = makeMemberWithLog();
 			const createLogWithPushedAt: ClientLogWithPushedAt = {
 				...createLog,
 				pushedAt: date,
@@ -203,7 +287,7 @@ describe(pushEndpoint, () => {
 			await putLog(createLogWithPushedAt, 400);
 		});
 		test("log data with userId 400", async () => {
-			const { createLog } = makeMemberWithLog(new Date());
+			const { createLog } = makeMemberWithLog();
 			await putLog(
 				{
 					...createLog,
@@ -215,26 +299,31 @@ describe(pushEndpoint, () => {
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
+				const { createLog } = makeMemberWithLog();
 
 				await putLog(createLog);
 				await checkLogIsServed(createLog);
 			});
 
 			test("send create operation twice succeeds 200", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
+				const { createLog } = makeMemberWithLog();
 				await putLog(createLog);
 				await putLog(createLog);
 			});
 
 			test("create member with same id fails 409", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
-				const { createLog: createLog2 } = makeMemberWithLog(new Date());
+				const { createLog } = makeMemberWithLog();
+				const { createLog: createLog2 } = makeMemberWithLog();
 				createLog2.memberId = createLog.memberId;
 
 				await putLog(createLog);
 
 				await putLog(createLog2, 409);
+			});
+
+			testImage((image) => {
+				const { createLog } = makeMemberWithLog(new Date(), image);
+				return Promise.resolve(createLog);
 			});
 		});
 
@@ -285,7 +374,7 @@ describe(pushEndpoint, () => {
 
 		describe("PUT update Member", () => {
 			test("200", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
+				const { createLog } = makeMemberWithLog();
 
 				await putLog(createLog);
 
@@ -316,7 +405,7 @@ describe(pushEndpoint, () => {
 			});
 
 			test("empty update data 400", async () => {
-				const { createLog } = makeMemberWithLog(new Date());
+				const { createLog } = makeMemberWithLog();
 
 				await putLog(createLog);
 
@@ -369,6 +458,21 @@ describe(pushEndpoint, () => {
 				};
 
 				await putLog(updateLog);
+			});
+
+			testImage(async (image) => {
+				const { createLog } = await createMember();
+				const updateLog: ClientLog = {
+					id: createId(),
+					memberId: createLog.memberId,
+					operationType: "update",
+					data: {
+						name: "A new name",
+						image: image,
+					},
+					executedAt: new Date(),
+				};
+				return updateLog;
 			});
 		});
 
@@ -472,7 +576,7 @@ describe(pushEndpoint, () => {
 		});
 
 		test("PUT create and delete in one request fails 400", async () => {
-			const member = makeMemberWithLog(new Date());
+			const member = makeMemberWithLog();
 
 			await putLogs(
 				[
@@ -489,7 +593,7 @@ describe(pushEndpoint, () => {
 		});
 
 		test("PUT update and delete in one request fails 400", async () => {
-			const member = makeMemberWithLog(new Date());
+			const member = makeMemberWithLog();
 
 			await putLog(member.createLog);
 			await putLogs(

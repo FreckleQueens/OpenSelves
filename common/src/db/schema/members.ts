@@ -14,8 +14,12 @@ export const members = pgTable(
 		name: text().notNull(),
 		pronouns: text().notNull(),
 		description: text().notNull(),
+
+		image: text(),
+
 		isArchived: boolean().notNull().default(false),
 		archivedReason: text(),
+
 		createdAt: timestamp().notNull(),
 		updatedAt: timestamp().notNull(),
 	},
