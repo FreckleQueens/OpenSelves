@@ -148,7 +148,7 @@ deadline or ETA
 - [ ] member profile picture
   - [x] simple URL field with reasonable length limit (allow data urls)
   - [x] allow "upload" of image by converting it to a data url
-  - [ ] cache images in IDB as data urls
+  - [ ] save a backup of remote images in IDB as data uris
   - [ ] upload larger image files to s3-compatible private object storage
 - [ ] member color
 

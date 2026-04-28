@@ -77,7 +77,6 @@
 			response = await call(forms[activeForm].endpoint, {
 				method: "POST",
 				data: forms[activeForm].data,
-				dontRefreshAuthOnUnauthorized: true,
 				returnRawResponse: true,
 			});
 

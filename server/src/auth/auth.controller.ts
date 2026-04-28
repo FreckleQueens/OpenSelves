@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
+import { SESSION_EXPIRED_ERROR } from "openselves-common";
 
 import { type ConfigData } from "../config.data.js";
 import { LoginDto } from "./data/login.dto.js";
@@ -55,22 +56,28 @@ export class AuthController {
 
 		const session = await this.sessionService.getSession({ token: refreshToken });
 		if (!session) {
-			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
+			throw new UnauthorizedException(SESSION_EXPIRED_ERROR, {
+				description: "Invalid token (session not found or token revoked)",
+			});
 		}
 
 		if (this.sessionService.hasSessionExpired(session)) {
-			throw new UnauthorizedException("Session expired");
+			throw new UnauthorizedException(SESSION_EXPIRED_ERROR, {
+				description: "Session expired",
+			});
 		}
 
-		if (session.user === null) {
-			throw new InternalServerErrorException("Session's user was not loaded with session");
+		const user = session.user;
+		if (user === null) {
+			throw new InternalServerErrorException("User was not loaded with old session");
 		}
 
 		const newSession = await this.sessionService.refreshSession(session.token);
 		if (!newSession) {
 			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
 		}
-		const accessToken = await this.sessionService.makeAccessToken(session.user);
+
+		const accessToken = await this.sessionService.makeAccessToken(user);
 		this.setAuthCookies(accessToken, newSession.token, response);
 		return {};
 	}

@@ -10,7 +10,7 @@ import {
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { TOKEN_EXPIRED_ERROR } from "openselves-common";
+import { SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "openselves-common";
 
 export const apiState = $state({
 	url:
@@ -29,13 +29,12 @@ export async function setServerUrl(newUrl: string) {
 export type CallOptions<RawResponse extends true | false> = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	data?: Record<string, unknown>;
-	dontRefreshAuthOnUnauthorized?: boolean;
 	returnRawResponse?: RawResponse;
 };
 
 export enum CallResult {
-	AUTH_FAILED,
 	API_UNREACHABLE,
+	SESSION_EXPIRED,
 	WRONG_VERSION,
 }
 
@@ -118,11 +117,22 @@ export async function callRaw(
 		}
 
 		if (response.status === 401 && responseBody.name === TOKEN_EXPIRED_ERROR) {
-			if (!options?.dontRefreshAuthOnUnauthorized && (await refreshAuth())) {
-				continue;
+			const authResponse = await fetch(`${apiState.url}/auth/refresh`, {
+				method: "POST",
+				credentials: "include",
+				headers: baseApiRequestHeaders,
+			});
+			const authResponseBody = await authResponse.json();
+			if (
+				!authResponse.ok &&
+				authResponse.status === 401 &&
+				authResponseBody.name === SESSION_EXPIRED_ERROR
+			) {
+				console.warn("Session expired with response", authResponseBody);
+				return CallResult.SESSION_EXPIRED;
 			}
 
-			return CallResult.AUTH_FAILED;
+			continue;
 		}
 
 		if (response.status === 406 && typeof responseBody.expectedVersion === "string") {
@@ -162,7 +172,7 @@ export async function call(
 	}
 
 	switch (result) {
-		case CallResult.AUTH_FAILED:
+		case CallResult.SESSION_EXPIRED:
 			await handleLogout();
 			return undefined;
 		case CallResult.API_UNREACHABLE:
@@ -194,15 +204,6 @@ async function isApiReachable(): Promise<boolean> {
 	}
 	console.debug("offline", debugData);
 	return false;
-}
-
-async function refreshAuth(): Promise<boolean> {
-	const response = await fetch(`${apiState.url}/auth/refresh`, {
-		method: "POST",
-		credentials: "include",
-		headers: baseApiRequestHeaders,
-	});
-	return response.ok;
 }
 
 export async function handleLogout() {

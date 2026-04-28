@@ -204,11 +204,12 @@ describe("Auth (e2e)", () => {
 
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
+				const oldAccessToken = extractCookie("accessToken", env.users.cookies);
+				const newAccessToken = extractCookie("accessToken", newCookies);
+				expect(newAccessToken).not.toBe(oldAccessToken);
+
 				const oldRefreshToken = extractCookie("refreshToken", env.users.cookies);
-				const newRefreshToken = extractCookie(
-					"refreshToken",
-					convertResponseCookiesToRequestCookies(response),
-				);
+				const newRefreshToken = extractCookie("refreshToken", newCookies);
 				expect(newRefreshToken).not.toBe(oldRefreshToken);
 
 				await env.request
@@ -219,6 +220,13 @@ describe("Auth (e2e)", () => {
 				// Old refresh token must be revoked
 				await testAuthRefreshFails(env.users.cookies, 401);
 
+				// New access token must work
+				await env.request
+					.get("/user/" + env.users.user.id)
+					.set("Cookie", newCookies)
+					.expect(200)
+					.expect("Content-Type", /json/);
+
 				// New refresh token must work
 				await env.request
 					.post("/auth/refresh")
@@ -227,25 +235,25 @@ describe("Auth (e2e)", () => {
 					.expect("Content-Type", /json/);
 			});
 
-			test("POST 401 invalid token", async () => {
+			test("POST 401 invalid refresh token", async () => {
 				await testAuthRefreshFails("refreshToken=notavalidtoken", 401);
 			});
 
-			test("POST 401 revoked token", async () => {
+			test("POST 401 revoked refresh token", async () => {
 				await env.request.post("/auth/logout").set("Cookie", env.users.cookies).expect(200);
 				await testAuthRefreshFails(env.users.cookies, 401);
 			});
 
-			test("POST 401 expired token", async () => {
+			test("POST 401 expired refresh token", async () => {
 				await makeRefreshTokenExpired();
 				await testAuthRefreshFails(env.users.cookies, 401);
 			});
 
-			test("POST 401 no token provided", async () => {
+			test("POST 401 no refresh token provided", async () => {
 				await testAuthRefreshFails("", 401);
 			});
 
-			test("POST 401 empty token", async () => {
+			test("POST 401 empty refresh token", async () => {
 				await testAuthRefreshFails("refreshToken=", 401);
 			});
 		});

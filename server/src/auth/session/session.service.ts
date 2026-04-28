@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { createId } from "@paralleldrive/cuid2";
 import { randomBytes } from "crypto";
 import { type RelationsFilterColumns, and, eq, gte } from "drizzle-orm";
 import { type PartialBy } from "openselves-common";
@@ -37,6 +38,8 @@ export class SessionService {
 	public async makeAccessToken(user: PartialBy<User, "passwordHash">) {
 		const { passwordHash, ...userWithoutPasswordHash } = user;
 		return await this.jwtService.signAsync<AccessTokenPayload>({
+			uniqueId: createId(),
+			timestampMs: Date.now(),
 			user: userWithoutPasswordHash,
 		});
 	}
@@ -52,13 +55,18 @@ export class SessionService {
 		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
 			infer: true,
 		});
-		return Date.now() - session.updatedAt.getTime() >= refreshTokenDuration * 1000;
+		const ttl = refreshTokenDuration * 1000;
+
+		const timeSinceLastUpdate = Date.now() - session.updatedAt.getTime();
+		return timeSinceLastUpdate >= ttl;
 	}
 
 	public async refreshSession(token: string): Promise<Session | undefined> {
 		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
 			infer: true,
 		});
+		const ttl = refreshTokenDuration * 1000;
+
 		const newToken = this.generateNewSessionToken();
 		return (
 			await this.db
@@ -67,7 +75,7 @@ export class SessionService {
 				.where(
 					and(
 						eq(sessions.token, token),
-						gte(sessions.updatedAt, new Date(Date.now() - refreshTokenDuration * 1000)),
+						gte(sessions.updatedAt, new Date(Date.now() - ttl)),
 					),
 				)
 				.returning()
