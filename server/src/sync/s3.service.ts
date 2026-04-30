@@ -31,6 +31,8 @@ class S3Transaction {
 			Bucket: this.bucketName,
 			Key: key,
 			Body: createReadStream(file.path),
+			ContentType: file.mimetype,
+			ContentLength: file.size,
 		});
 		this.uploadedFiles.push(key);
 		await this.client.send(command);
@@ -91,7 +93,6 @@ export class S3Service implements OnApplicationShutdown {
 		}
 	}
 
-	// TODO: attachment service get by key !!authenticated!!
 	public async getObject(key: string) {
 		if (!this.bucketName || !this.s3Client) {
 			throw new Error("S3 service is not available.");

@@ -601,7 +601,7 @@ export class SyncService {
 		};
 	}
 
-	async getLogsFrom(
+	public async getLogsFrom(
 		userId: User["id"],
 		timestamp: number,
 	): Promise<{
@@ -643,6 +643,10 @@ export class SyncService {
 				return newLog;
 			}),
 		};
+	}
+
+	public getLogAttachmentKey(userId: string, logId: string, key: string) {
+		return userId + "/" + logId + "/" + key;
 	}
 
 	private async uploadLogAttachments(
@@ -693,9 +697,5 @@ export class SyncService {
 				}
 			}
 		}
-	}
-
-	private getLogAttachmentKey(userId: string, logId: string, key: string) {
-		return userId + "/" + logId + "/" + key;
 	}
 }

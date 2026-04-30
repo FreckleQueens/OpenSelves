@@ -8,13 +8,14 @@ import path from "node:path";
 
 import { AppCommand } from "../AppCommand.js";
 import type { ConfigData } from "../config.data.js";
+import { AttachmentController } from "./attachment.controller.js";
 import { PushDtoTransformPipe } from "./data/push.dto.js";
 import { S3Service, S3_COMMAND } from "./s3.service.js";
 import { SyncController } from "./sync.controller.js";
 import { SyncService } from "./sync.service.js";
 
 @Module({
-	controllers: [SyncController],
+	controllers: [SyncController, AttachmentController],
 	providers: [
 		SyncService,
 		S3Service,

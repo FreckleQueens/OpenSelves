@@ -25,8 +25,8 @@ type FileToUpload = {
 const TEST_IMAGE_DATA_URL =
 	"data:image/png;base64," + fs.readFileSync("test/test_image_32x32.png").toString("base64");
 const LARGE_IMAGE_FILE_PATH = "test/test_image_512x512.png";
-const TEST_IMAGE_LONG_DATA_URL =
-	"data:image/png;base64," + fs.readFileSync(LARGE_IMAGE_FILE_PATH).toString("base64");
+const LARGE_IMAGE_CONTENT = fs.readFileSync(LARGE_IMAGE_FILE_PATH);
+const TEST_IMAGE_LONG_DATA_URL = "data:image/png;base64," + LARGE_IMAGE_CONTENT.toString("base64");
 
 describe(pushEndpoint, () => {
 	let env: TestEnv;
@@ -258,6 +258,8 @@ describe(pushEndpoint, () => {
 				},
 			]) {
 				test(testName, async () => {
+					const publicUrl = env.configService.getOrThrow("PUBLIC_URL", { infer: true });
+
 					const log = await testFn(
 						!image || typeof image === "string" ? image : undefined,
 					);
@@ -278,13 +280,7 @@ describe(pushEndpoint, () => {
 									buffer: createReadStream(image.path),
 								},
 							];
-							servedImage =
-								env.configService.getOrThrow("PUBLIC_URL", { infer: true }) +
-								"/attachment/" +
-								env.users.user.id +
-								"/" +
-								log.id +
-								"/image";
+							servedImage = `${publicUrl}/attachment/${env.users.user.id}/${log.id}/image`;
 						}
 					}
 
@@ -302,6 +298,21 @@ describe(pushEndpoint, () => {
 						await checkLogIsServed(servedLog);
 					} else {
 						await checkLogIsNotServed(servedLog);
+					}
+
+					if (pushedFiles?.length) {
+						const attachmentUrl = (servedImage as "string").slice(publicUrl.length);
+						await env.request.get(attachmentUrl).expect(401);
+						await env.request
+							.get(attachmentUrl)
+							.set("Cookie", env.users.cookies2)
+							.expect(404);
+						const response = await env.request
+							.get(attachmentUrl)
+							.set("Cookie", env.users.cookies)
+							.expect(200)
+							.expect("Content-Type", "image/png");
+						expect(response.body).toEqual(LARGE_IMAGE_CONTENT);
 					}
 				});
 			}
