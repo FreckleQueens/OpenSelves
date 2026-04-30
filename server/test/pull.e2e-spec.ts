@@ -198,12 +198,13 @@ describe("/sync/pull", () => {
 		test("initial sync 200", async () => {
 			const date = new Date();
 
+			const members = [...members1];
 			const logs = await callPullAndGetLogs("init", 200, env.users.cookies);
 
-			expect(logs.length).toBe(members1.length + 1);
-			for (let i = 0; i < members1.length; i++) {
+			expect(logs.length).toBe(members.length + 1);
+			for (let i = 0; i < members.length; i++) {
 				const log: Log = logs[i] as Log;
-				const member = members1[i];
+				const member = members[i];
 				expect(log).toMatchObject({
 					memberId: member.id,
 					operationType: "create",

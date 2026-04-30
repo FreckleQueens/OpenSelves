@@ -80,7 +80,7 @@ jobs:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
           ALLOWED_ORIGINS: http://127.0.0.1:4173
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
-          ACCESS_TOKEN_DURATION: 5
+          ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: 12345678
@@ -144,7 +144,7 @@ jobs:
           TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
           ALLOWED_ORIGINS: http://localhost
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
-          ACCESS_TOKEN_DURATION: 5
+          ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: notarealpassword
