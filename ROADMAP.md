@@ -148,7 +148,9 @@ deadline or ETA
 - [ ] member profile picture
   - [x] simple URL field with reasonable length limit (allow data urls)
   - [x] allow "upload" of image by converting it to a data url
-  - [ ] upload larger image files to s3-compatible private object storage
+  - [x] upload larger image files to s3-compatible private object storage
+  - [ ] delete attachments on update operation
+  - [ ] delete attachments on delete operation
 - [ ] member color
 
 ## 0.6.0 - Basic account features

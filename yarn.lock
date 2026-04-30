@@ -8618,6 +8618,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"filesize@npm:^11.0.17":
+  version: 11.0.17
+  resolution: "filesize@npm:11.0.17"
+  checksum: 10c0/c7d633559731c70e6400fd0f59d4bfef8e9ca44ee932276ee972bfa03eeab925dc7b8af5747b61a36ac2f04c03a3472c106d7e62797cd2c445ccdd8ed665d44a
+  languageName: node
+  linkType: hard
+
 "fill-range@npm:^7.1.1":
   version: 7.1.1
   resolution: "fill-range@npm:7.1.1"
@@ -11592,6 +11599,7 @@ __metadata:
     eslint: "npm:^10.2.0"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-svelte: "npm:^3.17.0"
+    filesize: "npm:^11.0.17"
     globals: "npm:^17.4.0"
     humanize-duration: "npm:^3.33.2"
     idb: "npm:^8.0.3"

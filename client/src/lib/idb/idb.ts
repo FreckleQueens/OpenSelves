@@ -1,3 +1,4 @@
+import { IDBAttachment } from "$lib/idb/IDBAttachment";
 import { IDBFront } from "$lib/idb/IDBFront";
 import { IDBLog } from "$lib/idb/IDBLog";
 import { IDBMember } from "$lib/idb/IDBMember";
@@ -35,6 +36,7 @@ export class IDB {
 
 	public readonly storageEntry: IDBStorageEntry = new IDBStorageEntry(this);
 	public readonly log: IDBLog = new IDBLog(this);
+	public readonly attachment: IDBAttachment = new IDBAttachment(this);
 	public readonly member: IDBMember = new IDBMember(this);
 	public readonly front: IDBFront = new IDBFront(this);
 	private db?: IDBDatabase;
@@ -151,6 +153,14 @@ export class IDB {
 				logsStore.createIndex("userId", "userId");
 
 				return storageEntriesStore.transaction;
+			}),
+			makeMigration((db) => {
+				const attachmentsStore = db.createObjectStore("attachments", {
+					keyPath: "id",
+				});
+				attachmentsStore.createIndex("id", "id", { unique: true });
+				attachmentsStore.createIndex("userId", "userId");
+				return attachmentsStore.transaction;
 			}),
 		];
 		const targetVersion = migrations.length;

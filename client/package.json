@@ -62,6 +62,7 @@
 		"@capacitor/core": "^8.3.0",
 		"@paralleldrive/cuid2": "^3.3.0",
 		"@tailwindcss/vite": "^4.2.2",
+		"filesize": "^11.0.17",
 		"humanize-duration": "^3.33.2",
 		"idb": "^8.0.3",
 		"is-url": "^1.2.4",

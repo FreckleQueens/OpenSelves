@@ -16,6 +16,7 @@ export class StatusController {
 			version: this.configService.getOrThrow("_APP_VERSION", {
 				infer: true,
 			}),
+			maxUploadSize: this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
 		};
 	}
 }

@@ -1,6 +1,11 @@
 import { APP_VERSION } from "$lib";
 import { IDBStorage, PersistentStorage } from "$lib/PersistentStorage";
-import { SERVER_URL_STORAGE_KEY, apiState } from "$lib/api.svelte";
+import {
+	SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY,
+	SERVER_URL_STORAGE_KEY,
+	apiState,
+	scheduleOnlineCheck,
+} from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
 import { DEFAULT_LOCALE } from "$lib/i18n/i18n";
 import { LOCALE_STORAGE_KEY, setLocale } from "$lib/i18n/i18n-client";
@@ -15,6 +20,7 @@ export async function initApp() {
 
 	// Persistent storage
 	await PersistentStorage.setInstance(new IDBStorage());
+	const storage = PersistentStorage.getInstance();
 
 	// SyncWorker
 	SyncWorker.initialize(appState.isAuthenticated && navigator.onLine);
@@ -29,14 +35,18 @@ export async function initApp() {
 	});
 
 	// i18n
-	await setLocale(
-		(await PersistentStorage.getInstance().getRaw(LOCALE_STORAGE_KEY)) || DEFAULT_LOCALE,
-		false,
-	);
+	await setLocale((await storage.getRaw(LOCALE_STORAGE_KEY)) || DEFAULT_LOCALE, false);
 
 	// Server url
-	const storedUrl = await PersistentStorage.getInstance().getRaw(SERVER_URL_STORAGE_KEY);
+	const storedUrl = await storage.getRaw(SERVER_URL_STORAGE_KEY);
 	if (storedUrl) {
 		apiState.url = storedUrl;
+	}
+
+	const storedMaxUploadSize = await storage.getRaw(SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY);
+	if (typeof storedMaxUploadSize === "string") {
+		apiState.maxUploadSize = parseInt(storedMaxUploadSize);
+	} else {
+		scheduleOnlineCheck(0);
 	}
 }

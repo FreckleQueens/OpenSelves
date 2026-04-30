@@ -212,6 +212,7 @@ export abstract class IDBSyncedModel<Model extends SyncedModelBase> extends IDBM
 	}
 
 	protected abstract getLogIdKey(): keyof Log & string;
+	protected abstract generateUniquePrimaryKey(): string;
 
 	protected onDeleteCascade<T extends SyncedModelBase>(
 		model: () => IDBSyncedModel<T>,

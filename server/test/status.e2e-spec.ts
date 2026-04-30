@@ -24,6 +24,9 @@ describe("/status", () => {
 		expect(typeof response.body.version).toBe("string");
 		expect(response.body.version).toMatch(/^((([1-9][0-9]*)|0)\.){2}(([1-9][0-9]*)|0)$/);
 		expect(response.body.version).toBe(rootPackage.version);
+		expect(response.body.maxUploadSize).toBe(
+			env.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
+		);
 	});
 
 	test("GET incorrect version", async () => {

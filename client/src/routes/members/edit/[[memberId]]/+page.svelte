@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { PersistentStorage } from "$lib/PersistentStorage";
+	import { apiState } from "$lib/api.svelte";
 	import MemberImage from "$lib/components/MemberImage.svelte";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
+	import ClearIcon from "$lib/components/icons/ClearIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
 	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import ImageIcon from "$lib/components/icons/ImageIcon.svelte";
@@ -13,8 +15,11 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import UploadIcon from "$lib/components/icons/UploadIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
+	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { requireAuth } from "$lib/routing-utils";
+	import { createId } from "@paralleldrive/cuid2";
+	import { filesize } from "filesize";
 	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
@@ -48,6 +53,7 @@
 	let editImageUrl = $state(false);
 	let imageFiles: FileList | undefined = $state();
 	let imageFileInputEl: HTMLInputElement | undefined = $state();
+	let attachedImage: File | null = $state(null);
 	let deleteRecordButton: Snippet | null = $state(null);
 
 	requireAuth();
@@ -72,15 +78,36 @@
 			return;
 		}
 
+		const maxDataUrlSize = 8192;
+		const maxSizeForDataUrl = (maxDataUrlSize * 3) / 4;
+		const maxFileSize = Math.max(apiState.maxUploadSize || 0, maxSizeForDataUrl);
+		if (file.size > maxFileSize) {
+			formState.errors["image"] = t(
+				"This file is too big! (max {file.size})",
+				filesize(maxFileSize, {
+					locale: localeState.locale || true,
+				}),
+			);
+			return;
+		}
+
 		const reader = new FileReader();
 		reader.onload = () => {
 			const result = reader.result?.toString() || "";
 			if (result) {
-				if (result.length <= 8192) {
+				formState.errors["image"] = "";
+				if (result.length <= maxSizeForDataUrl) {
 					member.image = result;
-					formState.errors["image"] = "";
+				} else if (result.length <= maxFileSize) {
+					member.image = "attachment:" + result;
+					attachedImage = file;
 				} else {
-					formState.errors["image"] = t("This file is too big! (max 8kB)");
+					formState.errors["image"] = t(
+						"This file is too big! (max {file.size})",
+						filesize(maxFileSize, {
+							locale: localeState.locale || true,
+						}),
+					);
 				}
 			} else {
 				formState.errors["image"] = t("Error while loading file {file.name}", file.name);
@@ -97,13 +124,26 @@
 	async function saveMember() {
 		const userId = storage.getUserId();
 
-		const image = member.image ? member.image : null;
+		let image = member.image ? member.image : null;
 		if (image) {
 			if (image.startsWith("data:")) {
 				if (!isDataURI(image)) {
 					formState.errors["image"] = t("Image url must be a valid data uri");
 					return false;
 				}
+			} else if (image.startsWith("attachment:")) {
+				if (!attachedImage) {
+					throw new Error("Attached image null");
+				}
+
+				const attachmentId = createId();
+				const dataUri = image.slice("attachment:".length);
+				image = "attachment:" + attachmentId;
+				await IDB.getInstance().attachment.put(attachmentId, {
+					userId: PersistentStorage.getInstance().getUserId(),
+					file: attachedImage,
+					dataUri,
+				});
 			} else {
 				let isValidUrl: boolean;
 				try {
@@ -161,7 +201,7 @@
 	bind:deleteRecordButton
 >
 	<Block class={"flex flex-col items-stretch" + (activeTab !== "info" ? " hidden" : "")}>
-		<MemberImage {member} class="w-6/12 self-center relative">
+		<MemberImage {member} class="w-6/12 self-center relative rounded-xl!">
 			<div class="absolute bottom-2 right-2" transition:fly={{ y: 50, duration: 150 }}>
 				<Button
 					id="edit-image-url-button"
@@ -175,6 +215,9 @@
 		</MemberImage>
 
 		<List class={editImageUrl ? "" : "hidden"}>
+			{@const disabled = !!["attachment:", "data:", `${apiState.url}/attachment/`].find(
+				(prefix) => member.image?.startsWith(prefix),
+			)}
 			<ListInput
 				type="url"
 				name="image"
@@ -183,6 +226,8 @@
 				maxlength="8192"
 				bind:value={member.image}
 				error={formState.errors["image"] || ""}
+				{disabled}
+				class={disabled ? "hidden" : ""}
 			>
 				{#snippet media()}
 					<ImageIcon input />
@@ -190,9 +235,27 @@
 			</ListInput>
 
 			<li class="m-4 text-center">
+				<div class:hidden={!disabled} class="text-brand-red">
+					{formState.errors["image"] || ""}
+				</div>
 				<Button
 					inline
 					tonal
+					class={"m-2" + ((member.image?.length || 0) > 0 ? "" : " hidden")}
+					type="button"
+					onclick={() => {
+						member.image = null;
+						formState.errors["image"] = "";
+					}}
+				>
+					<ClearIcon button before />
+					Remove image
+				</Button>
+
+				<Button
+					inline
+					tonal
+					class="m-2"
 					type="button"
 					onclick={() => {
 						imageFileInputEl?.click();

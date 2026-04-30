@@ -9,26 +9,41 @@ import {
 } from "$env/static/public";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
+import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "openselves-common";
 
-export const apiState = $state({
+export const apiState: {
+	url: string;
+	maxUploadSize: number | undefined;
+} = $state({
 	url:
 		dev || PUBLIC_TEST_ENVIRONMENT === "1"
 			? PUBLIC_DEFAULT_API_URL_DEV
 			: PUBLIC_DEFAULT_API_URL,
+	maxUploadSize: undefined,
 });
 
 export const SERVER_URL_STORAGE_KEY = "serverUrl";
+export const SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY = "maxUploadSize";
 
 export async function setServerUrl(newUrl: string) {
 	apiState.url = newUrl;
 	await PersistentStorage.getInstance().setRaw(SERVER_URL_STORAGE_KEY, newUrl);
 }
 
+export async function setMaxUploadSize(maxUploadSize: number) {
+	apiState.maxUploadSize = maxUploadSize;
+	await PersistentStorage.getInstance().setRaw(
+		SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY,
+		maxUploadSize.toString(),
+	);
+}
+
 export type CallOptions<RawResponse extends true | false> = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	data?: Record<string, unknown>;
+	attachments?: Attachment[];
 	returnRawResponse?: RawResponse;
 };
 
@@ -59,16 +74,33 @@ export async function callRaw(
 	path: string,
 	options?: CallOptions<true | false>,
 ): Promise<CallResult | Response | Record<string, unknown>> {
+	const isFileUpload = (options?.attachments?.length || 0) > 0;
+
 	const headers: Record<string, string> = { ...baseApiRequestHeaders };
-	if (options?.data) {
+	if (options?.data && !isFileUpload) {
 		headers["Content-Type"] = "application/json";
+	}
+
+	let body: BodyInit | null;
+	if (isFileUpload) {
+		body = new FormData();
+		if (options?.data) {
+			for (const [key, val] of Object.entries(options.data)) {
+				body.append(key, JSON.stringify(val));
+			}
+		}
+		for (const attachment of options?.attachments || []) {
+			body.append("attachments[]", attachment.file, attachment.id);
+		}
+	} else {
+		body = options?.data ? JSON.stringify(options?.data) : null;
 	}
 
 	const fetchInit: RequestInit = {
 		method: options?.method || "GET",
 		headers: headers,
 		credentials: "include",
-		body: options?.data ? JSON.stringify(options?.data) : null,
+		body,
 	};
 
 	const tryFetch = async () => await fetch(`${apiState.url}${path}`, fetchInit);
@@ -194,6 +226,7 @@ async function isApiReachable(): Promise<boolean> {
 			const responseBody = await response.json();
 			if (responseBody.ready === true && responseBody.version === PUBLIC_APP_VERSION) {
 				console.debug("online");
+				await setMaxUploadSize(responseBody.maxUploadSize);
 				return true;
 			}
 			debugData.push(responseBody);

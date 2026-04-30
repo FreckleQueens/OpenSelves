@@ -16,6 +16,7 @@ const ASSETS = [
 	...files, // everything in `static`
 	...prerendered, // all prerendered routes (SPA...)
 ];
+const CACHE_FIRST_PATHS = ["/attachment"];
 
 self.addEventListener("install", async (event) => {
 	console.debug("install");
@@ -52,10 +53,11 @@ self.addEventListener("fetch", (event) => {
 
 				if (
 					!["/service-worker.ts", "/manifest.json"].includes(url.pathname) &&
-					ASSETS.includes(url.pathname)
+					(ASSETS.includes(url.pathname) ||
+						CACHE_FIRST_PATHS.find((path) => url.pathname.startsWith(path)))
 				) {
 					const response = await cache.match(url.pathname);
-					console.debug("asset cache hit", url.pathname);
+					console.debug("cache-first hit", url.pathname);
 
 					if (response) {
 						return response;

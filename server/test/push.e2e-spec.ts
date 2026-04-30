@@ -95,9 +95,7 @@ describe(pushEndpoint, () => {
 	) {
 		let request = env.request.put(pushEndpoint).set("Cookie", cookies);
 		if (files.length > 0) {
-			request = request.field("logs", JSON.stringify(logs), {
-				contentType: "application/json",
-			});
+			request = request.field("logs", JSON.stringify(logs));
 			for (const file of files) {
 				request = request.attach(file.fieldName, file.buffer, {
 					filename: file.name,

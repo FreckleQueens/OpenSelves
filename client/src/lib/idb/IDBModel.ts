@@ -49,7 +49,6 @@ export abstract class IDBModel<Model extends ModelBase, PrimaryKey extends keyof
 		});
 	}
 
-	protected abstract generateUniquePrimaryKey(): string;
 	protected abstract getDrizzleModel(): Record<keyof Model, DBColumn>;
 	protected stripDrizzleFromModel<
 		R extends Record<"_" | "$inferSelect" | "$inferInsert" | "enableRLS", unknown>,
@@ -145,6 +144,20 @@ export abstract class IDBModel<Model extends ModelBase, PrimaryKey extends keyof
 					);
 				} else {
 					out[key] = date;
+					continue;
+				}
+			}
+
+			if (column.dataType === "object buffer") {
+				if (!(record[key] instanceof Blob)) {
+					throw new Error(
+						`${this.storeName} record[${key}]="${record[key]}" is an invalid Blob`,
+						{
+							cause: record,
+						},
+					);
+				} else {
+					out[key] = record[key];
 					continue;
 				}
 			}

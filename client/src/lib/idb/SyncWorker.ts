@@ -150,7 +150,22 @@ export class SyncWorker {
 			})
 			.sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
 
+		const pendingAttachments = (await idb.attachment.getByField("userId", userId)).filter(
+			(attachment) =>
+				pendingLogs.find(
+					(log) =>
+						log.data &&
+						Object.values(log.data).find(
+							(val) =>
+								typeof val === "string" &&
+								val.startsWith("attachment:") &&
+								val.split(":", 2)[1] === attachment.id,
+						),
+				),
+		);
+
 		console.debug("Logs to push:", formattedLogs);
+		console.debug("Attachments to push:", pendingAttachments);
 
 		if (formattedLogs.length > 0) {
 			const response = await call("/sync/push", {
@@ -158,6 +173,7 @@ export class SyncWorker {
 				data: {
 					logs: formattedLogs,
 				},
+				attachments: pendingAttachments,
 			});
 
 			if (!response || typeof response !== "object") {
@@ -165,7 +181,14 @@ export class SyncWorker {
 				return false;
 			}
 
-			await idb.log.delete(formattedLogs.map((log) => log.id));
+			await idb.transaction(["logs", "attachments"], async (tx) => {
+				for (const id of formattedLogs.map((log) => log.id)) {
+					await tx.delete("logs", id);
+				}
+				for (const id of pendingAttachments.map((attachment) => attachment.id)) {
+					await tx.delete("attachments", id);
+				}
+			});
 		}
 
 		if ((await idb.log.getByField("userId", userId)).length === 0) {
