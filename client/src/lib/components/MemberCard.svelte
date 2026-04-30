@@ -44,12 +44,12 @@
 	<div class="flex-1">
 		<!-- TODO: touch ripple -->
 		<Card raised class="member-card my-4 mx-0! cursor-pointer" onclick={onLinkClick}>
-			<div class={`flex items-center ${small ? "h-5" : "h-10"}`}>
+			<div class={`flex items-center ${small ? "h-10" : "h-14"}`}>
 				<div class="self-stretch mr-2 flex-0">
 					<MemberImage class="h-full" {member} />
 				</div>
 
-				<div class="flex-1">
+				<div class="flex-1 ml-1">
 					<p>{member.name}</p>
 					{#if !small}
 						<p class="opacity-70">{member.pronouns}</p>
@@ -75,7 +75,9 @@
 			</div>
 
 			{#if chips || secondaryActions}
-				<div class="flex flex-wrap-reverse gap-4 items-center pt-4">
+				<div
+					class="chips-and-secondary-actions flex flex-wrap-reverse gap-4 items-center pt-4"
+				>
 					{#if chips}
 						<div class="min-w-max">
 							{@render chips()}
@@ -112,3 +114,9 @@
 		</Card>
 	</div>
 </div>
+
+<style lang="scss">
+	:global .member-entry:not(:has(.chips-and-secondary-actions)) .member-card > * {
+		padding: calc(var(--spacing) * 2);
+	}
+</style>
