@@ -8,7 +8,7 @@ import {
 	S3Client,
 } from "@aws-sdk/client-s3";
 import { confirm } from "@inquirer/prompts";
-import { Injectable } from "@nestjs/common";
+import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createReadStream } from "node:fs";
 
@@ -18,11 +18,15 @@ import type { ConfigData } from "../config.data.js";
 class S3Transaction {
 	private readonly uploadedFiles: string[] = [];
 	constructor(
-		private readonly bucketName: string,
-		private readonly client: S3Client,
+		private readonly bucketName?: string,
+		private readonly client?: S3Client,
 	) {}
 
 	public async uploadFile(file: Express.Multer.File, key: string) {
+		if (!this.bucketName || !this.client) {
+			throw new Error("S3 service is not available.");
+		}
+
 		const command = new PutObjectCommand({
 			Bucket: this.bucketName,
 			Key: key,
@@ -37,6 +41,10 @@ class S3Transaction {
 	}
 
 	async rollback() {
+		if (!this.bucketName || !this.client) {
+			return;
+		}
+
 		for (const key of this.uploadedFiles) {
 			const command = new DeleteObjectCommand({
 				Bucket: this.bucketName,
@@ -48,12 +56,16 @@ class S3Transaction {
 }
 
 @Injectable()
-export class S3Service {
-	private readonly bucketName: string;
-	private readonly s3Client: S3Client;
+export class S3Service implements OnApplicationShutdown {
+	private readonly bucketName?: string;
+	private readonly s3Client?: S3Client;
 
 	constructor(private readonly configService: ConfigService<ConfigData>) {
-		// TODO: make S3 config optional
+		const maxUploadSize = configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true });
+		if (maxUploadSize === 0) {
+			return;
+		}
+
 		this.bucketName = configService.getOrThrow("S3_BUCKET", { infer: true });
 		this.s3Client = new S3Client({
 			endpoint: configService.getOrThrow("S3_ENDPOINT", { infer: true }),
@@ -63,6 +75,10 @@ export class S3Service {
 				secretAccessKey: configService.getOrThrow("S3_SECRET_KEY", { infer: true }),
 			},
 		});
+	}
+
+	public onApplicationShutdown() {
+		this.s3Client?.destroy();
 	}
 
 	public async transaction(callback: (tx: S3Transaction) => Promise<void>) {
@@ -77,6 +93,10 @@ export class S3Service {
 
 	// TODO: attachment service get by key !!authenticated!!
 	public async getObject(key: string) {
+		if (!this.bucketName || !this.s3Client) {
+			throw new Error("S3 service is not available.");
+		}
+
 		return this.s3Client.send(
 			new GetObjectCommand({
 				Bucket: this.bucketName,
@@ -90,6 +110,10 @@ export class S3Service {
 			throw new Error(
 				"This command is only available in development environment! Using this in production *will* wipe your configured s3 bucket.",
 			);
+		}
+
+		if (!this.bucketName || !this.s3Client) {
+			throw new Error("S3 service is not available.");
 		}
 
 		if (!silent) {

@@ -21,12 +21,12 @@ export interface ConfigData {
 	REGISTRATION_PASSWORD: string;
 
 	MAX_UPLOAD_SIZE: number;
-	TMP_UPLOAD_DIR: string;
-	S3_REGION: string;
-	S3_ENDPOINT: string;
-	S3_BUCKET: string;
-	S3_ACCESS_KEY: string;
-	S3_SECRET_KEY: string;
+	TMP_UPLOAD_DIR?: string;
+	S3_REGION?: string;
+	S3_ENDPOINT?: string;
+	S3_BUCKET?: string;
+	S3_ACCESS_KEY?: string;
+	S3_SECRET_KEY?: string;
 
 	_APP_VERSION: string;
 }
@@ -86,7 +86,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.required": "Please set REGISTER_PASSWORD environment variable to secure random string",
 	}),
 
-	MAX_UPLOAD_SIZE: Joi.number().min(1).required(),
+	MAX_UPLOAD_SIZE: Joi.number().min(0).default(0),
 	TMP_UPLOAD_DIR: Joi.string(),
 	S3_REGION: Joi.string(),
 	S3_ENDPOINT: Joi.string().uri(),

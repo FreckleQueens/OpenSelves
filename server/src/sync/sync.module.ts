@@ -32,8 +32,10 @@ import { SyncService } from "./sync.service.js";
 			inject: [ConfigService],
 			useFactory: (configService: ConfigService<ConfigData>) => {
 				let storage: StorageEngine | undefined = undefined;
+
+				const maxUploadSize = configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true });
 				const tmpUploadDirRawValue = configService.get("TMP_UPLOAD_DIR", { infer: true });
-				if (tmpUploadDirRawValue) {
+				if (maxUploadSize !== 0 && tmpUploadDirRawValue) {
 					const tmpUploadDir = path.resolve(tmpUploadDirRawValue);
 
 					if (!fs.existsSync(tmpUploadDir)) {
