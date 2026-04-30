@@ -12,20 +12,20 @@
 		member,
 		class: classNames,
 		...restProps
-	}: { children?: Snippet; member: Omit<Member, "userId">; class?: string } = $props();
+	}: { children?: Snippet; member?: Omit<Member, "userId">; class?: string } = $props();
 
 	let attachments: Attachment[] = $state([]);
 
 	let memberImageUrl = $derived.by(() => {
-		if (member.image?.startsWith("attachment:")) {
-			const data = member.image.slice("attachment:".length);
+		if (member?.image?.startsWith("attachment:")) {
+			const data = member?.image.slice("attachment:".length);
 			if (data.startsWith("data:")) {
 				return data;
 			} else {
 				return attachments.find((attachment) => attachment.id === data)?.dataUri;
 			}
 		}
-		return member.image;
+		return member?.image;
 	});
 
 	let showChildren = $state(false);
@@ -55,7 +55,7 @@
 	}}
 	{...restProps}
 >
-	{#if memberImageUrl}
+	{#if member && memberImageUrl}
 		<img
 			src={memberImageUrl}
 			alt={t("{member.name}'s profile picture", member.name)}
