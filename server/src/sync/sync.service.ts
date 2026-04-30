@@ -5,6 +5,7 @@ import {
 	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { createId } from "@paralleldrive/cuid2";
 import { DrizzleQueryError, SQL, and, eq, inArray, sql } from "drizzle-orm";
 import { PgAsyncTransaction } from "drizzle-orm/pg-core";
@@ -23,6 +24,7 @@ import {
 	type relations,
 } from "openselves-common/db";
 
+import type { ConfigData } from "../config.data.js";
 import { InjectDb } from "../db/db.service.js";
 import type { DB } from "../db/drizzle.js";
 import {
@@ -32,6 +34,7 @@ import {
 	PushLogDto,
 	type UpdateOperation,
 } from "./data/push.dto.js";
+import { S3Service } from "./s3.service.js";
 
 type SyncedModelParams<T extends TableMap = TableMap> = {
 	name: T["table"];
@@ -98,9 +101,17 @@ type RecordsToDelete<T extends TableMap = TableMap> = {
 
 @Injectable()
 export class SyncService {
-	constructor(@InjectDb() private readonly db: DB) {}
+	constructor(
+		@InjectDb() private readonly db: DB,
+		private readonly configService: ConfigService<ConfigData>,
+		private readonly s3Service: S3Service,
+	) {}
 
-	public async reduceAndSaveLogs(userId: string, logDtos: PushLogDto[]): Promise<void> {
+	public async reduceAndSaveLogs(
+		userId: string,
+		logDtos: PushLogDto[],
+		attachments: Express.Multer.File[],
+	): Promise<void> {
 		try {
 			await this.db.transaction(async (tx) => {
 				const alreadyPushedLogs: Log[] = await tx.query.logs.findMany({
@@ -117,24 +128,26 @@ export class SyncService {
 					return;
 				}
 
-				await this.tryCreateRecords(tx, userId, recordsToCreate);
-				await this.tryUpdateRecords(tx, userId, recordsToUpdate);
-				await this.tryDeleteRecords(tx, userId, recordsToDelete);
+				await this.uploadLogAttachments(userId, logsToSave, attachments, async () => {
+					await this.tryCreateRecords(tx, userId, recordsToCreate);
+					await this.tryUpdateRecords(tx, userId, recordsToUpdate);
+					await this.tryDeleteRecords(tx, userId, recordsToDelete);
 
-				const savedLogs = await tx
-					.insert(logs)
-					.values(
-						logsToSave.map((log) => ({
-							...log,
-							userId,
-							pushedAt: sql`CURRENT_TIMESTAMP`,
-						})),
-					)
-					.returning();
+					const savedLogs = await tx
+						.insert(logs)
+						.values(
+							logsToSave.map((log) => ({
+								...log,
+								userId,
+								pushedAt: sql`CURRENT_TIMESTAMP`,
+							})),
+						)
+						.returning();
 
-				if (savedLogs.length !== logsToSave.length) {
-					throw new InternalServerErrorException("Not all logs were saved");
-				}
+					if (savedLogs.length !== logsToSave.length) {
+						throw new InternalServerErrorException("Not all logs were saved");
+					}
+				});
 			});
 		} catch (error) {
 			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
@@ -580,6 +593,8 @@ export class SyncService {
 
 		logs.push(...user.logs.filter((log) => log.operationType === "delete"));
 
+		this.mapLogDataAttachmentsUrls(logs);
+
 		return {
 			timestamp: returnedTimestamp.getTime(),
 			logs,
@@ -607,6 +622,7 @@ export class SyncService {
 				queryTime: sql`CURRENT_TIMESTAMP`,
 			},
 		});
+
 		let returnedTimestamp = timestamp;
 		if (logs.length > 0) {
 			const queryTime = logs[logs.length - 1].queryTime;
@@ -617,6 +633,9 @@ export class SyncService {
 			}
 			returnedTimestamp = new Date(queryTime).getTime();
 		}
+
+		this.mapLogDataAttachmentsUrls(logs);
+
 		return {
 			timestamp: returnedTimestamp,
 			logs: logs.map((log) => {
@@ -624,5 +643,59 @@ export class SyncService {
 				return newLog;
 			}),
 		};
+	}
+
+	private async uploadLogAttachments(
+		userId: string,
+		logsToSave: LogToSave[],
+		attachments: Express.Multer.File[],
+		callback: () => Promise<void>,
+	) {
+		await this.s3Service.transaction(async (tx) => {
+			for (const log of logsToSave) {
+				if (log.data) {
+					for (const [key, value] of Object.entries(log.data)) {
+						if (typeof value === "string" && value.startsWith("attachment:")) {
+							const attachmentName = value.split(":", 2)[1];
+							const attachment = attachments.find(
+								(attachment) => attachment.originalname === attachmentName,
+							);
+							if (!attachment) {
+								throw new BadRequestException(
+									"Log contained reference to attachment that was not uploaded: " +
+										attachmentName,
+								);
+							}
+							await tx.uploadFile(
+								attachment,
+								this.getLogAttachmentKey(userId, log.id, key),
+							);
+						}
+					}
+				}
+			}
+
+			await callback();
+		});
+	}
+
+	private mapLogDataAttachmentsUrls(logs: Log[]) {
+		const publicUrl = this.configService.getOrThrow("PUBLIC_URL", { infer: true });
+		for (const log of logs) {
+			if (log.data) {
+				for (const [key, value] of Object.entries(log.data)) {
+					if (typeof value === "string" && value.startsWith("attachment:")) {
+						log.data[key] =
+							publicUrl +
+							"/attachment/" +
+							this.getLogAttachmentKey(log.userId, log.id, key);
+					}
+				}
+			}
+		}
+	}
+
+	private getLogAttachmentKey(userId: string, logId: string, key: string) {
+		return userId + "/" + logId + "/" + key;
 	}
 }

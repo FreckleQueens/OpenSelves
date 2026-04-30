@@ -1,3 +1,7 @@
+import type {
+	ArgumentMetadata,
+	PipeTransform,
+} from "@nestjs/common/interfaces/features/pipe-transform.interface.js";
 import { Type } from "class-transformer";
 import {
 	ArrayMinSize,
@@ -83,7 +87,10 @@ export class PushCreateMemberDto
 			return typeof value === "string" && value.startsWith("data:");
 		},
 	})
-	@ValidateIf((object, value) => value !== null)
+	@ValidateIf(
+		(object, value) =>
+			value !== null && !(typeof value === "string" && value.startsWith("attachment:")),
+	)
 	public readonly image?: string | null;
 
 	@IsBoolean()
@@ -167,7 +174,10 @@ export class PushUpdateMemberDto
 			return typeof value === "string" && value.startsWith("data:");
 		},
 	})
-	@ValidateIf((object, value) => value !== null)
+	@ValidateIf(
+		(object, value) =>
+			value !== null && !(typeof value === "string" && value.startsWith("attachment:")),
+	)
 	public readonly image?: string | null;
 
 	@IsOptional()
@@ -220,13 +230,13 @@ export class PushUpdateFrontDto
 
 export type CreateOperation = {
 	type: "create";
-	data: PushCreateMemberDto;
+	data: PushCreateMemberDto | PushCreateFrontDto;
 	recordId: string | null;
 	deletedId: null;
 };
 export type UpdateOperation = {
 	type: "update";
-	data: PushUpdateMemberDto;
+	data: PushUpdateMemberDto | PushUpdateFrontDto;
 	recordId: string | null;
 	deletedId: null;
 };
@@ -328,4 +338,16 @@ export class PushDto {
 	@ValidateNested({ each: true })
 	@Type(() => PushLogDto)
 	public readonly logs!: PushLogDto[];
+}
+
+export class PushDtoTransformPipe implements PipeTransform<unknown, unknown> {
+	transform(value: unknown, metadata: ArgumentMetadata): unknown {
+		const output = value;
+		if (metadata.metatype === PushDto) {
+			if (output && typeof output === "object" && typeof output["logs"] === "string") {
+				output["logs"] = JSON.parse(output["logs"]) as unknown;
+			}
+		}
+		return value;
+	}
 }

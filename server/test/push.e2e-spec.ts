@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
+import { type ReadStream, createReadStream } from "node:fs";
 import type { FrontCreate, Log, Member, MemberCreate } from "openselves-common/db";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
@@ -14,10 +15,18 @@ type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId" | "fr
 };
 type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt">;
 
+type FileToUpload = {
+	fieldName: string;
+	name: string;
+	buffer: Buffer | ReadStream;
+	contentType?: string;
+};
+
 const TEST_IMAGE_DATA_URL =
 	"data:image/png;base64," + fs.readFileSync("test/test_image_32x32.png").toString("base64");
+const LARGE_IMAGE_FILE_PATH = "test/test_image_512x512.png";
 const TEST_IMAGE_LONG_DATA_URL =
-	"data:image/png;base64," + fs.readFileSync("test/test_image_512x512.png").toString("base64");
+	"data:image/png;base64," + fs.readFileSync(LARGE_IMAGE_FILE_PATH).toString("base64");
 
 describe(pushEndpoint, () => {
 	let env: TestEnv;
@@ -73,23 +82,34 @@ describe(pushEndpoint, () => {
 		log: ClientLog,
 		expect: number = 200,
 		cookies: string = env.users.cookies,
+		files: FileToUpload[] = [],
 	) {
-		return putLogs([log], expect, cookies);
+		return putLogs([log], expect, cookies, files);
 	}
 
 	async function putLogs(
 		logs: ClientLog[],
 		expect: number = 200,
 		cookies: string = env.users.cookies,
+		files: FileToUpload[] = [],
 	) {
-		return env.request
-			.put(pushEndpoint)
-			.send({
+		let request = env.request.put(pushEndpoint).set("Cookie", cookies);
+		if (files.length > 0) {
+			request = request.field("logs", JSON.stringify(logs), {
+				contentType: "application/json",
+			});
+			for (const file of files) {
+				request = request.attach(file.fieldName, file.buffer, {
+					filename: file.name,
+					contentType: file.contentType,
+				});
+			}
+		} else {
+			request = request.send({
 				logs: logs,
-			})
-			.set("Cookie", cookies)
-			.expect(expect)
-			.expect("Content-Type", /json/);
+			});
+		}
+		return request.expect(expect).expect("Content-Type", /json/);
 	}
 
 	async function createMember() {
@@ -179,66 +199,109 @@ describe(pushEndpoint, () => {
 
 	function testImage(testFn: (image: string | null | undefined) => Promise<ClientLog>) {
 		describe("image", () => {
-			for (const { testName, image, expect, isServed } of [
+			for (const { testName, image, expectCode, isServed } of [
 				{
 					testName: "valid http url 200",
 					image: "http://example.com/image.png",
-					expect: 200,
+					expectCode: 200,
 					isServed: true,
 				},
 				{
 					testName: "data url (<8kB) 200",
 					image: TEST_IMAGE_DATA_URL,
-					expect: 200,
+					expectCode: 200,
 					isServed: true,
 				},
 				{
 					testName: "undefined 200",
 					image: undefined,
-					expect: 200,
+					expectCode: 200,
 					isServed: true,
 				},
 				{
 					testName: "null 200",
 					image: null,
-					expect: 200,
+					expectCode: 200,
+					isServed: true,
+				},
+				{
+					testName: "file upload 200",
+					image: {
+						path: LARGE_IMAGE_FILE_PATH,
+					},
+					expectCode: 200,
 					isServed: true,
 				},
 				{
 					testName: "data url too long (>8kB) 400",
 					image: TEST_IMAGE_LONG_DATA_URL,
-					expect: 400,
+					expectCode: 400,
 					isServed: false,
 				},
 				{
 					testName: "invalid data url 400",
 					image: "data:notavaliddataurl",
-					expect: 400,
+					expectCode: 400,
 					isServed: false,
 				},
 				{
 					testName: "empty string 400",
 					image: "",
-					expect: 400,
+					expectCode: 400,
 					isServed: false,
 				},
 				{
 					testName: "invalid url 400",
 					image: "invalid url",
-					expect: 400,
+					expectCode: 400,
 					isServed: false,
 				},
 			]) {
 				test(testName, async () => {
-					const log = await testFn(image);
-					if (log.data && typeof log.data === "object" && image === undefined) {
-						delete log.data["image"];
+					const log = await testFn(
+						!image || typeof image === "string" ? image : undefined,
+					);
+
+					let pushedFiles: FileToUpload[] | undefined = undefined;
+					let servedImage = image;
+
+					if (log.data && typeof log.data === "object") {
+						if (image === undefined) {
+							delete log.data["image"];
+						} else if (image && typeof image === "object" && image.path) {
+							const attachmentId = createId();
+							log.data["image"] = "attachment:" + attachmentId;
+							pushedFiles = [
+								{
+									fieldName: "attachments[]",
+									name: attachmentId,
+									buffer: createReadStream(image.path),
+								},
+							];
+							servedImage =
+								env.configService.getOrThrow("PUBLIC_URL", { infer: true }) +
+								"/attachment/" +
+								env.users.user.id +
+								"/" +
+								log.id +
+								"/image";
+						}
 					}
-					await putLog(log, expect);
+
+					await putLog(log, expectCode, undefined, pushedFiles);
+
+					const servedLog = {
+						...log,
+						data: { ...(log.data as object) },
+					};
+					if (servedImage) {
+						servedLog.data["image"] = servedImage;
+					}
+
 					if (isServed) {
-						await checkLogIsServed(log);
+						await checkLogIsServed(servedLog);
 					} else {
-						await checkLogIsNotServed(log);
+						await checkLogIsNotServed(servedLog);
 					}
 				});
 			}

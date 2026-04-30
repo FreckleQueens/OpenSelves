@@ -1,6 +1,9 @@
 import Joi, { type ArraySchema, type ObjectSchema } from "joi";
 
 export interface ConfigData {
+	CLI_ENV: "production" | "development";
+
+	PUBLIC_URL: string;
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
 	TEST_DB_URL: string;
@@ -16,6 +19,14 @@ export interface ConfigData {
 	REFRESH_TOKEN_SIZE: number;
 
 	REGISTRATION_PASSWORD: string;
+
+	MAX_UPLOAD_SIZE: number;
+	TMP_UPLOAD_DIR: string;
+	S3_REGION: string;
+	S3_ENDPOINT: string;
+	S3_BUCKET: string;
+	S3_ACCESS_KEY: string;
+	S3_SECRET_KEY: string;
 
 	_APP_VERSION: string;
 }
@@ -33,6 +44,14 @@ const extendedJoi = Joi.extend((joi) => ({
 })) as ExtendedJoi;
 
 export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
+	CLI_ENV: Joi.string().valid("production", "development").default("production"),
+
+	PUBLIC_URL: Joi.string()
+		.uri({
+			allowRelative: false,
+			scheme: ["http", "https"],
+		})
+		.required(),
 	LISTEN_PORT: Joi.number(),
 	DATABASE_URL: Joi.string().uri().required(),
 	TEST_DB_URL: Joi.string().uri().not(Joi.ref("DATABASE_URL")).messages({
@@ -66,5 +85,14 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set REGISTER_PASSWORD environment variable to secure random string",
 		"any.required": "Please set REGISTER_PASSWORD environment variable to secure random string",
 	}),
+
+	MAX_UPLOAD_SIZE: Joi.number().min(1).required(),
+	TMP_UPLOAD_DIR: Joi.string(),
+	S3_REGION: Joi.string(),
+	S3_ENDPOINT: Joi.string().uri(),
+	S3_BUCKET: Joi.string(),
+	S3_ACCESS_KEY: Joi.string(),
+	S3_SECRET_KEY: Joi.string(),
+
 	_APP_VERSION: Joi.forbidden(),
 });

@@ -4,6 +4,7 @@ import { NestFactory } from "@nestjs/core";
 
 import rootPackage from "../../package.json" with { type: "json" };
 import { AppModule, configureApp } from "./app.module.js";
+import { handleCli } from "./cli.js";
 import { type ConfigData } from "./config.data.js";
 
 async function bootstrap() {
@@ -14,6 +15,11 @@ async function bootstrap() {
 		logger: logger,
 	});
 	configureApp(app);
+
+	if (await handleCli(app)) {
+		return;
+	}
+
 	const configService = app.get(ConfigService<ConfigData>);
 	await app.listen(configService.get("LISTEN_PORT", 3000, { infer: true }));
 }

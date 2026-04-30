@@ -4,7 +4,8 @@
 		"rootDir": "./src",
 		"rootDirs": ["./src"],
 		"outDir": "./dist",
-		"tsBuildInfoFile": "./dist/.tsbuildinfo"
+		"tsBuildInfoFile": "./dist/.tsbuildinfo",
+		"types": ["node", "multer"]
 	},
 	"include": ["./src/**/*", "./test/**/*"],
 	"exclude": ["./node_modules/**/*"]

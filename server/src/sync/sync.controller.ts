@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import {
 	BadRequestException,
 	Body,
@@ -5,11 +6,15 @@ import {
 	HttpCode,
 	HttpStatus,
 	InternalServerErrorException,
+	ParseFilePipeBuilder,
 	Post,
 	Put,
 	Req,
+	UploadedFiles,
+	UseInterceptors,
 } from "@nestjs/common";
-import type { Request } from "express";
+import { FilesInterceptor } from "@nestjs/platform-express";
+import { type Request } from "express";
 import { type Log } from "openselves-common/db";
 
 import { InjectDb } from "../db/db.service.js";
@@ -28,26 +33,77 @@ export class SyncController {
 	) {}
 
 	@Put("push")
-	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
-		let lastDate: Date | undefined = undefined;
-		const idTracker: string[] = [];
-		for (const log of pushDto.logs) {
-			if (lastDate && log.executedAt.getTime() < lastDate.getTime()) {
-				throw new BadRequestException("logs must be sorted by executedAt");
-			}
-			lastDate = log.executedAt;
-
-			if (log.memberId) {
-				if (log.operationType === "delete" && idTracker.includes(log.memberId)) {
+	@UseInterceptors(FilesInterceptor("attachments[]"))
+	public async push(
+		@Body() pushDto: PushDto,
+		@Req() request: Request,
+		@UploadedFiles(
+			new ParseFilePipeBuilder()
+				.addFileTypeValidator({
+					fileType: /^image\//,
+					fallbackToMimetype: true,
+				})
+				.build({
+					fileIsRequired: false,
+				}),
+		)
+		attachments: Express.Multer.File[] = [],
+	) {
+		try {
+			for (const attachment of attachments) {
+				const log = pushDto.logs.find((log) =>
+					log.data
+						? Object.values(log.data).find(
+								(val) =>
+									typeof val === "string" &&
+									val.startsWith("attachment:") &&
+									val.split(":", 2)[1] === attachment.originalname,
+							)
+						: undefined,
+				);
+				if (!log) {
 					throw new BadRequestException(
-						"Cannot delete record AND perform other operations in the same request",
+						"Attachment " + attachment.originalname + " isn't referenced in any log",
 					);
 				}
-				idTracker.push(log.memberId);
+			}
+
+			let lastDate: Date | undefined = undefined;
+			const idTracker: string[] = [];
+			for (const log of pushDto.logs) {
+				if (lastDate && log.executedAt.getTime() < lastDate.getTime()) {
+					throw new BadRequestException("logs must be sorted by executedAt");
+				}
+				lastDate = log.executedAt;
+
+				if (log.memberId) {
+					if (log.operationType === "delete" && idTracker.includes(log.memberId)) {
+						throw new BadRequestException(
+							"Cannot delete record AND perform other operations in the same request",
+						);
+					}
+					idTracker.push(log.memberId);
+				}
+			}
+
+			await this.syncService.reduceAndSaveLogs(
+				request.accessTokenPayload.user.id,
+				pushDto.logs,
+				attachments,
+			);
+		} finally {
+			for (const attachment of attachments) {
+				await new Promise((resolve, reject) => {
+					fs.unlink(attachment.path, (err) => {
+						if (err) {
+							reject(err);
+						} else {
+							resolve(null);
+						}
+					});
+				});
 			}
 		}
-
-		await this.syncService.reduceAndSaveLogs(request.accessTokenPayload.user.id, pushDto.logs);
 		return {};
 	}
 

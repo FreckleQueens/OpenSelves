@@ -148,7 +148,6 @@ deadline or ETA
 - [ ] member profile picture
   - [x] simple URL field with reasonable length limit (allow data urls)
   - [x] allow "upload" of image by converting it to a data url
-  - [ ] save a backup of remote images in IDB as data uris
   - [ ] upload larger image files to s3-compatible private object storage
 - [ ] member color
 
@@ -246,6 +245,8 @@ a short-lived one
 ---
 
 ## Ideas for future releases
+- save a backup of remote (url) images (member pfp) in IDB as data uris
+- warn the user when the remote image doesn't load and allow them to use the backup image instead
 - Member onboarding procedure (needs thought out UX)
 - Make different types of groups? (sub-system, geographical, tag...) -> "visual only"
 - Public system page (optional, show name, optional show {profile picture, description, fronts, members}) -> needs a
