@@ -1,5 +1,4 @@
 import {
-	DeleteObjectCommand,
 	DeleteObjectsCommand,
 	GetObjectCommand,
 	ListObjectsCommand,
@@ -10,17 +9,46 @@ import {
 import { confirm } from "@inquirer/prompts";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { type Request } from "express";
 import { createReadStream } from "node:fs";
 
 import { AppCommand } from "../AppCommand.js";
 import type { ConfigData } from "../config.data.js";
 
+class TransactionAlreadyCommitedError extends Error {
+	constructor() {
+		super("Transaction was already commited.");
+	}
+}
+
 class S3Transaction {
 	private readonly uploadedFiles: string[] = [];
+
+	private readonly filesToUpload: { file: Express.Multer.File; key: string }[] = [];
+	private readonly filesToDelete: string[] = [];
+
+	private isCommitted: boolean = false;
+
 	constructor(
 		private readonly bucketName?: string,
 		private readonly client?: S3Client,
 	) {}
+
+	public queueUploadFile(file: Express.Multer.File, key: string) {
+		if (!this.bucketName || !this.client) {
+			throw new Error("S3 service is not available.");
+		}
+
+		this.filesToUpload.push({ file, key });
+	}
+
+	public queueDeleteFile(key: string) {
+		if (!this.bucketName || !this.client) {
+			throw new Error("S3 service is not available.");
+		}
+
+		this.filesToDelete.push(key);
+	}
 
 	public async uploadFile(file: Express.Multer.File, key: string) {
 		if (!this.bucketName || !this.client) {
@@ -38,19 +66,51 @@ class S3Transaction {
 		await this.client.send(command);
 	}
 
+	public async deleteFiles(keys: string[]) {
+		if (!this.bucketName || !this.client) {
+			throw new Error("S3 service is not available.");
+		}
+
+		const command = new DeleteObjectsCommand({
+			Bucket: this.bucketName,
+			Delete: {
+				Objects: keys.map((key) => ({
+					Key: key,
+				})),
+			},
+		});
+		await this.client.send(command);
+	}
+
 	public abort() {
 		throw new Error("Transaction aborted");
 	}
 
-	async rollback() {
+	async _commit() {
+		if (this.isCommitted) {
+			throw new TransactionAlreadyCommitedError();
+		}
+		this.isCommitted = true;
+
+		for (const { file, key } of this.filesToUpload) {
+			await this.uploadFile(file, key);
+		}
+		if (this.filesToDelete.length > 0) {
+			await this.deleteFiles(this.filesToDelete);
+		}
+	}
+
+	async _rollback() {
 		if (!this.bucketName || !this.client) {
 			return;
 		}
 
-		for (const key of this.uploadedFiles) {
-			const command = new DeleteObjectCommand({
+		if (this.uploadedFiles.length > 0) {
+			const command = new DeleteObjectsCommand({
 				Bucket: this.bucketName,
-				Key: key,
+				Delete: {
+					Objects: this.uploadedFiles.map((key) => ({ Key: key })),
+				},
 			});
 			await this.client.send(command);
 		}
@@ -83,17 +143,20 @@ export class S3Service implements OnApplicationShutdown {
 		this.s3Client?.destroy();
 	}
 
-	public async transaction(callback: (tx: S3Transaction) => Promise<void>) {
+	public async transaction(callback: (tx: S3Transaction) => Promise<void> | void) {
 		const transaction = new S3Transaction(this.bucketName, this.s3Client);
 		try {
 			await callback(transaction);
+			await transaction._commit();
 		} catch (error) {
-			await transaction.rollback();
+			if (!(error instanceof TransactionAlreadyCommitedError)) {
+				await transaction._rollback();
+			}
 			throw error;
 		}
 	}
 
-	public async getObject(key: string) {
+	public async getObject(key: string, request: Request) {
 		if (!this.bucketName || !this.s3Client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -102,6 +165,7 @@ export class S3Service implements OnApplicationShutdown {
 			new GetObjectCommand({
 				Bucket: this.bucketName,
 				Key: key,
+				IfNoneMatch: request.headers["if-none-match"],
 			}),
 		);
 	}

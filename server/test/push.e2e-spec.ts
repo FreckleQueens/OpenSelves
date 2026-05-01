@@ -1,24 +1,32 @@
 import * as fs from "node:fs";
 import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
-import { type ReadStream, createReadStream } from "node:fs";
-import type { FrontCreate, Log, Member, MemberCreate } from "openselves-common/db";
+import { createReadStream } from "node:fs";
+import type { FrontCreate, Log, Member, MemberCreate, User } from "openselves-common/db";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
 
 const pushEndpoint = "/sync/push";
 const pullEndpoint = "/sync/pull";
 
+type ClientAttachment = {
+	path: string;
+};
+
 type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId" | "frontId"> & {
 	memberId?: string;
 	frontId?: string;
 };
-type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt">;
+type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt"> & {
+	attachments?: (FileToUpload & {
+		fieldName: "attachments[]";
+	})[];
+};
 
 type FileToUpload = {
 	fieldName: string;
 	name: string;
-	buffer: Buffer | ReadStream;
+	path: string;
 	contentType?: string;
 };
 
@@ -28,15 +36,43 @@ const LARGE_IMAGE_FILE_PATH = "test/test_image_512x512.png";
 const LARGE_IMAGE_CONTENT = fs.readFileSync(LARGE_IMAGE_FILE_PATH);
 const TEST_IMAGE_LONG_DATA_URL = "data:image/png;base64," + LARGE_IMAGE_CONTENT.toString("base64");
 
+function getLogAttachmentUrl(env: TestEnv, userId: string, log: ClientLog, dataKey: string) {
+	const publicUrl = env.configService.getOrThrow("PUBLIC_URL", { infer: true });
+	return {
+		absolute: `${publicUrl}/attachment/${userId}/${log.id}/${dataKey}`,
+		relative: `/attachment/${userId}/${log.id}/${dataKey}`,
+	};
+}
+
 describe(pushEndpoint, () => {
 	let env: TestEnv;
 
-	function makeMemberWithLog(date: Date = new Date(), image: string | null = null) {
+	function attachFileToLog(attachment: ClientAttachment, log: ClientLog, dataKey: string) {
+		if (!log.data || typeof log.data !== "object" || !(dataKey in log.data)) {
+			throw new Error("Wrong log.data for key " + dataKey, { cause: log.data });
+		}
+
+		const attachmentId = createId();
+		log.data[dataKey] = "attachment:" + attachmentId;
+		if (!log.attachments) {
+			log.attachments = [];
+		}
+		log.attachments.push({
+			fieldName: "attachments[]",
+			name: attachmentId,
+			path: attachment.path,
+		});
+	}
+
+	function makeMemberWithLog(
+		date: Date = new Date(),
+		image: string | ClientAttachment | null = null,
+	) {
 		const member: Omit<MemberCreate, "userId" | "id"> = {
 			name: "Alice",
 			pronouns: "she/her",
 			description: "a member of our& system",
-			image,
+			image: typeof image === "string" ? image : null,
 			isArchived: false,
 			archivedReason: null,
 			createdAt: date,
@@ -51,6 +87,11 @@ describe(pushEndpoint, () => {
 			data: member,
 			executedAt: date,
 		};
+
+		if (image && typeof image !== "string") {
+			attachFileToLog(image, createLog, "image");
+		}
+
 		return { member, createLog, date };
 	}
 
@@ -82,22 +123,22 @@ describe(pushEndpoint, () => {
 		log: ClientLog,
 		expect: number = 200,
 		cookies: string = env.users.cookies,
-		files: FileToUpload[] = [],
 	) {
-		return putLogs([log], expect, cookies, files);
+		return putLogs([log], expect, cookies);
 	}
 
 	async function putLogs(
 		logs: ClientLog[],
 		expect: number = 200,
 		cookies: string = env.users.cookies,
-		files: FileToUpload[] = [],
 	) {
+		const files: FileToUpload[] = logs.map((log) => log.attachments || []).flat();
+
 		let request = env.request.put(pushEndpoint).set("Cookie", cookies);
 		if (files.length > 0) {
 			request = request.field("logs", JSON.stringify(logs));
 			for (const file of files) {
-				request = request.attach(file.fieldName, file.buffer, {
+				request = request.attach(file.fieldName, createReadStream(file.path), {
 					filename: file.name,
 					contentType: file.contentType,
 				});
@@ -110,8 +151,8 @@ describe(pushEndpoint, () => {
 		return request.expect(expect).expect("Content-Type", /json/);
 	}
 
-	async function createMember() {
-		const { member, createLog } = makeMemberWithLog();
+	async function createMember(date?: Date, image?: string | ClientAttachment | null) {
+		const { member, createLog } = makeMemberWithLog(date, image);
 		const response = await putLog(createLog);
 		expect(response.body.logs).not.toBeDefined();
 		await checkLogIsServed(createLog);
@@ -156,13 +197,54 @@ describe(pushEndpoint, () => {
 		return response;
 	}
 
-	async function checkLogIsServed(logToCheck: ClientLog) {
+	function checkAndExtractLogAttachments(inputLog: ClientLog, user: User) {
+		const outputLog = { ...inputLog };
+		const attachments: ClientAttachment[] = [];
+		if (outputLog.attachments) {
+			if (!outputLog.data) {
+				throw new Error("Log has attachments but not data", { cause: outputLog });
+			}
+			for (const [key, value] of Object.entries(outputLog.data)) {
+				const attachment = outputLog.attachments.find(
+					(attachment) => value === "attachment:" + attachment.name,
+				);
+				if (attachment) {
+					attachments.push(attachment);
+					outputLog.data[key] = getLogAttachmentUrl(
+						env,
+						user.id,
+						outputLog,
+						key,
+					).absolute;
+				}
+			}
+			if (outputLog.attachments?.length !== attachments.length) {
+				throw new Error("Not all attachments were mapped", { cause: outputLog });
+			}
+			delete outputLog.attachments;
+		}
+		return {
+			log: outputLog,
+			attachments: attachments,
+		};
+	}
+
+	async function checkLogIsServed(
+		logToCheck: ClientLog,
+		user: User = env.users.user,
+		cookies: string = env.users.cookies,
+	) {
+		const { log: expectedClientLog, attachments } = checkAndExtractLogAttachments(
+			logToCheck,
+			user,
+		);
+
 		const logToCheckServer: Omit<Log, "userId" | "pushedAt" | "deletedId"> = {
 			memberId: null,
 			frontId: null,
-			...logToCheck,
+			...expectedClientLog,
 		};
-		const response = await getSyncFrom(0);
+		const response = await getSyncFrom(0, cookies);
 		const pulledLogs = response.body.logs as Array<unknown>;
 		const pulledLog = pulledLogs.find(
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
@@ -184,18 +266,61 @@ describe(pushEndpoint, () => {
 				}),
 			),
 		);
+
+		if (attachments.length > 0) {
+			// Handling multiple attachments per log can be done once needed.
+			expect(attachments.length).toBe(1);
+
+			const attachmentUrl = getLogAttachmentUrl(
+				env,
+				env.users.user.id,
+				logToCheck,
+				"image",
+			).relative;
+			await env.request.get(attachmentUrl).expect(401);
+			await env.request.get(attachmentUrl).set("Cookie", env.users.cookies2).expect(404);
+			const response = await env.request
+				.get(attachmentUrl)
+				.set("Cookie", env.users.cookies)
+				.expect(200)
+				.expect("Content-Type", "image/png");
+			expect(response.body).toEqual(fs.readFileSync(attachments[0].path));
+
+			await env.request
+				.get(attachmentUrl)
+				.set("Cookie", env.users.cookies)
+				.set("If-None-Match", response.headers["etag"])
+				.expect(304);
+		}
 	}
 
-	async function checkLogIsNotServed(logToCheck: ClientLog) {
+	async function checkLogIsNotServed(logToCheck: ClientLog, user: User = env.users.user) {
+		const { attachments } = checkAndExtractLogAttachments(logToCheck, user);
+
 		const response = await getSyncFrom(0);
 		const pulledLogs = response.body.logs as Array<unknown>;
 		const pulledLog = pulledLogs.find(
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
 		);
 		expect(pulledLog).not.toBeDefined();
+
+		if (attachments.length > 0) {
+			// Handling multiple attachments per log can be done once needed.
+			expect(attachments.length).toBe(1);
+
+			const attachmentUrl = getLogAttachmentUrl(
+				env,
+				env.users.user.id,
+				logToCheck,
+				"image",
+			).relative;
+			await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(404);
+		}
 	}
 
-	function testImage(testFn: (image: string | null | undefined) => Promise<ClientLog>) {
+	function testImage(
+		testFn: (image: string | ClientAttachment | null | undefined) => Promise<ClientLog>,
+	) {
 		describe("image", () => {
 			for (const { testName, image, expectCode, isServed } of [
 				{
@@ -256,65 +381,28 @@ describe(pushEndpoint, () => {
 				},
 			]) {
 				test(testName, async () => {
-					const publicUrl = env.configService.getOrThrow("PUBLIC_URL", { infer: true });
-
-					const log = await testFn(
-						!image || typeof image === "string" ? image : undefined,
-					);
-
-					let pushedFiles: FileToUpload[] | undefined = undefined;
-					let servedImage = image;
-
-					if (log.data && typeof log.data === "object") {
-						if (image === undefined) {
-							delete log.data["image"];
-						} else if (image && typeof image === "object" && image.path) {
-							const attachmentId = createId();
-							log.data["image"] = "attachment:" + attachmentId;
-							pushedFiles = [
-								{
-									fieldName: "attachments[]",
-									name: attachmentId,
-									buffer: createReadStream(image.path),
-								},
-							];
-							servedImage = `${publicUrl}/attachment/${env.users.user.id}/${log.id}/image`;
-						}
-					}
-
-					await putLog(log, expectCode, undefined, pushedFiles);
-
-					const servedLog = {
-						...log,
-						data: { ...(log.data as object) },
-					};
-					if (servedImage) {
-						servedLog.data["image"] = servedImage;
-					}
+					const log = await testFn(image);
+					await putLog(log, expectCode, undefined);
 
 					if (isServed) {
-						await checkLogIsServed(servedLog);
+						await checkLogIsServed(log);
 					} else {
-						await checkLogIsNotServed(servedLog);
-					}
-
-					if (pushedFiles?.length) {
-						const attachmentUrl = (servedImage as "string").slice(publicUrl.length);
-						await env.request.get(attachmentUrl).expect(401);
-						await env.request
-							.get(attachmentUrl)
-							.set("Cookie", env.users.cookies2)
-							.expect(404);
-						const response = await env.request
-							.get(attachmentUrl)
-							.set("Cookie", env.users.cookies)
-							.expect(200)
-							.expect("Content-Type", "image/png");
-						expect(response.body).toEqual(LARGE_IMAGE_CONTENT);
+						await checkLogIsNotServed(log);
 					}
 				});
 			}
 		});
+	}
+
+	async function testAttachmentIsDeleted(
+		log: ClientLog,
+		dataKey: string,
+		callback: () => Promise<void>,
+	) {
+		const attachmentUrl = getLogAttachmentUrl(env, env.users.user.id, log, dataKey).relative;
+		await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(200);
+		await callback();
+		await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(404);
 	}
 
 	setupTestSuite((testEnv) => (env = testEnv));
@@ -442,6 +530,23 @@ describe(pushEndpoint, () => {
 				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
 				expect(response2.body.logs).toBe(undefined);
 			});
+
+			test("Delete member with image deletes image from s3", async () => {
+				const { createLog } = await createMember(undefined, {
+					path: LARGE_IMAGE_FILE_PATH,
+				});
+
+				await testAttachmentIsDeleted(createLog, "image", async () => {
+					const deleteLog = {
+						id: createId(),
+						memberId: createLog.memberId,
+						operationType: "delete",
+						data: null,
+						executedAt: new Date(),
+					} satisfies ClientLog;
+					await putLog(deleteLog, 200);
+				});
+			});
 		});
 
 		describe("PUT update Member", () => {
@@ -534,17 +639,50 @@ describe(pushEndpoint, () => {
 
 			testImage(async (image) => {
 				const { createLog } = await createMember();
-				const updateLog: ClientLog = {
+				const updateLog: ClientLog & {
+					data: {
+						name: string;
+						image?: string | null;
+					};
+				} = {
 					id: createId(),
 					memberId: createLog.memberId,
 					operationType: "update",
 					data: {
 						name: "A new name",
-						image: image,
+						image: typeof image === "string" ? image : null,
 					},
 					executedAt: new Date(),
-				};
+				} satisfies ClientLog;
+
+				if (image === undefined) {
+					delete updateLog.data.image;
+				}
+
+				if (image && typeof image !== "string") {
+					attachFileToLog(image, updateLog, "image");
+				}
+
 				return updateLog;
+			});
+		});
+
+		test("Set member with image image's to null deletes image from s3", async () => {
+			const { createLog } = await createMember(undefined, {
+				path: LARGE_IMAGE_FILE_PATH,
+			});
+
+			await testAttachmentIsDeleted(createLog, "image", async () => {
+				const updateLog = {
+					id: createId(),
+					memberId: createLog.memberId,
+					operationType: "update",
+					data: {
+						image: null,
+					},
+					executedAt: new Date(),
+				} satisfies ClientLog;
+				await putLog(updateLog, 200);
 			});
 		});
 
@@ -690,7 +828,7 @@ describe(pushEndpoint, () => {
 		});
 
 		async function setupLogMatrix() {
-			const member = await createMember();
+			const member = await createMember(new Date(0));
 			const client1Logs: ClientLog[] = [
 				{
 					id: createId(),

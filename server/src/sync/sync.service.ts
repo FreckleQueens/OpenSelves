@@ -74,29 +74,35 @@ type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof models, t
 type TableMap =
 	| {
 			table: "members";
-			data: Omit<MemberCreate, "userId">;
+			selectData: Member;
+			createData: Omit<MemberCreate, "userId">;
 			deleteId: Member["id"];
 			modelIdLogKey: "memberId";
 	  }
 	| {
 			table: "fronts";
-			data: Omit<FrontCreate, "userId">;
+			selectData: Front;
+			createData: Omit<FrontCreate, "userId">;
 			deleteId: Front["id"];
 			modelIdLogKey: "frontId";
 	  };
 type UpdateData<Type> = Partial<Omit<Type, "userId" | "id" | "createdAt" | "updatedAt">>;
 
 type RecordsToCreate<T extends TableMap = TableMap> = {
-	[P in T["table"]]?: T["data"][];
+	[P in T["table"]]?: T["createData"][];
 };
 type RecordsToUpdate<T extends TableMap = TableMap> = {
 	[P in T["table"]]?: {
 		id: Member["id"];
-		data: UpdateData<T["data"]>;
+		data: UpdateData<T["createData"]>;
 	}[];
 };
 type RecordsToDelete<T extends TableMap = TableMap> = {
 	[P in T["table"]]?: T["deleteId"][];
+};
+type UserAttachment = {
+	logId: string;
+	dataKey: string;
 };
 
 @Injectable()
@@ -121,33 +127,52 @@ export class SyncService {
 					},
 				});
 
-				const { logsToSave, recordsToCreate, recordsToUpdate, recordsToDelete } =
-					await this.computeOperations(tx, userId, logDtos, alreadyPushedLogs);
+				const {
+					logsToSave,
+					recordsToCreate,
+					recordsToUpdate,
+					recordsToDelete,
+					attachmentsToDelete,
+				} = await this.computeOperations(tx, userId, logDtos, alreadyPushedLogs);
 
 				if (logsToSave.length === 0) {
 					return;
 				}
-
-				await this.uploadLogAttachments(userId, logsToSave, attachments, async () => {
-					await this.tryCreateRecords(tx, userId, recordsToCreate);
-					await this.tryUpdateRecords(tx, userId, recordsToUpdate);
-					await this.tryDeleteRecords(tx, userId, recordsToDelete);
-
-					const savedLogs = await tx
-						.insert(logs)
-						.values(
-							logsToSave.map((log) => ({
-								...log,
-								userId,
-								pushedAt: sql`CURRENT_TIMESTAMP`,
-							})),
-						)
-						.returning();
-
-					if (savedLogs.length !== logsToSave.length) {
-						throw new InternalServerErrorException("Not all logs were saved");
+				await this.tryCreateRecords(tx, userId, recordsToCreate);
+				await this.tryUpdateRecords(tx, userId, recordsToUpdate);
+				const deletedRecords = await this.tryDeleteRecords(tx, userId, recordsToDelete);
+				for (const record of deletedRecords) {
+					for (const [key, value] of Object.entries(record)) {
+						if (typeof value === "string" && value.startsWith("attachment:")) {
+							attachmentsToDelete.push({
+								logId: value.slice("attachment:".length),
+								dataKey: key,
+							});
+						}
 					}
-				});
+				}
+
+				const savedLogs = await tx
+					.insert(logs)
+					.values(
+						logsToSave.map((log) => ({
+							...log,
+							userId,
+							pushedAt: sql`CURRENT_TIMESTAMP`,
+						})),
+					)
+					.returning();
+
+				if (savedLogs.length !== logsToSave.length) {
+					throw new InternalServerErrorException("Not all logs were saved");
+				}
+
+				await this.handleLogAttachments(
+					userId,
+					logsToSave,
+					attachments,
+					attachmentsToDelete,
+				);
 			});
 		} catch (error) {
 			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
@@ -233,10 +258,12 @@ export class SyncService {
 					}),
 			),
 		];
-		const existingUpdateLogs: Log[] = await tx.query.logs.findMany({
+		const existingDataLogs: Log[] = await tx.query.logs.findMany({
 			where: {
 				userId,
-				operationType: "update",
+				operationType: {
+					in: ["create", "update"],
+				},
 				OR: [
 					{
 						memberId: {
@@ -251,6 +278,8 @@ export class SyncService {
 				],
 			},
 		});
+
+		const attachmentsToDelete: UserAttachment[] = [];
 
 		for (const model of Object.values(syncedModels)) {
 			// Skip update and delete logs for already deleted records
@@ -312,7 +341,7 @@ export class SyncService {
 							executedAt: log.executedAt,
 						};
 					}),
-				...existingUpdateLogs.map((log) => ({
+				...existingDataLogs.map((log) => ({
 					dbLog: log,
 					recordId: log[model.modelIdLogKey] as string,
 					data: log.data as Record<string, unknown>,
@@ -337,7 +366,24 @@ export class SyncService {
 						delete step.data[key];
 					}
 				}
-				for (const key of Object.keys(dataTracker.data)) {
+				for (const [key, value] of Object.entries(dataTracker.data)) {
+					const oldValue = step.data[key];
+					if (
+						value !== oldValue &&
+						typeof oldValue === "string" &&
+						oldValue.startsWith("attachment:")
+					) {
+						const logId = step.dbLog?.id || step.logToSave?.id;
+						if (!logId) {
+							throw new InternalServerErrorException("No logId in history step", {
+								cause: step,
+							});
+						}
+						attachmentsToDelete.push({
+							logId,
+							dataKey: key,
+						});
+					}
 					delete step.data[key];
 				}
 				dataTracker.data = Object.assign({ ...step.data }, dataTracker.data);
@@ -351,8 +397,22 @@ export class SyncService {
 				Object.keys((log as LogToSave<UpdateOperation>).data).length > 0,
 		);
 
+		// Set attachments to log id
+		const logsDataForRecords = logsToSave.map((log) => {
+			const outputLog = { ...log };
+			if (outputLog.data && typeof outputLog.data === "object") {
+				outputLog.data = { ...outputLog.data };
+				for (const [key, value] of Object.entries(outputLog.data)) {
+					if (typeof value === "string" && value.startsWith("attachment:")) {
+						outputLog.data[key] = "attachment:" + outputLog.id;
+					}
+				}
+			}
+			return outputLog;
+		});
+
 		const recordsToCreate: RecordsToCreate = {};
-		for (const log of logsToSave.filter((log) => log.operationType === "create")) {
+		for (const log of logsDataForRecords.filter((log) => log.operationType === "create")) {
 			const inferredLog = log as LogToSave<CreateOperation>;
 
 			const model: SyncedModelParams | undefined = Object.values(syncedModels).find(
@@ -379,7 +439,7 @@ export class SyncService {
 		}
 
 		const recordsToUpdate: RecordsToUpdate = {};
-		for (const log of logsToSave.filter((log) => log.operationType === "update")) {
+		for (const log of logsDataForRecords.filter((log) => log.operationType === "update")) {
 			const inferredLog = log as LogToSave<UpdateOperation>;
 
 			const model: SyncedModelParams | undefined = Object.values(syncedModels).find(
@@ -406,7 +466,7 @@ export class SyncService {
 		}
 
 		const recordsToDelete: RecordsToDelete = {};
-		for (const log of logsToSave.filter((log) => log.operationType === "delete")) {
+		for (const log of logsDataForRecords.filter((log) => log.operationType === "delete")) {
 			const inferredLog = log as LogToSave<DeleteOperation>;
 			const [tableName, id] = inferredLog.deletedId.split(".");
 			const model = Object.values(syncedModels).find((model) => model.name === tableName);
@@ -425,6 +485,7 @@ export class SyncService {
 			recordsToCreate,
 			recordsToUpdate,
 			recordsToDelete,
+			attachmentsToDelete,
 		};
 	}
 
@@ -505,6 +566,7 @@ export class SyncService {
 		userId: string,
 		recordsToDelete: RecordsToDelete,
 	) {
+		const allDeletedRecords: TableMap["selectData"][] = [];
 		for (const model of Object.values(syncedModels).reverse()) {
 			const recordsToDeleteIds = recordsToDelete[model.name];
 			if (recordsToDeleteIds && recordsToDeleteIds.length > 0) {
@@ -538,8 +600,11 @@ export class SyncService {
 						throw new NotFoundException(`Some ${model.name} were not found`);
 					}
 				}
+				allDeletedRecords.push(...deletedRecords);
 			}
 		}
+
+		return allDeletedRecords;
 	}
 
 	public async generateInitialSync(userId: User["id"]): Promise<{
@@ -645,17 +710,17 @@ export class SyncService {
 		};
 	}
 
-	public getLogAttachmentKey(userId: string, logId: string, key: string) {
-		return userId + "/" + logId + "/" + key;
+	public getLogAttachmentKey(userId: string, logId: string, dataKey: string) {
+		return userId + "/" + logId + "/" + dataKey;
 	}
 
-	private async uploadLogAttachments(
+	private async handleLogAttachments(
 		userId: string,
 		logsToSave: LogToSave[],
 		attachments: Express.Multer.File[],
-		callback: () => Promise<void>,
+		attachmentsToDelete: UserAttachment[],
 	) {
-		await this.s3Service.transaction(async (tx) => {
+		await this.s3Service.transaction((tx) => {
 			for (const log of logsToSave) {
 				if (log.data) {
 					for (const [key, value] of Object.entries(log.data)) {
@@ -670,7 +735,7 @@ export class SyncService {
 										attachmentName,
 								);
 							}
-							await tx.uploadFile(
+							tx.queueUploadFile(
 								attachment,
 								this.getLogAttachmentKey(userId, log.id, key),
 							);
@@ -679,7 +744,11 @@ export class SyncService {
 				}
 			}
 
-			await callback();
+			for (const attachment of attachmentsToDelete) {
+				tx.queueDeleteFile(
+					this.getLogAttachmentKey(userId, attachment.logId, attachment.dataKey),
+				);
+			}
 		});
 	}
 

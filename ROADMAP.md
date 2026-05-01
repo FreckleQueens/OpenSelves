@@ -145,12 +145,12 @@ deadline or ETA
 ## 🚧 0.5.0 - Member profile picture
 - [ ] ~~client: switch to a better md3 library~~ (canceled)
 - [x] add version checks on /push and /pull endpoints
-- [ ] member profile picture
+- [x] member profile picture
   - [x] simple URL field with reasonable length limit (allow data urls)
   - [x] allow "upload" of image by converting it to a data url
   - [x] upload larger image files to s3-compatible private object storage
-  - [ ] delete attachments on update operation
-  - [ ] delete attachments on delete operation
+  - [x] delete attachments on update operation
+  - [x] delete attachments on delete operation
 - [ ] member color
 
 ## 0.6.0 - Basic account features
