@@ -15,7 +15,8 @@ describe("/sync/pull", () => {
 	setupTestSuite((testEnv) => (env = testEnv));
 
 	beforeAll(async () => {
-		const date = new Date();
+		let timestamp: number = Date.now() - 1000;
+		const getDate = () => new Date(timestamp++);
 		members1 = await env.db
 			.insert(members)
 			.values([
@@ -24,16 +25,16 @@ describe("/sync/pull", () => {
 					name: "Alice",
 					pronouns: "she/her",
 					description: "a member of our& system",
-					createdAt: date,
-					updatedAt: date,
+					createdAt: getDate(),
+					updatedAt: getDate(),
 				},
 				{
 					userId: env.users.user.id,
 					name: "Bob",
 					pronouns: "he/him",
 					description: "another member of our& system",
-					createdAt: date,
-					updatedAt: date,
+					createdAt: getDate(),
+					updatedAt: getDate(),
 				},
 			])
 			.returning();
@@ -46,8 +47,8 @@ describe("/sync/pull", () => {
 						name: "Dex",
 						pronouns: "they/them",
 						description: "a deleted member of our& system",
-						createdAt: date,
-						updatedAt: date,
+						createdAt: getDate(),
+						updatedAt: getDate(),
 					},
 				])
 				.returning()
@@ -62,8 +63,8 @@ describe("/sync/pull", () => {
 					name: "Claire",
 					pronouns: "they/them",
 					description: "someone else somewhere else",
-					createdAt: date,
-					updatedAt: date,
+					createdAt: getDate(),
+					updatedAt: getDate(),
 				},
 			])
 			.returning();
@@ -90,8 +91,8 @@ describe("/sync/pull", () => {
 					data: {
 						name: "a new name",
 					},
-					executedAt: new Date(),
-					pushedAt: new Date(),
+					executedAt: getDate(),
+					pushedAt: getDate(),
 				},
 				{
 					userId: env.users.user.id,
@@ -100,16 +101,16 @@ describe("/sync/pull", () => {
 					data: {
 						description: "a new description",
 					},
-					executedAt: new Date(),
-					pushedAt: new Date(),
+					executedAt: getDate(),
+					pushedAt: getDate(),
 				},
 				{
 					userId: env.users.user.id,
 					deletedId: `members.${deletedMember1.id}`,
 					operationType: "delete",
 					data: null,
-					executedAt: new Date(),
-					pushedAt: new Date(),
+					executedAt: getDate(),
+					pushedAt: getDate(),
 				},
 			])
 			.returning();
@@ -134,8 +135,8 @@ describe("/sync/pull", () => {
 				data: {
 					pronouns: "rad/af",
 				},
-				executedAt: new Date(),
-				pushedAt: new Date(),
+				executedAt: getDate(),
+				pushedAt: getDate(),
 			},
 		]);
 	});
