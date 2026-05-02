@@ -47,7 +47,7 @@
 		navbarRight?: Snippet;
 		subnavbar?: Snippet;
 		transparentNavbar?: boolean;
-		title?: string;
+		title?: string | Snippet;
 		loading?: boolean;
 		pageContent?: HTMLDivElement | undefined;
 	} = $props();

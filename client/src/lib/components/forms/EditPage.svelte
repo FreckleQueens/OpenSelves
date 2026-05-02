@@ -11,6 +11,7 @@
 
 	let {
 		children,
+		pageTitle = "",
 		thingName,
 		tabs = undefined,
 		hasRecordChanged,
@@ -24,6 +25,7 @@
 		deleteRecordButton = $bindable(),
 	}: {
 		children?: Snippet;
+		pageTitle?: string | Snippet;
 		thingName: string;
 		tabs?: {
 			id: TabId;
@@ -86,7 +88,7 @@
 	}
 </script>
 
-<AppPage title="" loading={!ready} showMenu={false}>
+<AppPage title={pageTitle} loading={!ready} showMenu={false}>
 	{#snippet navbarLeft()}
 		<BackLink onClick={backLinkOnClick} />
 		{#if hasRecordChanged()}

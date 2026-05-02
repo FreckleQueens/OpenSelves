@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { apiState } from "$lib/api.svelte";
+	import MemberCard from "$lib/components/MemberCard.svelte";
 	import MemberImage from "$lib/components/MemberImage.svelte";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
@@ -203,6 +204,10 @@
 	bind:activeTab
 	bind:deleteRecordButton
 >
+	{#snippet pageTitle()}
+		<MemberCard {member} small inline />
+	{/snippet}
+
 	<Block class={"flex flex-col items-stretch" + (activeTab !== "info" ? " hidden" : "")}>
 		<MemberImage
 			{member}
