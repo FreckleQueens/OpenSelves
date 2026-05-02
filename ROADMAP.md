@@ -151,7 +151,8 @@ deadline or ETA
   - [x] upload larger image files to s3-compatible private object storage
   - [x] delete attachments on update operation
   - [x] delete attachments on delete operation
-- [ ] member color
+- [x] member color
+- [ ] verify and fix iOS colors
 
 ## 0.6.0 - Basic account features
 - [ ] password recovery
@@ -191,6 +192,8 @@ a short-lived one
 - [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
 - [ ] fab menus: don't use fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
 - [ ] ListInput: make the text field focus when clicking anywhere inside the whole visible box (+ cursor change)
+- [ ] member edit: make profile picture edit button always visible (maybe move it outside the image's box)
+- [ ] ListInput: make clear button better (example: member edit form color field)
 
 ## 1.0.0 - Official release
 - [ ] email verification

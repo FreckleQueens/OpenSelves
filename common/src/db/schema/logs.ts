@@ -69,3 +69,4 @@ export const logs = pgTable(
 );
 export type Log = typeof logs.$inferSelect;
 export type LogCreate = typeof logs.$inferInsert;
+export type LogUpdate = Partial<LogCreate>;

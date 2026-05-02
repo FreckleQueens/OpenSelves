@@ -14,6 +14,7 @@ export const members = pgTable(
 		name: text().notNull(),
 		pronouns: text().notNull(),
 		description: text().notNull(),
+		color: text(),
 
 		image: text(),
 
@@ -31,3 +32,4 @@ export const members = pgTable(
 );
 export type Member = typeof members.$inferSelect;
 export type MemberCreate = typeof members.$inferInsert;
+export type MemberUpdate = Partial<MemberCreate>;

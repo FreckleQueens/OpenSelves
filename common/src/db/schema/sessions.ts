@@ -13,3 +13,4 @@ export const sessions = pgTable("sessions", {
 });
 export type Session = typeof sessions.$inferSelect;
 export type SessionCreate = typeof sessions.$inferInsert;
+export type SessionUpdate = Partial<SessionCreate>;

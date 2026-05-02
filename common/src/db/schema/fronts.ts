@@ -31,3 +31,4 @@ export const fronts = pgTable(
 );
 export type Front = typeof fronts.$inferSelect;
 export type FrontCreate = typeof fronts.$inferInsert;
+export type FrontUpdate = Partial<FrontCreate>;

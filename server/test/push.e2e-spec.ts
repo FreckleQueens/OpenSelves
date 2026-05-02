@@ -67,17 +67,21 @@ describe(pushEndpoint, () => {
 	function makeMemberWithLog(
 		date: Date = new Date(),
 		image: string | ClientAttachment | null = null,
+		minimal: boolean = false,
 	) {
 		const member: Omit<MemberCreate, "userId" | "id"> = {
 			name: "Alice",
 			pronouns: "she/her",
 			description: "a member of our& system",
-			image: typeof image === "string" ? image : null,
-			isArchived: false,
-			archivedReason: null,
 			createdAt: date,
 			updatedAt: date,
 		};
+		if (!minimal) {
+			member.color = "#123abc";
+			member.image = typeof image === "string" ? image : null;
+			member.isArchived = false;
+			member.archivedReason = null;
+		}
 		const createLog: ClientLog & {
 			memberId: string;
 		} = {
@@ -121,15 +125,15 @@ describe(pushEndpoint, () => {
 
 	async function putLog(
 		log: ClientLog,
-		expect: number = 200,
+		expectCode: number = 200,
 		cookies: string = env.users.cookies,
 	) {
-		return putLogs([log], expect, cookies);
+		return putLogs([log], expectCode, cookies);
 	}
 
 	async function putLogs(
 		logs: ClientLog[],
-		expect: number = 200,
+		expectCode: number = 200,
 		cookies: string = env.users.cookies,
 	) {
 		const files: FileToUpload[] = logs.map((log) => log.attachments || []).flat();
@@ -148,7 +152,12 @@ describe(pushEndpoint, () => {
 				logs: logs,
 			});
 		}
-		return request.expect(expect).expect("Content-Type", /json/);
+		const response = await request.expect("Content-Type", /json/);
+		if (response.statusCode !== expectCode) {
+			console.error(response.body);
+		}
+		expect(response.statusCode).toBe(expectCode);
+		return response;
 	}
 
 	async function createMember(date?: Date, image?: string | ClientAttachment | null) {
@@ -460,6 +469,13 @@ describe(pushEndpoint, () => {
 		describe("PUT create Member", () => {
 			test("200", async () => {
 				const { createLog } = makeMemberWithLog();
+
+				await putLog(createLog);
+				await checkLogIsServed(createLog);
+			});
+
+			test("minimal create data 200", async () => {
+				const { createLog } = makeMemberWithLog(undefined, undefined, true);
 
 				await putLog(createLog);
 				await checkLogIsServed(createLog);

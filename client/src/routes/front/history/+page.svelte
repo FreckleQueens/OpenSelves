@@ -3,7 +3,7 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import MemberImage from "$lib/components/MemberImage.svelte";
+	import MemberCard from "$lib/components/MemberCard.svelte";
 	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import SortAscIcon from "$lib/components/icons/SortAscIcon.svelte";
 	import SortDescIcon from "$lib/components/icons/SortDescIcon.svelte";
@@ -126,8 +126,7 @@
 				{#each sortedFronts as front (front.id)}
 					<TableRow class="text-nowrap">
 						<TableCell class="flex items-center">
-							<MemberImage member={front.member} class="h-10 mr-2" />
-							{front.member?.name || t("Unknown")}
+							<MemberCard member={front.member} small inline />
 						</TableCell>
 						<TableCell>
 							<time datetime={front.startedAt.toISOString()}>

@@ -10,14 +10,18 @@
 		member,
 		onClick,
 		small = false,
+		inline = false,
+		class: classNames,
 		actions,
 		chips,
 		secondaryActions,
 		footer,
 	}: {
-		member: Member;
-		onClick: ClickEventHandler;
+		member?: Omit<Member, "userId">;
+		onClick?: ClickEventHandler;
 		small?: boolean;
+		inline?: boolean;
+		class?: string;
 		actions?: { id: string; icon: Component; onClick: ClickEventHandler }[];
 		chips?: Snippet;
 		secondaryActions?: {
@@ -30,7 +34,7 @@
 
 	function onLinkClick(event: MouseEvent) {
 		event.preventDefault();
-		onClick(event);
+		onClick?.(event);
 	}
 
 	function onActionClick(event: MouseEvent, action: ClickEventHandler) {
@@ -40,83 +44,101 @@
 	}
 </script>
 
-<div class="member-entry flex items-center" data-id={member.id} data-name={member.name}>
-	<div class="flex-1">
-		<!-- TODO: touch ripple -->
-		<Card raised class="member-card my-4 mx-0! cursor-pointer" onclick={onLinkClick}>
-			<div class={`flex items-center ${small ? "h-10" : "h-14"}`}>
-				<div class="self-stretch mr-2 flex-0">
-					<MemberImage class="h-full" {member} />
-				</div>
-
-				<div class="flex-1 ml-1">
-					<p>{member.name}</p>
-					{#if !small}
-						<p class="opacity-70">{member.pronouns}</p>
-					{/if}
-				</div>
-				{#if member.isArchived}
-					<ArchivedIcon class="text-3xl opacity-75" />
-				{/if}
-
-				{#if actions}
-					{#each actions as action (action.id)}
-						{@const Icon = action.icon}
-						<Button
-							class={`${action.id}-button p-4 h-fit`}
-							onclick={(ev) => onActionClick(ev, action.onClick)}
-							inline
-							tonal
-						>
-							<Icon button />
-						</Button>
-					{/each}
-				{/if}
+<div
+	class={`member-entry my-4${inline ? " my-0" : ""}${classNames ? ` ${classNames}` : ""}`}
+	data-id={member?.id}
+	data-name={member?.name}
+>
+	<!-- TODO: touch ripple -->
+	<Card
+		class={`member-card my-0 mx-0! w-full${onClick ? " cursor-pointer" : ""}${inline ? ` bg-transparent! p-0! border-0! inline-card-container` : ""}`}
+		onclick={onClick ? onLinkClick : undefined}
+	>
+		<div class={`flex items-center ${small ? "h-10" : "h-14"}`}>
+			<div class="self-stretch mr-2 flex-0">
+				<MemberImage
+					class="h-full"
+					round={small}
+					imageContainerClass={inline || small ? "" : "rounded-xl"}
+					{member}
+				/>
 			</div>
 
-			{#if chips || secondaryActions}
-				<div
-					class="chips-and-secondary-actions flex flex-wrap-reverse gap-4 items-center pt-4"
-				>
-					{#if chips}
-						<div class="min-w-max">
-							{@render chips()}
-						</div>
-					{/if}
-
-					{#if secondaryActions}
-						<div class="ml-auto inline-flex gap-2">
-							{#each secondaryActions as action (action.id)}
-								<Button
-									class={`${action.id}-button p-2`}
-									inline
-									tonal
-									raised
-									onclick={(ev) => {
-										ev.stopPropagation();
-										return action.onClick(ev);
-									}}
-								>
-									{@const Icon = action.icon}
-									<Icon button />
-								</Button>
-							{/each}
-						</div>
-					{/if}
-				</div>
+			<div class="flex-1 ml-1">
+				<p>{member?.name || t("Unknown")}</p>
+				{#if member && !small}
+					<p class="opacity-70">{member.pronouns}</p>
+				{/if}
+			</div>
+			{#if member && member.isArchived && !inline}
+				<ArchivedIcon class="text-3xl opacity-75" />
 			{/if}
 
-			{#if footer}
-				<div>
-					{@render footer()}
-				</div>
+			{#if actions}
+				{#each actions as action (action.id)}
+					{@const Icon = action.icon}
+					<Button
+						class={`main-action-button ${action.id}-button p-4 h-fit`}
+						onclick={(ev) => onActionClick(ev, action.onClick)}
+						inline
+						tonal
+					>
+						<Icon button />
+					</Button>
+				{/each}
 			{/if}
-		</Card>
-	</div>
+		</div>
+
+		{#if chips || secondaryActions}
+			<div class="chips-and-secondary-actions flex flex-wrap-reverse gap-4 items-center pt-4">
+				{#if chips}
+					<div class="min-w-max">
+						{@render chips()}
+					</div>
+				{/if}
+
+				{#if secondaryActions}
+					<div class="ml-auto inline-flex gap-2">
+						{#each secondaryActions as action (action.id)}
+							<Button
+								class={`${action.id}-button p-2`}
+								inline
+								tonal
+								raised
+								onclick={(ev) => {
+									ev.stopPropagation();
+									return action.onClick(ev);
+								}}
+							>
+								{@const Icon = action.icon}
+								<Icon button />
+							</Button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		{#if footer}
+			<div>
+				{@render footer()}
+			</div>
+		{/if}
+	</Card>
 </div>
 
 <style lang="scss">
 	:global .member-entry:not(:has(.chips-and-secondary-actions)) .member-card > * {
 		padding: calc(var(--spacing) * 2);
+	}
+	:global .member-entry .k-card {
+		border: 1px solid oklch(from var(--color-md-light-surface-1) calc(l * 0.975) c h);
+		@media (prefers-color-scheme: dark) {
+			border-color: oklch(from var(--color-md-dark-surface-1) calc(l * 1.2) c h);
+		}
+
+		&.inline-card-container > * {
+			padding: 0;
+		}
 	}
 </style>

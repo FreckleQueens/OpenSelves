@@ -6,11 +6,13 @@
 	import EditPageDangerZone from "$lib/components/forms/EditPageDangerZone.svelte";
 	import ArchiveInputIcon from "$lib/components/icons/ArchiveInputIcon.svelte";
 	import ClearIcon from "$lib/components/icons/ClearIcon.svelte";
+	import ColorInputIcon from "$lib/components/icons/ColorInputIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
 	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import ImageIcon from "$lib/components/icons/ImageIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
+	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import PronounsInputIcon from "$lib/components/icons/PronounsInputIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import UploadIcon from "$lib/components/icons/UploadIcon.svelte";
@@ -38,6 +40,7 @@
 		name: "",
 		pronouns: "",
 		description: "",
+		color: null,
 		image: null,
 		isArchived: false,
 		archivedReason: null,
@@ -201,9 +204,15 @@
 	bind:deleteRecordButton
 >
 	<Block class={"flex flex-col items-stretch" + (activeTab !== "info" ? " hidden" : "")}>
-		<MemberImage {member} class="w-6/12 self-center relative rounded-xl!">
+		<MemberImage
+			{member}
+			class="w-6/12 self-center relative"
+			imageContainerClass="rounded-xl"
+			showMemberColor={false}
+		>
 			<div class="absolute bottom-2 right-2" transition:fly={{ y: 50, duration: 150 }}>
 				<Button
+					raised
 					id="edit-image-url-button"
 					class="p-2"
 					type="button"
@@ -289,6 +298,7 @@
 					<NameInputIcon input />
 				{/snippet}
 			</ListInput>
+
 			<ListInput
 				name="pronouns"
 				label={t("Pronouns")}
@@ -300,6 +310,7 @@
 					<PronounsInputIcon input />
 				{/snippet}
 			</ListInput>
+
 			<ListInput
 				name="description"
 				label={t("Description")}
@@ -314,6 +325,30 @@
 					<DescriptionInputIcon input />
 				{/snippet}
 			</ListInput>
+
+			{#if member.color}
+				<ListInput
+					name="color"
+					label={t("Color")}
+					type="color"
+					bind:value={member.color}
+					error={formState.errors["color"] || ""}
+					clearButton
+					onClear={() => (member.color = null)}
+				>
+					{#snippet media()}
+						<ColorInputIcon input />
+					{/snippet}
+				</ListInput>
+			{:else}
+				<input type="hidden" name="color" value={member.color} />
+				<ListItem class="text-center">
+					<Button inline tonal type="button" onclick={() => (member.color = "#aaa")}>
+						<ColorInputIcon secondary={PlusIcon} button before />
+						Add a color
+					</Button>
+				</ListItem>
+			{/if}
 		</List>
 	</Block>
 

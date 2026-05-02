@@ -9,6 +9,7 @@ import {
 	IsBoolean,
 	IsDataURI,
 	IsDate,
+	IsHexColor,
 	IsIn,
 	IsNumber,
 	IsOptional,
@@ -18,110 +19,27 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from "class-validator";
-import type { PartialBy } from "openselves-common";
-import type { Front, Log, Member } from "openselves-common/db";
+import type {
+	FrontCreate,
+	FrontUpdate,
+	Log,
+	MemberCreate,
+	MemberUpdate,
+} from "openselves-common/db";
 
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
 type OmitBaseFields<K> = Omit<K, "id" | "userId">;
 
-class PushRecordCreateDto {
+class PushRecordDto {
 	@IsIn([undefined])
 	public readonly id!: undefined;
 
 	@IsIn([undefined])
 	public readonly userId!: undefined;
-
-	@IsDate()
-	public readonly createdAt!: Date;
-
-	@IsDate()
-	public readonly updatedAt!: Date;
 }
 
-class PushRecordUpdateDto {
-	@IsIn([undefined])
-	public readonly id!: undefined;
-
-	@IsIn([undefined])
-	public readonly userId!: undefined;
-
-	@IsOptional()
-	@IsDate()
-	public readonly createdAt?: Date;
-
-	@IsOptional()
-	@IsDate()
-	public readonly updatedAt?: Date;
-}
-
-export class PushCreateMemberDto
-	extends PushRecordCreateDto
-	implements PartialBy<OmitBaseFields<Member>, "image">
-{
-	@IsString()
-	public readonly name!: string;
-
-	@IsString()
-	public readonly pronouns!: string;
-
-	@IsString()
-	public readonly description!: string;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(8 * 1024) // 8kB
-	@IsUrl(
-		{
-			allow_fragments: false,
-			validate_length: false,
-		},
-		{
-			validateIf(object, value) {
-				return typeof value === "string" && !value.startsWith("data:");
-			},
-		},
-	)
-	@IsDataURI({
-		validateIf(object, value) {
-			return typeof value === "string" && value.startsWith("data:");
-		},
-	})
-	@ValidateIf(
-		(object, value) =>
-			value !== null && !(typeof value === "string" && value.startsWith("attachment:")),
-	)
-	public readonly image?: string | null;
-
-	@IsBoolean()
-	public readonly isArchived!: boolean;
-
-	@IsString()
-	@ValidateIf((object, value) => value !== null)
-	public readonly archivedReason!: string | null;
-}
-
-export class PushCreateFrontDto extends PushRecordCreateDto implements OmitBaseFields<Front> {
-	@IsCuid2()
-	public readonly memberId!: string;
-
-	@IsDate()
-	public readonly startedAt!: Date;
-
-	@ValidateIf((object, value) => value !== null)
-	@IsDate()
-	@Type(() => Date)
-	public readonly endedAt!: Date | null;
-
-	@IsString()
-	@ValidateIf((object, value) => value !== null)
-	public readonly note!: string | null;
-}
-
-export class PushUpdateMemberDto
-	extends PushRecordUpdateDto
-	implements Partial<OmitBaseFields<Member>>
-{
+export class PushUpdateMemberDto extends PushRecordDto implements OmitBaseFields<MemberUpdate> {
 	@IsString()
 	@IsNumber()
 	@IsIn([undefined])
@@ -132,6 +50,7 @@ export class PushUpdateMemberDto
 			"name",
 			"pronouns",
 			"description",
+			"color",
 			"image",
 			"isArchived",
 			"archivedReason",
@@ -154,6 +73,11 @@ export class PushUpdateMemberDto
 	@IsOptional()
 	@IsString()
 	public readonly description?: string;
+
+	@IsString()
+	@IsHexColor()
+	@ValidateIf((object, value) => value !== undefined && value !== null)
+	public readonly color?: string | null;
 
 	@IsOptional()
 	@IsString()
@@ -188,12 +112,37 @@ export class PushUpdateMemberDto
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly archivedReason?: string | null;
+
+	@IsOptional()
+	@IsDate()
+	public readonly createdAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	public readonly updatedAt?: Date;
 }
 
-export class PushUpdateFrontDto
-	extends PushRecordUpdateDto
-	implements Partial<OmitBaseFields<Front>>
+export class PushCreateMemberDto
+	extends PushUpdateMemberDto
+	implements OmitBaseFields<MemberCreate>
 {
+	@IsString()
+	declare public readonly name: string;
+
+	@IsString()
+	declare public readonly pronouns: string;
+
+	@IsString()
+	declare public readonly description: string;
+
+	@IsDate()
+	declare public readonly createdAt: Date;
+
+	@IsDate()
+	declare public readonly updatedAt: Date;
+}
+
+export class PushUpdateFrontDto extends PushRecordDto implements OmitBaseFields<FrontUpdate> {
 	@IsString()
 	@IsNumber()
 	@IsIn([undefined])
@@ -226,6 +175,28 @@ export class PushUpdateFrontDto
 	@IsString()
 	@ValidateIf((object, value) => value !== null)
 	public readonly note?: string | null;
+
+	@IsOptional()
+	@IsDate()
+	public readonly createdAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	public readonly updatedAt?: Date;
+}
+
+export class PushCreateFrontDto extends PushUpdateFrontDto implements OmitBaseFields<FrontCreate> {
+	@IsCuid2()
+	declare public readonly memberId: string;
+
+	@IsDate()
+	declare public readonly startedAt: Date;
+
+	@IsDate()
+	declare public readonly createdAt: Date;
+
+	@IsDate()
+	declare public readonly updatedAt: Date;
 }
 
 export type CreateOperation = {
