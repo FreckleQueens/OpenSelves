@@ -28,6 +28,7 @@ export class SyncWorker {
 	private syncTimeout: number | undefined = undefined;
 	private syncing: boolean = false;
 	private _online: boolean = false;
+	private shuttingDownPromise: Promise<void> | undefined = undefined;
 
 	protected constructor(online: boolean) {
 		this.online = online;
@@ -59,21 +60,31 @@ export class SyncWorker {
 	}
 
 	public async shutdown(): Promise<void> {
-		this.pause();
-		for (let attempts = 0; attempts < 3; attempts++) {
-			if (!this._hasPushBacklog) {
-				break;
-			}
-			try {
-				await this.push();
-			} catch (e) {
-				console.error(e);
-				if (attempts < 3) {
-					await new Promise((resolve) => {
-						setTimeout(resolve, 1500);
-					});
+		if (this.shuttingDownPromise) {
+			return this.shuttingDownPromise;
+		}
+
+		try {
+			await (this.shuttingDownPromise = (async () => {
+				this.pause();
+				for (let attempts = 0; attempts < 3; attempts++) {
+					if (!this._hasPushBacklog) {
+						break;
+					}
+					try {
+						await this.push();
+					} catch (e) {
+						console.error(e);
+						if (attempts < 3) {
+							await new Promise((resolve) => {
+								setTimeout(resolve, 1500);
+							});
+						}
+					}
 				}
-			}
+			})());
+		} finally {
+			this.shuttingDownPromise = undefined;
 		}
 	}
 

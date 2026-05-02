@@ -56,14 +56,16 @@ export class AuthController {
 
 		const session = await this.sessionService.getSession({ token: refreshToken });
 		if (!session) {
-			throw new UnauthorizedException(SESSION_EXPIRED_ERROR, {
+			throw new UnauthorizedException({
+				name: SESSION_EXPIRED_ERROR,
 				description: "Invalid token (session not found or token revoked)",
 			});
 		}
 
 		if (this.sessionService.hasSessionExpired(session)) {
-			throw new UnauthorizedException(SESSION_EXPIRED_ERROR, {
-				description: "Session expired",
+			throw new UnauthorizedException({
+				name: SESSION_EXPIRED_ERROR,
+				description: "Invalid token (session expired)",
 			});
 		}
 

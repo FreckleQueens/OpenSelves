@@ -149,18 +149,7 @@ export async function callRaw(
 		}
 
 		if (response.status === 401 && responseBody.name === TOKEN_EXPIRED_ERROR) {
-			const authResponse = await fetch(`${apiState.url}/auth/refresh`, {
-				method: "POST",
-				credentials: "include",
-				headers: baseApiRequestHeaders,
-			});
-			const authResponseBody = await authResponse.json();
-			if (
-				!authResponse.ok &&
-				authResponse.status === 401 &&
-				authResponseBody.name === SESSION_EXPIRED_ERROR
-			) {
-				console.warn("Session expired with response", authResponseBody);
+			if (!(await refreshAuth())) {
 				return CallResult.SESSION_EXPIRED;
 			}
 
@@ -216,6 +205,42 @@ export async function call(
 	}
 }
 
+let refreshingAuthPromise: Promise<void> | null = null;
+async function refreshAuth(): Promise<boolean> {
+	while (refreshingAuthPromise) {
+		try {
+			await refreshingAuthPromise;
+		} catch {
+			return false;
+		}
+	}
+
+	try {
+		await (refreshingAuthPromise = (async () => {
+			const authResponse = await fetch(`${apiState.url}/auth/refresh`, {
+				method: "POST",
+				credentials: "include",
+				headers: baseApiRequestHeaders,
+			});
+
+			const authResponseBody = await authResponse.json();
+			if (
+				!authResponse.ok &&
+				authResponse.status === 401 &&
+				authResponseBody.name === SESSION_EXPIRED_ERROR
+			) {
+				console.warn("Session expired with response", authResponseBody);
+				throw undefined;
+			}
+		})());
+		return true;
+	} catch {
+		return false;
+	} finally {
+		refreshingAuthPromise = null;
+	}
+}
+
 async function isApiReachable(): Promise<boolean> {
 	const debugData: unknown[] = [];
 	try {
@@ -240,7 +265,10 @@ async function isApiReachable(): Promise<boolean> {
 }
 
 export async function handleLogout() {
-	clearTimeout(onlineCheckTimeout);
+	if (onlineCheckTimeout !== undefined) {
+		clearTimeout(onlineCheckTimeout);
+		onlineCheckTimeout = undefined;
+	}
 	await SyncWorker.getInstance().shutdown();
 	await PersistentStorage.getInstance().setOffline();
 	await goto(resolve("/"));
