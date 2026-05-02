@@ -3,8 +3,8 @@ import {
 	foreignKey,
 	json,
 	pgEnum,
-	pgTable,
 	primaryKey,
+	camelCase,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -16,7 +16,7 @@ import { users } from "./users.js";
 import { fronts } from "./fronts.js";
 
 export const logOperationType = pgEnum("logOperationType", ["create", "update", "delete"]);
-export const logs = pgTable(
+export const logs = camelCase.table(
 	"logs",
 	{
 		userId: text()

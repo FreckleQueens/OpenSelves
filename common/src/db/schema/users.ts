@@ -1,7 +1,7 @@
-import { pgTable, text } from "drizzle-orm/pg-core";
+import { camelCase, text } from "drizzle-orm/pg-core";
 import { idPrimaryKey, timestamps } from "./utils.js";
 
-export const users = pgTable("users", {
+export const users = camelCase.table("users", {
 	...idPrimaryKey,
 	email: text().notNull().unique(),
 	passwordHash: text().notNull(),

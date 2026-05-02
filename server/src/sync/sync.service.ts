@@ -69,7 +69,7 @@ type LogToSave<Op extends OperationType = OperationType> = Omit<
 	frontId: Op["recordId"];
 	deletedId: Op["deletedId"];
 };
-type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof models, typeof relations>;
+type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof relations>;
 
 type TableMap =
 	| {

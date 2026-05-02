@@ -30,6 +30,6 @@
 	},
 	"dependencies": {
 		"@paralleldrive/cuid2": "^3.3.0",
-		"drizzle-orm": "1.0.0-beta.20"
+		"drizzle-orm": "1.0.0-rc.1"
 	}
 }
