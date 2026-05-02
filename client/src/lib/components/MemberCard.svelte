@@ -131,14 +131,13 @@
 	:global .member-entry:not(:has(.chips-and-secondary-actions)) .member-card > * {
 		padding: calc(var(--spacing) * 2);
 	}
-	:global .member-entry .k-card {
+	:global .member-entry .k-card.inline-card-container > * {
+		padding: 0;
+	}
+	:global .k-material .member-entry .k-card {
 		border: 1px solid oklch(from var(--color-md-light-surface-1) calc(l * 0.975) c h);
 		@media (prefers-color-scheme: dark) {
 			border-color: oklch(from var(--color-md-dark-surface-1) calc(l * 1.2) c h);
-		}
-
-		&.inline-card-container > * {
-			padding: 0;
 		}
 	}
 </style>

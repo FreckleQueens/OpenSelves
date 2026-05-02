@@ -152,7 +152,7 @@ deadline or ETA
   - [x] delete attachments on update operation
   - [x] delete attachments on delete operation
 - [x] member color
-- [ ] verify and fix iOS colors
+- [x] verify and fix iOS colors
 
 ## 0.6.0 - Basic account features
 - [ ] password recovery

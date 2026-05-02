@@ -12,6 +12,6 @@
 		Danger zone
 	</p>
 </BlockTitle>
-<Block>
+<Block insetIos class="flex flex-col items-center">
 	{@render children()}
 </Block>

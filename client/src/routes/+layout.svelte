@@ -33,8 +33,10 @@
 
 <App safeAreas theme={isIos() ? "ios" : "material"}>
 	<div class="safe-areas">
-		<Page class="bg-md-light-surface-darker dark:bg-md-dark-surface-darker">
-			<div class="frame bg-md-light-surface dark:bg-md-dark-surface flex flex-col">
+		<Page class="material:bg-md-light-surface-darker material:dark:bg-md-dark-surface-darker">
+			<div
+				class="frame material:bg-md-light-surface material:dark:bg-md-dark-surface flex flex-col ios:dark:text-white"
+			>
 				{@render children()}
 			</div>
 		</Page>

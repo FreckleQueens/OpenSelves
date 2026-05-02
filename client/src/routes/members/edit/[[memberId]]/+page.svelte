@@ -359,35 +359,33 @@
 
 	<div class:hidden={activeTab !== "settings"}>
 		{#if member.id}
-			<Block>
-				<List>
-					<ListItem label title={t("Archive member")}>
-						{#snippet after()}
-							<Toggle
-								name="isArchived"
-								checked={!!member.isArchived}
-								onChange={() => (member.isArchived = !member.isArchived)}
-							/>
+			<List strongIos inset class="my-8">
+				<ListItem label title={t("Archive member")}>
+					{#snippet after()}
+						<Toggle
+							name="isArchived"
+							checked={!!member.isArchived}
+							onChange={() => (member.isArchived = !member.isArchived)}
+						/>
+					{/snippet}
+				</ListItem>
+				<div class:hidden={!member.isArchived}>
+					<ListInput
+						name="archivedReason"
+						label={t("Archived reason")}
+						floatingLabel
+						type="textarea"
+						autocomplete="off"
+						inputClass="min-h-6"
+						bind:value={member.archivedReason}
+						error={formState.errors["archivedReason"] || ""}
+					>
+						{#snippet media()}
+							<ArchiveInputIcon input />
 						{/snippet}
-					</ListItem>
-					<div class:hidden={!member.isArchived}>
-						<ListInput
-							name="archivedReason"
-							label={t("Archived reason")}
-							floatingLabel
-							type="textarea"
-							autocomplete="off"
-							inputClass="min-h-6"
-							bind:value={member.archivedReason}
-							error={formState.errors["archivedReason"] || ""}
-						>
-							{#snippet media()}
-								<ArchiveInputIcon input />
-							{/snippet}
-						</ListInput>
-					</div>
-				</List>
-			</Block>
+					</ListInput>
+				</div>
+			</List>
 
 			<EditPageDangerZone>
 				{@render deleteRecordButton?.()}

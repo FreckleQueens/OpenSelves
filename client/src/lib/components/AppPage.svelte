@@ -101,7 +101,7 @@
 		</MenuList>
 
 		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />
-		<Block class="">
+		<Block>
 			<div class="flex items-center">
 				{#if !appState.isAuthenticated}
 					Exclusive offline mode

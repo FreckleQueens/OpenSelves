@@ -193,8 +193,9 @@
 		onClick={() => {
 			openDeleteMemberDialog = true;
 		}}
-		class="k-color-brand-red"
+		class="k-color-brand-red m-2"
 		type="button"
+		inline
 	>
 		<DeleteIcon button before />
 		{t("Delete {thingName} (irreversible)", thingName)}
