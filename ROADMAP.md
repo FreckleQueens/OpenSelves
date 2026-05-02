@@ -142,7 +142,11 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.5.0 - Member profile picture
+## ✅ 0.5.0 - Member profile picture
+
+<details>
+  <summary>dev todo</summary>
+
 - [ ] ~~client: switch to a better md3 library~~ (canceled)
 - [x] add version checks on /push and /pull endpoints
 - [x] member profile picture
@@ -154,7 +158,9 @@ deadline or ETA
 - [x] member color
 - [x] verify and fix iOS colors
 
-## 0.6.0 - Basic account features
+</details>
+
+## 🚧 0.6.0 - Basic account features
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
