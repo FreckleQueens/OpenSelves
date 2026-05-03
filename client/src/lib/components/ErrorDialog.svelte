@@ -28,8 +28,8 @@
 	class={errors.length > 0 ? "has-errors" : ""}
 >
 	{#snippet title()}
-		<span>
-			<AppErrorIcon class="inline text-brand-red" />
+		<span class="flex items-center gap-2">
+			<AppErrorIcon class="text-brand-red" />
 			Application error
 		</span>
 	{/snippet}
