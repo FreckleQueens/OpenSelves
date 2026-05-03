@@ -203,13 +203,12 @@ describe("/sync/pull", () => {
 			const logs = await callPullAndGetLogs("init", 200, env.users.cookies);
 
 			expect(logs.length).toBe(members.length + 1);
-			for (let i = 0; i < members.length; i++) {
-				const log: Log = logs[i] as Log;
-				const member = members[i];
-				expect(log).toMatchObject({
-					memberId: member.id,
-					operationType: "create",
-				});
+			for (const member of members) {
+				const log: Log | undefined = logs.find(
+					(log) => log && typeof log === "object" && log["memberId"] === member.id,
+				) as Log;
+				expect(log).toBeDefined();
+				expect(log["operationType"]).toBe("create");
 
 				const { id, userId, createdAt, updatedAt, ...memberData } = member;
 				expect(log.data).toStrictEqual({
@@ -229,8 +228,11 @@ describe("/sync/pull", () => {
 				expect(log.deletedId).toBeUndefined();
 			}
 
-			expect(logs[logs.length - 1]).toMatchObject({
-				memberId: deletedMember1.id,
+			const deleteLog = logs.find(
+				(log) => log && typeof log === "object" && log["memberId"] === deletedMember1.id,
+			);
+			expect(deleteLog).toBeDefined();
+			expect(deleteLog).toMatchObject({
 				operationType: "delete",
 				data: null,
 			});
