@@ -3,6 +3,7 @@
 	"packageManager": "yarn@4.13.0",
 	"scripts": {
 		"build": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
+		"dev": "yarn build --watch",
 		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
 		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
 	},
