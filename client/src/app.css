@@ -24,12 +24,12 @@
 	--color-brand-red: #d72638;
 }
 
-.bg-md-light-surface-darker {
+.k-material .material\:bg-md-light-surface-darker {
 	background-color: oklab(from var(--color-md-light-surface) calc(l * 0.8) a b);
 }
 
 @media (prefers-color-scheme: dark) {
-	.dark\:bg-md-dark-surface-darker {
+	.k-material .material\:dark\:bg-md-dark-surface-darker {
 		background-color: oklab(from var(--color-md-dark-surface) calc(l * 0.8) a b);
 	}
 }
