@@ -18,7 +18,7 @@
 	}: OSIconProps = $props();
 
 	const classes: string = $derived.by(() => {
-		const vals: string[] = [];
+		const vals: string[] = ["icon"];
 		if (button || fab || input) {
 			vals.push("text-xl");
 		}
@@ -67,10 +67,16 @@
 </Icon>
 
 <style lang="scss">
-	:global .has-secondary-icon > svg {
-		mask: radial-gradient(circle at 80% 80%, transparent 30%, black 30%);
-		mask-repeat: no-repeat;
+	:global .icon {
+		svg {
+			overflow: visible;
+		}
+		&.has-secondary-icon > svg {
+			mask: radial-gradient(circle at 80% 80%, transparent 30%, black 30%);
+			mask-repeat: no-repeat;
+		}
 	}
+
 	.secondary-icon {
 		position: absolute;
 		left: 80%;
