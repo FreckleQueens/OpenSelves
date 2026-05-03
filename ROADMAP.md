@@ -162,7 +162,7 @@ deadline or ETA
 
 ## 🚧 0.5.1
 - [x] fix desktop frame background color regression
-- [ ] fix server warning for route pattern "/attachment/*"
+- [x] fix server warning for route pattern "/attachment/*"
 - [ ] fix server deployment needing package.json 2 levels above with version
 
 ## 🚧 0.6.0 - Basic account features

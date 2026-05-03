@@ -32,7 +32,7 @@ import { VersionMiddleware } from "./version.middleware.js";
 })
 export class AppModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
-		consumer.apply(VersionMiddleware).exclude("/attachment/*").forRoutes("*");
+		consumer.apply(VersionMiddleware).exclude("/attachment/*path").forRoutes("*");
 	}
 }
 
