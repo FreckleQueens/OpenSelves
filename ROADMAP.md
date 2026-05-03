@@ -165,6 +165,7 @@ deadline or ETA
 - [x] fix server warning for route pattern "/attachment/*"
 - [x] fix server deployment needing package.json 2 levels above with version
 - [x] Add dialog for app updates to allow user to easily reload the app
+- [x] server: check file upload dir for readwrite permissions
 
 ## 🚧 0.6.0 - Basic account features
 - [ ] password recovery

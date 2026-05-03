@@ -51,6 +51,15 @@ import { SyncService } from "./sync.service.js";
 						);
 					}
 
+					try {
+						fs.accessSync(tmpUploadDir, fs.constants.R_OK | fs.constants.W_OK);
+					} catch {
+						throw new Error(
+							"TMP_UPLOAD_DIR set to path without read/write permissions: " +
+								tmpUploadDir,
+						);
+					}
+
 					storage = diskStorage({
 						destination: tmpUploadDir,
 					});
