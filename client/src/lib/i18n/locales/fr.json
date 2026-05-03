@@ -55,7 +55,7 @@
 	"Note": "Note",
 	"Offline - #{user.id}": "Hors ligne - #{user.id}",
 	"OpenSelves": "OpenSelves",
-	"OpenSelves client version {PUBLIC_APP_VERSION}": "OpenSelves - client version {PUBLIC_APP_VERSION}",
+	"OpenSelves client version {VERSION}": "OpenSelves - client version {VERSION}",
 	"Password": "Mot de passe",
 	"Please note that if you close the app instead, you will have to re-enter your credentials manually.": "Attention : si vous fermez l'application, vous devrez à nouveau saisir vos identifiants.",
 	"Pronouns": "Pronoms",

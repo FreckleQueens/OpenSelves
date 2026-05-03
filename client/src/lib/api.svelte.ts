@@ -2,7 +2,6 @@ import { dev } from "$app/environment";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import {
-	PUBLIC_APP_VERSION,
 	PUBLIC_DEFAULT_API_URL,
 	PUBLIC_DEFAULT_API_URL_DEV,
 	PUBLIC_TEST_ENVIRONMENT,
@@ -11,7 +10,7 @@ import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
 import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "openselves-common";
+import { API_VERSION, SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "openselves-common";
 
 export const apiState: {
 	url: string;
@@ -55,7 +54,7 @@ export enum CallResult {
 
 const baseApiRequestHeaders = {
 	Accept: "application/json",
-	"X-OpenSelves-Version": PUBLIC_APP_VERSION,
+	"X-OpenSelves-Version": API_VERSION,
 };
 
 export async function callRaw(
@@ -125,7 +124,7 @@ export async function callRaw(
 			);
 		}
 
-		if (response && response.headers.get("X-OpenSelves-Version") !== PUBLIC_APP_VERSION) {
+		if (response && response.headers.get("X-OpenSelves-Version") !== API_VERSION) {
 			console.debug(response.headers);
 			return CallResult.WRONG_VERSION;
 		}
@@ -249,7 +248,7 @@ async function isApiReachable(): Promise<boolean> {
 		});
 		if (response.ok) {
 			const responseBody = await response.json();
-			if (responseBody.ready === true && responseBody.version === PUBLIC_APP_VERSION) {
+			if (responseBody.ready === true && responseBody.version === API_VERSION) {
 				console.debug("online");
 				await setMaxUploadSize(responseBody.maxUploadSize);
 				return true;

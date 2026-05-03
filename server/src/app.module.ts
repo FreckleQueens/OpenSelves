@@ -7,8 +7,8 @@ import {
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
+import { API_VERSION } from "openselves-common";
 
-import rootPackage from "../../package.json" with { type: "json" };
 import { AuthModule } from "./auth/auth.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
@@ -39,7 +39,7 @@ export class AppModule implements NestModule {
 export function configureApp(app: INestApplication) {
 	const configService = app.get(ConfigService<ConfigData>);
 
-	configService.set("_APP_VERSION", rootPackage.version);
+	configService.set("_APP_VERSION", API_VERSION);
 
 	app.useGlobalPipes(
 		new ValidationPipe({

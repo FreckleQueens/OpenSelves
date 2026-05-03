@@ -6,10 +6,6 @@ import IconsResolver from "unplugin-icons/resolver";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vitest/config";
 
-import rootPackage from "../package.json" with { type: "json" };
-
-process.env.PUBLIC_APP_VERSION = rootPackage.version;
-
 export default defineConfig({
 	plugins: [
 		tailwindcss(),

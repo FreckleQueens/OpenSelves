@@ -1,4 +1,3 @@
-import { APP_VERSION } from "$lib";
 import { IDBStorage, PersistentStorage } from "$lib/PersistentStorage";
 import {
 	SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY,
@@ -11,9 +10,10 @@ import { DEFAULT_LOCALE } from "$lib/i18n/i18n";
 import { LOCALE_STORAGE_KEY, setLocale } from "$lib/i18n/i18n-client";
 import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker";
+import { API_VERSION } from "openselves-common";
 
 export async function initApp() {
-	console.log("OpenSelves client version", APP_VERSION);
+	console.log("OpenSelves client version", API_VERSION);
 
 	// IDB
 	await IDB.init();

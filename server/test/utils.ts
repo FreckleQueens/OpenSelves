@@ -5,13 +5,13 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { createId } from "@paralleldrive/cuid2";
 import { inArray } from "drizzle-orm";
 import methods from "methods";
+import { API_VERSION } from "openselves-common";
 import { type User, users } from "openselves-common/db";
 import type { ValueFromArray } from "rxjs";
 import request, { type Response } from "supertest";
 import type TestAgent from "supertest/lib/agent.js";
 import type { App } from "supertest/types.js";
 
-import rootPackage from "../../package.json" with { type: "json" };
 import { AppModule, configureApp } from "../src/app.module.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
@@ -100,7 +100,7 @@ export function setupTestSuite(
 					get(target, name, receiver) {
 						if (typeof name === "string" && isMethod(name)) {
 							return (url: string) =>
-								target[name](url).set("X-OpenSelves-Version", rootPackage.version);
+								target[name](url).set("X-OpenSelves-Version", API_VERSION);
 						} else {
 							return Reflect.get(target, name, receiver) as unknown;
 						}
