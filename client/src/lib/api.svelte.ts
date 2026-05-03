@@ -15,12 +15,14 @@ import { API_VERSION, SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "opensel
 export const apiState: {
 	url: string;
 	maxUploadSize: number | undefined;
+	mismatchedRemoteVersion: string | undefined;
 } = $state({
 	url:
 		dev || PUBLIC_TEST_ENVIRONMENT === "1"
 			? PUBLIC_DEFAULT_API_URL_DEV
 			: PUBLIC_DEFAULT_API_URL,
 	maxUploadSize: undefined,
+	mismatchedRemoteVersion: undefined,
 });
 
 export const SERVER_URL_STORAGE_KEY = "serverUrl";
@@ -122,6 +124,10 @@ export async function callRaw(
 				response,
 				responseBody,
 			);
+		}
+
+		if (responseBody && typeof responseBody?.expectedVersion === "string") {
+			apiState.mismatchedRemoteVersion = responseBody.expectedVersion;
 		}
 
 		if (response && response.headers.get("X-OpenSelves-Version") !== API_VERSION) {

@@ -164,6 +164,7 @@ deadline or ETA
 - [x] fix desktop frame background color regression
 - [x] fix server warning for route pattern "/attachment/*"
 - [x] fix server deployment needing package.json 2 levels above with version
+- [x] Add dialog for app updates to allow user to easily reload the app
 
 ## 🚧 0.6.0 - Basic account features
 - [ ] password recovery

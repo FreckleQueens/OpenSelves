@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import { appState } from "$lib/appState.svelte.js";
+	import AppUpdateDialog from "$lib/components/AppUpdateDialog.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
@@ -60,6 +61,8 @@
 	additionalErrors={[syncWorkerError ? transformErrorToReadable(syncWorkerError) : null]}
 	onDismiss={() => SyncWorker.getInstance().clearError()}
 />
+
+<AppUpdateDialog />
 
 <Panel side="left" opened={openMenu} onBackdropClick={() => (openMenu = false)}>
 	<Page class="pt-safe pb-safe pl-safe flex flex-col">
