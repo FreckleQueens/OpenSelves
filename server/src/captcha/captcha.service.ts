@@ -14,7 +14,6 @@ import type { ConfigData } from "../config.data.js";
 
 @Injectable()
 export class CaptchaService {
-	public static easyCaptchaForTests: boolean = false;
 	public static challengeTtl: number = 30 * 60; // 30 minutes
 
 	constructor(private readonly configService: ConfigService<ConfigData>) {}
@@ -36,7 +35,11 @@ export class CaptchaService {
 			expiresAt: new Date(Date.now() + CaptchaService.challengeTtl * 1000),
 		};
 
-		if (CaptchaService.easyCaptchaForTests) {
+		if (
+			this.configService.get("INSECURE_EASY_CAPTCHA_FOR_TESTS", {
+				infer: true,
+			})
+		) {
 			challengeParams.counter = 1;
 			challengeParams.cost = 1;
 			challengeParams.memoryCost = 32;

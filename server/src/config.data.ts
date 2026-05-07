@@ -30,6 +30,8 @@ export interface ConfigData {
 	S3_ACCESS_KEY?: string;
 	S3_SECRET_KEY?: string;
 
+	INSECURE_EASY_CAPTCHA_FOR_TESTS: boolean;
+
 	_APP_VERSION: string;
 }
 
@@ -108,5 +110,6 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	S3_ACCESS_KEY: Joi.string(),
 	S3_SECRET_KEY: Joi.string(),
 
+	INSECURE_EASY_CAPTCHA_FOR_TESTS: Joi.boolean(),
 	_APP_VERSION: Joi.forbidden(),
 });

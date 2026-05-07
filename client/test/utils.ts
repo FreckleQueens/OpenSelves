@@ -23,6 +23,8 @@ export async function registerAndLoginUser(
 	await form.locator("input[name=email]").fill(email);
 	await form.locator("input[name=password]").fill(password);
 	await form.locator('input[name="registrationPassword"]').fill("12345678");
+	await form.locator('.altcha input[type="checkbox"] + svg').click();
+	await page.waitForSelector(".altcha[data-state='verified']");
 	await form.getByRole("button", { name: "Register" }).click();
 	await page.locator("#auto-login-button").click();
 

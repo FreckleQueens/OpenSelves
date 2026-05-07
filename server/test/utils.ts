@@ -89,7 +89,6 @@ export function setupTestSuite(
 
 	beforeAll(async () => {
 		DbService.dbUrlConfigKey = "TEST_DB_URL";
-		CaptchaService.easyCaptchaForTests = true;
 
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
@@ -98,6 +97,7 @@ export function setupTestSuite(
 		const app: INestApplication<App> = moduleFixture.createNestApplication();
 		configureApp(app);
 		const configService: ConfigService<ConfigData> = app.get(ConfigService);
+		configService.set("INSECURE_EASY_CAPTCHA_FOR_TESTS", true);
 		const registrationPassword = configService.getOrThrow("REGISTRATION_PASSWORD", {
 			infer: true,
 		});

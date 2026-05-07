@@ -3415,14 +3415,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@playwright/test@npm:=1.58.2":
-  version: 1.58.2
-  resolution: "@playwright/test@npm:1.58.2"
+"@playwright/test@npm:=1.59.1":
+  version: 1.59.1
+  resolution: "@playwright/test@npm:1.59.1"
   dependencies:
-    playwright: "npm:1.58.2"
+    playwright: "npm:1.59.1"
   bin:
     playwright: cli.js
-  checksum: 10c0/2164c03ad97c3653ff02e8818a71f3b2bbc344ac07924c9d8e31cd57505d6d37596015a41f51396b3ed8de6840f59143eaa9c21bf65515963da20740119811da
+  checksum: 10c0/8c2d94a860d3c254a0b114df2f888ad0a0e9310f45b6059bd5d4da196d965cadf6922267cef0881cfa9784d4bef6d78363d2c2d94caa64be67ff644c41162137
   languageName: node
   linkType: hard
 
@@ -5868,6 +5868,15 @@ __metadata:
   bin:
     altcha-lib: bin/cli.mjs
   checksum: 10c0/5c56e19453d4a3460ce4bb814f75e76ff073a0f324b47f4ee6eba721c63ccbcd66290ded964817ecf1d2bd764292111b6ba7b0ef353ff4ae08df2cc088264f30
+  languageName: node
+  linkType: hard
+
+"altcha@npm:^3.0.8":
+  version: 3.0.8
+  resolution: "altcha@npm:3.0.8"
+  dependencies:
+    hash-wasm: "npm:^4.12.0"
+  checksum: 10c0/5b7f597a21fba5664cbf86d1c33b32d797822063a69cb3d1d667718f20ae0eb2f9fdddc3c9b1eb0b042a5e13f2789b7502176f1fff9eaea59b9e04479b023984
   languageName: node
   linkType: hard
 
@@ -9241,6 +9250,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"hash-wasm@npm:^4.12.0":
+  version: 4.12.0
+  resolution: "hash-wasm@npm:4.12.0"
+  checksum: 10c0/6cb95055319810b6f673de755289960683a9831807690795f0e8918b2fd7e6ae5b82a9dc47cbace171cf2814b412ef68c315a0ead0b4d96bd3e56a05e4bde136
+  languageName: node
+  linkType: hard
+
 "hasown@npm:^2.0.2":
   version: 2.0.2
   resolution: "hasown@npm:2.0.2"
@@ -11608,7 +11624,7 @@ __metadata:
     "@iconify-json/material-symbols-light": "npm:^1.2.69"
     "@iconify-json/mdi": "npm:^1.2.3"
     "@paralleldrive/cuid2": "npm:^3.3.0"
-    "@playwright/test": "npm:=1.58.2"
+    "@playwright/test": "npm:=1.59.1"
     "@sveltejs/adapter-static": "npm:^3.0.10"
     "@sveltejs/kit": "npm:^2.59.0"
     "@sveltejs/vite-plugin-svelte": "npm:^7.0.0"
@@ -11619,6 +11635,7 @@ __metadata:
     "@types/node": "npm:^25.6.0"
     "@types/validator": "npm:^13.15.10"
     "@vitest/browser-playwright": "npm:^4.1.5"
+    altcha: "npm:^3.0.8"
     eslint: "npm:^10.3.0"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-svelte: "npm:^3.17.1"
@@ -11630,7 +11647,7 @@ __metadata:
     konsta: "npm:^5.0.9"
     magic-string: "npm:^0.30.21"
     openselves-common: "workspace:^"
-    playwright: "npm:=1.58.2"
+    playwright: "npm:=1.59.1"
     prettier: "npm:^3.8.3"
     prettier-plugin-svelte: "npm:^3.5.1"
     sass-embedded: "npm:^1.99.0"
@@ -12110,27 +12127,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"playwright-core@npm:1.58.2":
-  version: 1.58.2
-  resolution: "playwright-core@npm:1.58.2"
+"playwright-core@npm:1.59.1":
+  version: 1.59.1
+  resolution: "playwright-core@npm:1.59.1"
   bin:
     playwright-core: cli.js
-  checksum: 10c0/5aa15b2b764e6ffe738293a09081a6f7023847a0dbf4cd05fe10eed2e25450d321baf7482f938f2d2eb330291e197fa23e57b29a5b552b89927ceb791266225b
+  checksum: 10c0/d41a74d9681ce3beb3d5239e9ed577710b4ad099a6ca2476219c6599d51e9cb4b80bd72ed82c528da6a5d929c18ae3b872cf02bb83f78fa1c2cb9199c501abee
   languageName: node
   linkType: hard
 
-"playwright@npm:1.58.2, playwright@npm:=1.58.2":
-  version: 1.58.2
-  resolution: "playwright@npm:1.58.2"
+"playwright@npm:1.59.1, playwright@npm:=1.59.1":
+  version: 1.59.1
+  resolution: "playwright@npm:1.59.1"
   dependencies:
     fsevents: "npm:2.3.2"
-    playwright-core: "npm:1.58.2"
+    playwright-core: "npm:1.59.1"
   dependenciesMeta:
     fsevents:
       optional: true
   bin:
     playwright: cli.js
-  checksum: 10c0/d060d9b7cc124bd8b5dffebaab5e84f6b34654a553758fe7b19cc598dfbee93f6ecfbdc1832b40a6380ae04eade86ef3285ba03aa0b136799e83402246dc0727
+  checksum: 10c0/dfe38396e616e5c4f98825ce90037bb96e477c5a2bd9258a24854f8ce72a8a41427b19098863866f85aa0216e70287dd537c4438d761aca93995e31ae099c533
   languageName: node
   linkType: hard
 

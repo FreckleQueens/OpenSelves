@@ -1,9 +1,10 @@
 <script lang="ts">
+	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import type { AuthFormData } from "$lib/forms";
-	import { BlockTitle, List, ListInput } from "konsta/svelte";
+	import { BlockTitle, List, ListInput, ListItem } from "konsta/svelte";
 
 	let { formState = $bindable() }: { formState: AuthFormData } = $props();
 </script>
@@ -42,5 +43,13 @@
 				<PasswordIcon input />
 			{/snippet}
 		</ListInput>
+	</List>
+
+	<List>
+		<ListItem>
+			{#snippet inner()}
+				<Captcha bind:value={formState.data["captcha"]} />
+			{/snippet}
+		</ListItem>
 	</List>
 </FormFields>

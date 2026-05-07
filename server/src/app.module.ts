@@ -3,6 +3,7 @@ import {
 	type MiddlewareConsumer,
 	Module,
 	type NestModule,
+	RequestMethod,
 	ValidationPipe,
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
@@ -34,7 +35,14 @@ import { VersionMiddleware } from "./version.middleware.js";
 })
 export class AppModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
-		consumer.apply(VersionMiddleware).exclude("/attachment/*path").forRoutes("*");
+		consumer
+			.apply(VersionMiddleware)
+			.exclude("/attachment/*path")
+			.exclude({
+				path: "/captcha/challenge",
+				method: RequestMethod.GET,
+			})
+			.forRoutes("*");
 	}
 }
 
