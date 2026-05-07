@@ -1,8 +1,10 @@
-import { afterAll, beforeAll, beforeEach } from "@jest/globals";
+import { afterAll, beforeAll, beforeEach, expect, test } from "@jest/globals";
 import type { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { createId } from "@paralleldrive/cuid2";
+import { type Challenge, type Solution, solveChallenge } from "altcha-lib";
+import { deriveKey } from "altcha-lib/algorithms/argon2id";
 import { inArray } from "drizzle-orm";
 import methods from "methods";
 import { API_VERSION } from "openselves-common";
@@ -13,9 +15,15 @@ import type TestAgent from "supertest/lib/agent.js";
 import type { App } from "supertest/types.js";
 
 import { AppModule, configureApp } from "../src/app.module.js";
+import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
 import type { DB } from "../src/db/drizzle.js";
+
+export type Captcha = {
+	challenge: Challenge;
+	solution: Solution;
+};
 
 type CreateUsersEnv = {
 	db: DB;
@@ -33,7 +41,9 @@ export type TestEnv = {
 	app: INestApplication<App>;
 	configService: ConfigService<ConfigData>;
 	users: TestEnvUsers;
+	captcha: Captcha;
 } & CreateUsersEnv;
+
 async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	if (existingUsers) {
 		await env.db
@@ -49,13 +59,19 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 					email: createId() + "@example.com",
 					password: userPassword,
 					registrationPassword: env.registrationPassword,
+					captcha: await solveCaptcha(env.request),
 				})
 				.expect(201)
 		).body;
-		const response = await env.request
-			.post("/auth/login")
-			.send({ email: user.email, password: userPassword })
-			.expect(200);
+		const response = await env.request.post("/auth/login").send({
+			email: user.email,
+			password: userPassword,
+			captcha: await solveCaptcha(env.request),
+		});
+		if (response.status !== 200) {
+			console.error(response.body);
+		}
+		expect(response.status).toBe(200);
 		const cookies = convertResponseCookiesToRequestCookies(response);
 		return { user, cookies };
 	}
@@ -73,6 +89,7 @@ export function setupTestSuite(
 
 	beforeAll(async () => {
 		DbService.dbUrlConfigKey = "TEST_DB_URL";
+		CaptchaService.easyCaptchaForTests = true;
 
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
@@ -114,6 +131,7 @@ export function setupTestSuite(
 			app,
 			configService,
 			users: await createUsers(createUsersEnv),
+			captcha: await solveCaptcha(createUsersEnv.request),
 		};
 		envCallback(env);
 	});
@@ -152,4 +170,106 @@ export function extractCookie(cookieName: string, cookies: string) {
 		throw new Error(`${cookieName} not found in cookies`);
 	}
 	return value;
+}
+
+export async function solveCaptcha(request: TestAgent): Promise<Captcha> {
+	const response = await request.get("/captcha/challenge");
+
+	if (response.status !== 200) {
+		console.error(response.body);
+	}
+	expect(response.status).toBe(200);
+
+	const challenge = response.body;
+	const solution = await solveChallenge({
+		challenge,
+		deriveKey,
+	});
+
+	if (!solution) {
+		throw new Error("No solution for captcha");
+	}
+
+	return {
+		challenge: challenge,
+		solution: solution,
+	};
+}
+
+export function testCaptcha(
+	getEnv: () => TestEnv,
+	successCode: number,
+	callback: (captcha: Captcha | object | string | null | undefined) => Promise<request.Response>,
+) {
+	for (const { test: testName, status, captcha: getCaptcha } of [
+		{
+			test: `POST ${successCode} valid captcha`,
+			status: successCode,
+			captcha: async () => solveCaptcha(getEnv().request),
+		},
+		{
+			test: "POST 400 undefined captcha",
+			status: 400,
+			captcha: undefined,
+		},
+		{
+			test: "POST 400 null captcha",
+			status: 400,
+			captcha: null,
+		},
+		{
+			test: "POST 400 empty string captcha",
+			status: 400,
+			captcha: "",
+		},
+		{
+			test: "POST 401 invalid captcha",
+			status: 401,
+			captcha: {
+				challenge: {},
+				solution: {},
+			},
+		},
+		{
+			test: "POST 401 no solution captcha",
+			status: 401,
+			captcha: async () => {
+				const captcha = await solveCaptcha(getEnv().request);
+				return { ...captcha, solution: {} };
+			},
+		},
+		{
+			test: "POST 401 expired captcha",
+			status: 401,
+			captcha: async () => {
+				const initialChallengeTtl = CaptchaService.challengeTtl;
+				CaptchaService.challengeTtl = -1;
+				const challenge = await getEnv().app.get(CaptchaService).createChallenge();
+				CaptchaService.challengeTtl = initialChallengeTtl;
+				const solution = await solveChallenge({
+					challenge,
+					deriveKey,
+				});
+				return {
+					challenge,
+					solution,
+				};
+			},
+		},
+	]) {
+		test(testName, async () => {
+			let captcha: Captcha | object | string | null | undefined;
+			if (typeof getCaptcha === "function") {
+				captcha = await getCaptcha();
+			} else {
+				captcha = getCaptcha;
+			}
+			const response = await callback(captcha);
+
+			if (response.status !== status) {
+				console.error(response.body);
+			}
+			expect(response.status).toBe(status);
+		});
+	}
 }

@@ -1,8 +1,10 @@
-import { Module } from "@nestjs/common";
+import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 
+import { CaptchaMiddleware } from "../captcha/captcha.middleware.js";
+import { CaptchaModule } from "../captcha/captcha.module.js";
 import { type ConfigData } from "../config.data.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
@@ -27,6 +29,7 @@ import { UserService } from "./user/user.service.js";
 				};
 			},
 		}),
+		CaptchaModule,
 	],
 	providers: [
 		{
@@ -38,4 +41,11 @@ import { UserService } from "./user/user.service.js";
 	],
 	controllers: [AuthController, UserController],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(CaptchaMiddleware).forRoutes("/auth/login", {
+			path: "/user",
+			method: RequestMethod.POST,
+		});
+	}
+}

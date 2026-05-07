@@ -10,6 +10,7 @@ import cookieParser from "cookie-parser";
 import { API_VERSION } from "openselves-common";
 
 import { AuthModule } from "./auth/auth.module.js";
+import { CaptchaModule } from "./captcha/captcha.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
 import { StatusController } from "./status.controller.js";
@@ -19,6 +20,7 @@ import { VersionMiddleware } from "./version.middleware.js";
 @Module({
 	imports: [
 		AuthModule,
+		CaptchaModule,
 		ConfigModule.forRoot({
 			isGlobal: true,
 			cache: true,

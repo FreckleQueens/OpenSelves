@@ -174,6 +174,17 @@ deadline or ETA
 </details>
 
 ## 🚧 0.6.0 - Basic account features
+- [ ] public registrations with captcha
+  - [x] simple implementation
+  - [ ] protect against replay attacks by caching solved challenges in memory for their TTL
+  - [ ] increase work requirement by n when criteria met n times before 600s release period (memory cache):
+    - [ ] same ip (beware of reverse proxy with x-forwarded-for header)
+    - [ ] same email (for actions that send emails)
+    - [ ] same user (for heavy authenticated actions)
+    - [ ] configurable total /captcha/challenge number call threshold
+- [ ] email verification
+  - [ ] basic verification link
+  - [ ] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
@@ -215,8 +226,6 @@ a short-lived one
 - [ ] ListInput: make clear button better (example: member edit form color field)
 
 ## 1.0.0 - Official release
-- [ ] email verification
-- [ ] public registrations with captcha
 - [ ] general UI/UX accessibility check
 - [ ] review [private launch items](./private%20launch%20items.md) (not accessible publicly)
 

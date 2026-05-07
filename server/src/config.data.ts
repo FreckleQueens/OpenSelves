@@ -19,6 +19,8 @@ export interface ConfigData {
 	REFRESH_TOKEN_SIZE: number;
 
 	REGISTRATION_PASSWORD: string;
+	CAPTCHA_SECRET: string;
+	CAPTCHA_KEY_SECRET: string;
 
 	MAX_UPLOAD_SIZE: number;
 	TMP_UPLOAD_DIR?: string;
@@ -85,6 +87,21 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set REGISTER_PASSWORD environment variable to secure random string",
 		"any.required": "Please set REGISTER_PASSWORD environment variable to secure random string",
 	}),
+	CAPTCHA_SECRET: Joi.string().min(32).not("CHANGE_ME").required().messages({
+		"any.invalid": "Please set CAPTCHA_SECRET environment variable to secure random string",
+		"any.required": "Please set CAPTCHA_SECRET environment variable to secure random string",
+	}),
+	CAPTCHA_KEY_SECRET: Joi.string()
+		.min(32)
+		.not("CHANGE_ME")
+		.not(Joi.ref("CAPTCHA_SECRET"))
+		.required()
+		.messages({
+			"any.invalid":
+				"Please set CAPTCHA_KEY_SECRET environment variable to secure random string (different than CAPTCHA_SECRET)",
+			"any.required":
+				"Please set CAPTCHA_KEY_SECRET environment variable to secure random string",
+		}),
 
 	MAX_UPLOAD_SIZE: Joi.number().min(0).default(0),
 	TMP_UPLOAD_DIR: Joi.string(),

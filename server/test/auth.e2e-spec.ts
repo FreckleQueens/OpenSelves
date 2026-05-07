@@ -11,6 +11,7 @@ import {
 	convertResponseCookiesToRequestCookies,
 	extractCookie,
 	setupTestSuite,
+	testCaptcha,
 	waitFor,
 } from "./utils.js";
 
@@ -53,7 +54,11 @@ describe("Auth (e2e)", () => {
 			test("POST 200", async () => {
 				const response = await env.request
 					.post("/auth/login")
-					.send({ email: env.users.user.email, password: env.users.userPassword })
+					.send({
+						email: env.users.user.email,
+						password: env.users.userPassword,
+						captcha: env.captcha,
+					})
 					.expect(200)
 					.expect("Content-Type", /json/)
 					.expect(
@@ -102,55 +107,70 @@ describe("Auth (e2e)", () => {
 			for (const { test: testName, data, status } of [
 				{
 					test: "POST 401 wrong password",
-					data: () => ({ email: env.users.user.email, password: "wrong password" }),
 					status: 401,
+					data: () => ({ email: env.users.user.email, password: "wrong password" }),
 				},
 				{
 					test: "POST 401 unknown email address",
+					status: 401,
 					data: () => ({
 						email: "unknown.email@example.com",
 						password: env.users.userPassword,
 					}),
-					status: 401,
 				},
 				{
 					test: "POST 400 no email provided",
-					data: () => ({ password: env.users.userPassword }),
 					status: 400,
+					data: () => ({ password: env.users.userPassword }),
 				},
 				{
 					test: "POST 400 empty email provided",
-					data: () => ({ email: "", password: env.users.userPassword }),
 					status: 400,
+					data: () => ({ email: "", password: env.users.userPassword }),
 				},
 				{
 					test: "POST 400 invalid email provided",
+					status: 400,
 					data: () => ({
 						email: "not an email address",
 						password: env.users.userPassword,
 					}),
-					status: 400,
 				},
 				{
 					test: "POST 400 no password provided",
-					data: () => ({ email: env.users.user.email }),
 					status: 400,
+					data: () => ({ email: env.users.user.email }),
 				},
 				{
 					test: "POST 400 empty password",
-					data: () => ({ email: env.users.user.email, password: "" }),
 					status: 400,
+					data: () => ({ email: env.users.user.email, password: "" }),
 				},
 			]) {
 				test(testName, async () => {
 					await env.request
 						.post("/auth/login")
-						.send(data())
+						.send({
+							...data(),
+							captcha: env.captcha,
+						})
 						.expect(status)
 						.expect("Content-Type", /json/)
 						.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
 				});
 			}
+
+			testCaptcha(
+				() => env,
+				200,
+				async (captcha) => {
+					return env.request.post("/auth/login").send({
+						email: env.users.user.email,
+						password: env.users.userPassword,
+						captcha: captcha,
+					});
+				},
+			);
 		});
 
 		describe("/refresh", () => {
@@ -347,6 +367,7 @@ describe("Auth (e2e)", () => {
 					email: createId() + "@example.com",
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
+					captcha: env.captcha,
 				})
 				.expect(201)
 				.expect("Content-Type", /json/);
@@ -362,7 +383,11 @@ describe("Auth (e2e)", () => {
 			test(`POST ${testCase.test} 400`, async () => {
 				await env.request
 					.post("/user")
-					.send({ registrationPassword: env.registrationPassword, ...testCase })
+					.send({
+						registrationPassword: env.registrationPassword,
+						...testCase,
+						captcha: env.captcha,
+					})
 					.expect(400)
 					.expect("Content-Type", /json/);
 			});
@@ -376,6 +401,7 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
+					captcha: env.captcha,
 				})
 				.expect(201);
 			await env.request
@@ -384,6 +410,7 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "87654321",
 					registrationPassword: env.registrationPassword,
+					captcha: env.captcha,
 				})
 				.expect(409)
 				.expect("Content-Type", /json/);
@@ -397,6 +424,7 @@ describe("Auth (e2e)", () => {
 					email: "john@example.com",
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
+					captcha: env.captcha,
 				})
 				.expect(401)
 				.expect("Content-Type", /json/);
@@ -405,10 +433,23 @@ describe("Auth (e2e)", () => {
 		test("POST without general registration password 401", async () => {
 			await env.request
 				.post("/user")
-				.send({ email: "john@example.com", password: "12345678" })
+				.send({ email: "john@example.com", password: "12345678", captcha: env.captcha })
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
+
+		testCaptcha(
+			() => env,
+			201,
+			async (captcha) => {
+				return env.request.post("/user").send({
+					email: createId() + "@example.com",
+					password: "12345678",
+					registrationPassword: env.registrationPassword,
+					captcha,
+				});
+			},
+		);
 
 		test("GET 200", async () => {
 			const response = await env.request
