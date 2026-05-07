@@ -48,15 +48,18 @@ export class UserController {
 	@Public({ allowAuthenticatedUsers: false })
 	@Post("")
 	public async createUser(@Body() createUserDto: CreateUserDto) {
-		if (!createUserDto.registrationPassword) {
-			throw new UnauthorizedException("Missing registration password.");
-		}
+		const expectedRegistrationPassword = this.configService.get("REGISTRATION_PASSWORD", {
+			infer: true,
+		});
 
-		if (
-			createUserDto.registrationPassword !==
-			this.configService.getOrThrow("REGISTRATION_PASSWORD", { infer: true })
-		) {
-			throw new UnauthorizedException("Wrong registration password.");
+		if (expectedRegistrationPassword) {
+			if (!createUserDto.registrationPassword) {
+				throw new UnauthorizedException("Missing registration password.");
+			}
+
+			if (createUserDto.registrationPassword !== expectedRegistrationPassword) {
+				throw new UnauthorizedException("Wrong registration password.");
+			}
 		}
 
 		const hashedPassword = await this.userService.hashPassword(createUserDto.password);

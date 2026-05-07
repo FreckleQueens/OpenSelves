@@ -15,6 +15,7 @@ import { API_VERSION, SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "opensel
 export const apiState: {
 	url: string;
 	maxUploadSize: number | undefined;
+	areRegistrationsOpen: boolean | undefined;
 	mismatchedRemoteVersion: string | undefined;
 } = $state({
 	url:
@@ -22,6 +23,7 @@ export const apiState: {
 			? PUBLIC_DEFAULT_API_URL_DEV
 			: PUBLIC_DEFAULT_API_URL,
 	maxUploadSize: undefined,
+	areRegistrationsOpen: undefined,
 	mismatchedRemoteVersion: undefined,
 });
 
@@ -257,6 +259,7 @@ async function isApiReachable(): Promise<boolean> {
 			if (responseBody.ready === true && responseBody.version === API_VERSION) {
 				console.debug("online");
 				await setMaxUploadSize(responseBody.maxUploadSize);
+				apiState.areRegistrationsOpen = !!responseBody.areRegistrationsOpen;
 				return true;
 			}
 			debugData.push(responseBody);

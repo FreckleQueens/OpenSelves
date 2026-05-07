@@ -17,6 +17,7 @@ export class StatusController {
 				infer: true,
 			}),
 			maxUploadSize: this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
+			areRegistrationsOpen: !this.configService.get("REGISTRATION_PASSWORD", { infer: true }),
 		};
 	}
 }

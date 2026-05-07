@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { apiState } from "$lib/api.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
@@ -45,25 +46,27 @@
 		</ListInput>
 	</List>
 
-	<BlockTitle>Authorization</BlockTitle>
-	<List>
-		<ListInput
-			label={t("Registration password")}
-			floatingLabel
-			info={t(
-				"This is provided by the website's administrator. It may be required to be allowed to create a new account.",
-			)}
-			type="password"
-			name="registrationPassword"
-			bind:value={formState.data["registrationPassword"]}
-			error={formState.errors["registrationPassword"] || ""}
-			pattern=".{'{'}8,}"
-			minlength={8}
-			autocomplete="current-password"
-		>
-			{#snippet media()}
-				<PassphraseIcon input />
-			{/snippet}
-		</ListInput>
-	</List>
+	{#if !apiState.areRegistrationsOpen}
+		<BlockTitle>Authorization</BlockTitle>
+		<List>
+			<ListInput
+				label={t("Registration password")}
+				floatingLabel
+				info={t(
+					"This is provided by the website's administrator. It may be required to be allowed to create a new account.",
+				)}
+				type="password"
+				name="registrationPassword"
+				bind:value={formState.data["registrationPassword"]}
+				error={formState.errors["registrationPassword"] || ""}
+				pattern=".{'{'}8,}"
+				minlength={8}
+				autocomplete="current-password"
+			>
+				{#snippet media()}
+					<PassphraseIcon input />
+				{/snippet}
+			</ListInput>
+		</List>
+	{/if}
 </FormFields>
