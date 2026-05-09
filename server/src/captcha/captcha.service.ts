@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { CACHE_MANAGER, Cache } from "@nestjs/cache-manager";
+import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
 	type Challenge,
@@ -12,11 +13,17 @@ import { deriveKey } from "altcha-lib/algorithms/argon2id";
 
 import type { ConfigData } from "../config.data.js";
 
+const CAPTCHA_CACHE_PREFIX = "service.captcha.";
+
 @Injectable()
 export class CaptchaService {
 	public static challengeTtl: number = 30 * 60; // 30 minutes
 
-	constructor(private readonly configService: ConfigService<ConfigData>) {}
+	constructor(
+		private readonly configService: ConfigService<ConfigData>,
+		@Inject(CACHE_MANAGER)
+		private readonly cache: Cache,
+	) {}
 
 	public async createChallenge() {
 		const challengeParams: CreateChallengeOptions = {
@@ -61,6 +68,21 @@ export class CaptchaService {
 					infer: true,
 				}),
 			});
+
+			if (result.verified) {
+				const challengeCacheKey = CAPTCHA_CACHE_PREFIX + JSON.stringify(challenge);
+
+				if ((await this.cache.get(challengeCacheKey)) === true) {
+					return false;
+				}
+
+				const expiresAt = challenge.parameters.expiresAt;
+				if (!expiresAt) {
+					return false;
+				}
+
+				await this.cache.set(challengeCacheKey, true, expiresAt * 1000 - Date.now());
+			}
 
 			return result.verified;
 		} catch {

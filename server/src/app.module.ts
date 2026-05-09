@@ -1,3 +1,4 @@
+import { CacheModule } from "@nestjs/cache-manager";
 import {
 	type INestApplication,
 	type MiddlewareConsumer,
@@ -26,6 +27,9 @@ import { VersionMiddleware } from "./version.middleware.js";
 			isGlobal: true,
 			cache: true,
 			validationSchema: validationSchema,
+		}),
+		CacheModule.register({
+			isGlobal: true,
 		}),
 		DbModule,
 		SyncModule,

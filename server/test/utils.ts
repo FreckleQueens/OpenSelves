@@ -41,7 +41,6 @@ export type TestEnv = {
 	app: INestApplication<App>;
 	configService: ConfigService<ConfigData>;
 	users: TestEnvUsers;
-	captcha: Captcha;
 } & CreateUsersEnv;
 
 async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
@@ -59,14 +58,14 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 					email: createId() + "@example.com",
 					password: userPassword,
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env.request),
+					captcha: await solveCaptcha(env),
 				})
 				.expect(201)
 		).body;
 		const response = await env.request.post("/auth/login").send({
 			email: user.email,
 			password: userPassword,
-			captcha: await solveCaptcha(env.request),
+			captcha: await solveCaptcha(env),
 		});
 		if (response.status !== 200) {
 			console.error(response.body);
@@ -131,7 +130,6 @@ export function setupTestSuite(
 			app,
 			configService,
 			users: await createUsers(createUsersEnv),
-			captcha: await solveCaptcha(createUsersEnv.request),
 		};
 		envCallback(env);
 	});
@@ -172,8 +170,8 @@ export function extractCookie(cookieName: string, cookies: string) {
 	return value;
 }
 
-export async function solveCaptcha(request: TestAgent): Promise<Captcha> {
-	const response = await request.get("/captcha/challenge");
+export async function solveCaptcha(env: CreateUsersEnv): Promise<Captcha> {
+	const response = await env.request.get("/captcha/challenge");
 
 	if (response.status !== 200) {
 		console.error(response.body);
@@ -201,11 +199,20 @@ export function testCaptcha(
 	successCode: number,
 	callback: (captcha: Captcha | object | string | null | undefined) => Promise<request.Response>,
 ) {
+	let usedCaptcha: Captcha | null = null;
 	for (const { test: testName, status, captcha: getCaptcha } of [
 		{
 			test: `POST ${successCode} valid captcha`,
 			status: successCode,
-			captcha: async () => solveCaptcha(getEnv().request),
+			captcha: async () => (usedCaptcha = await solveCaptcha(getEnv())),
+		},
+		{
+			test: `POST 401 already used captcha challenge`,
+			status: 401,
+			captcha: () => {
+				expect(usedCaptcha).not.toBeNull();
+				return usedCaptcha;
+			},
 		},
 		{
 			test: "POST 400 undefined captcha",
@@ -234,7 +241,7 @@ export function testCaptcha(
 			test: "POST 401 no solution captcha",
 			status: 401,
 			captcha: async () => {
-				const captcha = await solveCaptcha(getEnv().request);
+				const captcha = await solveCaptcha(getEnv());
 				return { ...captcha, solution: {} };
 			},
 		},

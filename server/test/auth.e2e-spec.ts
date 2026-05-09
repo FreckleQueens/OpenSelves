@@ -11,6 +11,7 @@ import {
 	convertResponseCookiesToRequestCookies,
 	extractCookie,
 	setupTestSuite,
+	solveCaptcha,
 	testCaptcha,
 	waitFor,
 } from "./utils.js";
@@ -57,7 +58,7 @@ describe("Auth (e2e)", () => {
 					.send({
 						email: env.users.user.email,
 						password: env.users.userPassword,
-						captcha: env.captcha,
+						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
 					.expect("Content-Type", /json/)
@@ -148,15 +149,18 @@ describe("Auth (e2e)", () => {
 				},
 			]) {
 				test(testName, async () => {
-					await env.request
+					const response = await env.request
 						.post("/auth/login")
 						.send({
 							...data(),
-							captcha: env.captcha,
+							captcha: await solveCaptcha(env),
 						})
-						.expect(status)
 						.expect("Content-Type", /json/)
 						.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
+					if (response.status !== status) {
+						console.error(response.body);
+					}
+					expect(response.status).toBe(status);
 				});
 			}
 
@@ -367,7 +371,7 @@ describe("Auth (e2e)", () => {
 					email: createId() + "@example.com",
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: env.captcha,
+					captcha: await solveCaptcha(env),
 				})
 				.expect(201)
 				.expect("Content-Type", /json/);
@@ -386,7 +390,7 @@ describe("Auth (e2e)", () => {
 					.send({
 						registrationPassword: env.registrationPassword,
 						...testCase,
-						captcha: env.captcha,
+						captcha: await solveCaptcha(env),
 					})
 					.expect(400)
 					.expect("Content-Type", /json/);
@@ -401,7 +405,7 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: env.captcha,
+					captcha: await solveCaptcha(env),
 				})
 				.expect(201);
 			await env.request
@@ -410,7 +414,7 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "87654321",
 					registrationPassword: env.registrationPassword,
-					captcha: env.captcha,
+					captcha: await solveCaptcha(env),
 				})
 				.expect(409)
 				.expect("Content-Type", /json/);
@@ -424,7 +428,7 @@ describe("Auth (e2e)", () => {
 					email: "john@example.com",
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: env.captcha,
+					captcha: await solveCaptcha(env),
 				})
 				.expect(401)
 				.expect("Content-Type", /json/);
@@ -433,7 +437,11 @@ describe("Auth (e2e)", () => {
 		test("POST without general registration password 401", async () => {
 			await env.request
 				.post("/user")
-				.send({ email: "john@example.com", password: "12345678", captcha: env.captcha })
+				.send({
+					email: "john@example.com",
+					password: "12345678",
+					captcha: await solveCaptcha(env),
+				})
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});

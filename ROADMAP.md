@@ -176,7 +176,7 @@ deadline or ETA
 ## 🚧 0.6.0 - Basic account features
 - [ ] public registrations with captcha
   - [x] simple implementation
-  - [ ] protect against replay attacks by caching solved challenges in memory for their TTL
+  - [x] protect against replay attacks by caching solved challenges in memory for their TTL
   - [ ] increase work requirement by n when criteria met n times before 600s release period (memory cache):
     - [ ] same ip (beware of reverse proxy with x-forwarded-for header)
     - [ ] same email (for actions that send emails)
@@ -207,6 +207,7 @@ a short-lived one
         - [ ] leverage Background Sync API when available
     - [ ] server
         - [ ] purge logs that don't have an effect anymore
+        - [ ] use @nestjs/cache-manager to cache s3 get responses
 
 ## 0.9.0 - Exclusive-offline mode
 - [ ] add data export to json
