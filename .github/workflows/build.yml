@@ -84,6 +84,8 @@ jobs:
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: 12345678
+          CAPTCHA_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod2
+          CAPTCHA_KEY_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod3
           MAX_UPLOAD_SIZE: 5000000
           TMP_UPLOAD_DIR: ./tmp_upload
           S3_REGION: ${{ secrets.S3_REGION }}
@@ -148,6 +150,8 @@ jobs:
           REFRESH_TOKEN_DURATION: 2592000
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: notarealpassword
+          CAPTCHA_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod2
+          CAPTCHA_KEY_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod3
           MAX_UPLOAD_SIZE: 5000000
           TMP_UPLOAD_DIR: ./tmp_upload
           S3_REGION: ${{ secrets.S3_REGION }}
