@@ -11,9 +11,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "yarn check && prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run && npm run test:e2e",
-		"test:e2e": "playwright test"
+		"test": "playwright test"
 	},
 	"packageManager": "yarn@4.13.0",
 	"devDependencies": {
@@ -52,9 +50,7 @@
 		"typescript-eslint": "^8.59.1",
 		"unplugin-auto-import": "^21.0.0",
 		"unplugin-icons": "^23.0.1",
-		"vite": "^8.0.10",
-		"vitest": "^4.1.5",
-		"vitest-browser-svelte": "^2.1.1"
+		"vite": "^8.0.10"
 	},
 	"dependencies": {
 		"@capacitor/android": "^8.3.1",
