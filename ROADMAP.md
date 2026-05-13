@@ -178,7 +178,7 @@ deadline or ETA
   - [x] simple implementation
   - [x] protect against replay attacks by caching solved challenges in memory for their TTL
   - [ ] increase work requirement by n when criteria met n times before 600s release period (memory cache):
-    - [ ] same ip (beware of reverse proxy with x-forwarded-for header)
+    - [x] same ip (beware of reverse proxy with x-forwarded-for header)
     - [ ] same email (for actions that send emails)
     - [ ] same user (for heavy authenticated actions)
     - [ ] configurable total /captcha/challenge number call threshold
@@ -188,26 +188,28 @@ deadline or ETA
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
-- [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
-- [ ] turn on Secure flag on cookies (except in dev and test mode)
 - [ ] add a warning about data being accessible even after a logout
-- [ ] add ability to wipe IDB from auth settings menu
+  - [ ] add a warning popup
+  - [ ] add an option to logout and wipe IDB
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
-a short-lived one 
+a short-lived one
+- [ ] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag (use var(--...) to change based on light/dark mode)
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
 ## 0.8.0 - Optimizations
-- [ ] Sync engine optimizations
-    - [ ] client
-        - [ ] drop prior unsynced create and update operations when deleting a record
-        - [ ] leverage @capacitor/background-runner
-        - [ ] leverage Background Sync API when available
-    - [ ] server
-        - [ ] purge logs that don't have an effect anymore
-        - [ ] use @nestjs/cache-manager to cache s3 get responses
+- [ ] client
+    - [ ] drop prior unsynced create and update operations when deleting a record
+    - [ ] leverage @capacitor/background-runner
+    - [ ] leverage Background Sync API when available
+- [ ] server
+    - [ ] purge logs that don't have an effect anymore
+    - [ ] use @nestjs/cache-manager to cache s3 get responses
+    - [ ] throttle requests using @nestjs/throttler
+    - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
+    - [ ] turn on Secure flag on cookies (except in dev and test mode)
 
 ## 0.9.0 - Exclusive-offline mode
 - [ ] add data export to json
@@ -216,7 +218,7 @@ a short-lived one
 - [ ] warn the user that using the app in this mode has potential data loss risks and that they should backup their data regularly
 - [ ] add data backup reminder
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
-- 
+
 ## 0.10.0 - UI tweaks
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
 - [ ] show proper language names in language switcher
@@ -225,6 +227,8 @@ a short-lived one
 - [ ] ListInput: make the text field focus when clicking anywhere inside the whole visible box (+ cursor change)
 - [ ] member edit: make profile picture edit button always visible (maybe move it outside the image's box)
 - [ ] ListInput: make clear button better (example: member edit form color field)
+- [ ] bug: click on a member's card image captures click events, preventing from performing card click action
+- [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check

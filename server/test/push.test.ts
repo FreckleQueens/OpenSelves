@@ -1,10 +1,11 @@
 import * as fs from "node:fs";
-import { describe, expect, test } from "@jest/globals";
 import { createId } from "@paralleldrive/cuid2";
+import assert from "node:assert";
 import { createReadStream } from "node:fs";
+import test, { describe } from "node:test";
 import type { FrontCreate, Log, Member, MemberCreate, User } from "openselves-common/db";
 
-import { type TestEnv, setupTestSuite } from "./utils.js";
+import { type TestEnv, type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pushEndpoint = "/sync/push";
 const pullEndpoint = "/sync/pull";
@@ -45,7 +46,7 @@ function getLogAttachmentUrl(env: TestEnv, userId: string, log: ClientLog, dataK
 }
 
 describe(pushEndpoint, () => {
-	let env: TestEnv;
+	let env: TestEnvWithUsers;
 
 	function attachFileToLog(attachment: ClientAttachment, log: ClientLog, dataKey: string) {
 		if (!log.data || typeof log.data !== "object" || !(dataKey in log.data)) {
@@ -156,14 +157,14 @@ describe(pushEndpoint, () => {
 		if (response.statusCode !== expectCode) {
 			console.error(response.body);
 		}
-		expect(response.statusCode).toBe(expectCode);
+		assert.strictEqual(response.statusCode, expectCode);
 		return response;
 	}
 
 	async function createMember(date?: Date, image?: string | ClientAttachment | null) {
 		const { member, createLog } = makeMemberWithLog(date, image);
 		const response = await putLog(createLog);
-		expect(response.body.logs).not.toBeDefined();
+		assert.strictEqual(response.body.logs, undefined);
 		await checkLogIsServed(createLog);
 		return { member, createLog, response };
 	}
@@ -187,7 +188,7 @@ describe(pushEndpoint, () => {
 		const { member, createLog: memberCreateLog } = await createMember();
 		const { front, createLog } = makeFrontWithLog(new Date(), memberCreateLog);
 		const response = await putLog(createLog);
-		expect(response.body.logs).not.toBeDefined();
+		assert.strictEqual(response.body.logs, undefined);
 		await checkLogIsServed(createLog);
 		return { front, createLog, member, memberCreateLog, response };
 	}
@@ -201,8 +202,8 @@ describe(pushEndpoint, () => {
 			.set("Cookie", cookies)
 			.expect(200)
 			.expect("Content-Type", /json/);
-		expect(response.body.logs).toBeInstanceOf(Array);
-		expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+		assert(Array.isArray(response.body.logs));
+		assert(response.body.logs.length >= 1);
 		return response;
 	}
 
@@ -258,8 +259,9 @@ describe(pushEndpoint, () => {
 		const pulledLog = pulledLogs.find(
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
 		);
-		expect(pulledLog).toBeDefined();
-		expect(pulledLog).toStrictEqual(
+		assert.notStrictEqual(pulledLog, undefined);
+		assert.deepStrictEqual(
+			pulledLog,
 			Object.fromEntries(
 				Object.entries(logToCheckServer).map(([key, value]) => {
 					if (value instanceof Date) {
@@ -278,7 +280,7 @@ describe(pushEndpoint, () => {
 
 		if (attachments.length > 0) {
 			// Handling multiple attachments per log can be done once needed.
-			expect(attachments.length).toBe(1);
+			assert.strictEqual(attachments.length, 1);
 
 			const attachmentUrl = getLogAttachmentUrl(
 				env,
@@ -293,7 +295,7 @@ describe(pushEndpoint, () => {
 				.set("Cookie", env.users.cookies)
 				.expect(200)
 				.expect("Content-Type", "image/png");
-			expect(response.body).toEqual(fs.readFileSync(attachments[0].path));
+			assert.deepStrictEqual(response.body, fs.readFileSync(attachments[0].path));
 
 			await env.request
 				.get(attachmentUrl)
@@ -311,11 +313,11 @@ describe(pushEndpoint, () => {
 		const pulledLog = pulledLogs.find(
 			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
 		);
-		expect(pulledLog).not.toBeDefined();
+		assert.strictEqual(pulledLog, undefined);
 
 		if (attachments.length > 0) {
 			// Handling multiple attachments per log can be done once needed.
-			expect(attachments.length).toBe(1);
+			assert.strictEqual(attachments.length, 1);
 
 			const attachmentUrl = getLogAttachmentUrl(
 				env,
@@ -414,7 +416,9 @@ describe(pushEndpoint, () => {
 		await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(404);
 	}
 
-	setupTestSuite((testEnv) => (env = testEnv));
+	setupTestSuiteWithUsers((testEnv) => {
+		env = testEnv;
+	});
 
 	test("GET 404", async () => {
 		await env.request.get(pushEndpoint).expect(404);
@@ -527,7 +531,7 @@ describe(pushEndpoint, () => {
 					executedAt: new Date(),
 				};
 				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
-				expect(response2.body.logs).toBe(undefined);
+				assert.strictEqual(response2.body.logs, undefined);
 
 				// Check member was not deleted
 				await checkLogIsServed(createLog);
@@ -544,7 +548,7 @@ describe(pushEndpoint, () => {
 					executedAt: new Date(),
 				};
 				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
-				expect(response2.body.logs).toBe(undefined);
+				assert.strictEqual(response2.body.logs, undefined);
 			});
 
 			test("Delete member with image deletes image from s3", async () => {
@@ -589,12 +593,12 @@ describe(pushEndpoint, () => {
 				await checkLogIsServed(updateLog);
 
 				const response = await getSyncFrom("init");
-				expect(response.body.logs.length).toBeGreaterThanOrEqual(1);
+				assert(response.body.logs.length >= 1);
 				const memberLog = (response.body.logs as Array<Log>).find(
 					(log) => log.operationType === "create" && log.memberId === createLog.memberId,
 				);
-				expect(memberLog).toBeDefined();
-				expect(memberLog?.data).toMatchObject(updateLog.data as Record<string, unknown>);
+				assert.notStrictEqual(memberLog, undefined);
+				assert.partialDeepStrictEqual(memberLog?.data, updateLog.data);
 			});
 
 			test("empty update data 400", async () => {
@@ -611,7 +615,7 @@ describe(pushEndpoint, () => {
 					executedAt: date,
 				};
 				const response = await putLog(updateLog, 400);
-				expect(response.body.logs).not.toBeDefined();
+				assert.strictEqual(response.body.logs, undefined);
 			});
 
 			test("update member of another user fails 404", async () => {
@@ -628,13 +632,13 @@ describe(pushEndpoint, () => {
 				};
 				const response2 = await putLog(updateLog, 404, env.users.cookies2);
 
-				expect(response2.body.logs).toBe(undefined);
+				assert.strictEqual(response2.body.logs, undefined);
 
 				// Check member was not deleted
-				expect(createLog.data).toBeDefined();
+				assert.notStrictEqual(createLog.data, undefined);
 				const createName = (createLog.data as Record<string, unknown>)["name"];
-				expect(createName).toBeDefined();
-				expect(createName).not.toBe((updateLog.data as Record<string, unknown>).name);
+				assert.notStrictEqual(createName, undefined);
+				assert.notStrictEqual(createName, (updateLog.data as Record<string, unknown>).name);
 				await checkLogIsServed(createLog);
 			});
 
@@ -764,10 +768,10 @@ describe(pushEndpoint, () => {
 					},
 				},
 			});
-			expect(dbRecords.length).toBe(3);
+			assert.strictEqual(dbRecords.length, 3);
 			for (const record of dbRecords) {
 				const member = members.find((member) => member.createLog.memberId === record.id);
-				expect(member).toBeDefined();
+				assert.notStrictEqual(member, undefined);
 
 				let expectedData = Object.assign({}, member?.createLog.data);
 				for (const log of logs) {
@@ -775,7 +779,7 @@ describe(pushEndpoint, () => {
 						expectedData = Object.assign(expectedData, log.data);
 					}
 				}
-				expect(record).toMatchObject(expectedData);
+				assert.partialDeepStrictEqual(record, expectedData);
 			}
 		});
 
@@ -906,8 +910,8 @@ describe(pushEndpoint, () => {
 					id: member.createLog.memberId,
 				},
 			});
-			expect(dbRecord).toBeDefined();
-			expect(dbRecord).toMatchObject({
+			assert.notStrictEqual(dbRecord, undefined);
+			assert.partialDeepStrictEqual(dbRecord, {
 				name: "1",
 				pronouns: "2",
 				description: "3",

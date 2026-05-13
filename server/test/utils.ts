@@ -1,12 +1,14 @@
-import { afterAll, beforeAll, beforeEach, expect, test } from "@jest/globals";
 import type { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
 import { createId } from "@paralleldrive/cuid2";
 import { type Challenge, type Solution, solveChallenge } from "altcha-lib";
 import { deriveKey } from "altcha-lib/algorithms/argon2id";
 import { inArray } from "drizzle-orm";
 import methods from "methods";
+import assert from "node:assert";
+import { after, before, beforeEach } from "node:test";
 import { API_VERSION } from "openselves-common";
 import { type User, users } from "openselves-common/db";
 import type { ValueFromArray } from "rxjs";
@@ -14,7 +16,6 @@ import request, { type Response } from "supertest";
 import type TestAgent from "supertest/lib/agent.js";
 import type { App } from "supertest/types.js";
 
-import { AppModule, configureApp } from "../src/app.module.js";
 import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
@@ -40,8 +41,10 @@ export type TestEnvUsers = {
 export type TestEnv = {
 	app: INestApplication<App>;
 	configService: ConfigService<ConfigData>;
-	users: TestEnvUsers;
 } & CreateUsersEnv;
+export type TestEnvWithUsers = TestEnv & {
+	users: TestEnvUsers;
+};
 
 async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	if (existingUsers) {
@@ -70,7 +73,7 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 		if (response.status !== 200) {
 			console.error(response.body);
 		}
-		expect(response.status).toBe(200);
+		assert.strictEqual(response.status, 200);
 		const cookies = convertResponseCookiesToRequestCookies(response);
 		return { user, cookies };
 	}
@@ -81,19 +84,20 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	return { userPassword, user, cookies, user2, cookies2 };
 }
 export function setupTestSuite(
-	envCallback: (env: TestEnv) => void,
-	recreateUsersBeforeEach: boolean = false,
+	envCallback: (env: TestEnv) => Promise<void> | void,
+	setCaptchaToEasyMode: boolean = true,
 ) {
 	let env: TestEnv;
 
-	beforeAll(async () => {
+	before(async () => {
 		DbService.dbUrlConfigKey = "TEST_DB_URL";
 
+		const { AppModule, configureApp } = await import("../src/app.module.js");
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
 		}).compile();
 
-		const app: INestApplication<App> = moduleFixture.createNestApplication();
+		const app = moduleFixture.createNestApplication<NestExpressApplication>();
 		configureApp(app);
 		const configService: ConfigService<ConfigData> = app.get(ConfigService);
 		configService.set("INSECURE_EASY_CAPTCHA_FOR_TESTS", true);
@@ -129,14 +133,27 @@ export function setupTestSuite(
 			...createUsersEnv,
 			app,
 			configService,
-			users: await createUsers(createUsersEnv),
 		};
-		envCallback(env);
+		configService.set("INSECURE_EASY_CAPTCHA_FOR_TESTS", setCaptchaToEasyMode);
+		await envCallback(env);
 	});
 
-	afterAll(async () => {
-		await env.app.close();
+	after(async () => {
+		await env?.app?.close();
 	});
+}
+
+export function setupTestSuiteWithUsers(
+	envCallback: (env: TestEnvWithUsers) => Promise<void> | void,
+	setCaptchaToEasyMode: boolean = true,
+	recreateUsersBeforeEach: boolean = false,
+) {
+	let env: TestEnvWithUsers;
+
+	setupTestSuite(async (sourceEnv) => {
+		env = { ...sourceEnv, users: await createUsers(sourceEnv) };
+		await envCallback(env);
+	}, setCaptchaToEasyMode);
 
 	if (recreateUsersBeforeEach) {
 		beforeEach(async () => {
@@ -176,7 +193,7 @@ export async function solveCaptcha(env: CreateUsersEnv): Promise<Captcha> {
 	if (response.status !== 200) {
 		console.error(response.body);
 	}
-	expect(response.status).toBe(200);
+	assert.strictEqual(response.status, 200);
 
 	const challenge = response.body;
 	const solution = await solveChallenge({
@@ -197,6 +214,7 @@ export async function solveCaptcha(env: CreateUsersEnv): Promise<Captcha> {
 export function testCaptcha(
 	getEnv: () => TestEnv,
 	successCode: number,
+	doTest: (testName: string, testCallback: () => Promise<void> | void) => void,
 	callback: (captcha: Captcha | object | string | null | undefined) => Promise<request.Response>,
 ) {
 	let usedCaptcha: Captcha | null = null;
@@ -210,7 +228,7 @@ export function testCaptcha(
 			test: `POST 401 already used captcha challenge`,
 			status: 401,
 			captcha: () => {
-				expect(usedCaptcha).not.toBeNull();
+				assert.notStrictEqual(usedCaptcha, null);
 				return usedCaptcha;
 			},
 		},
@@ -249,10 +267,15 @@ export function testCaptcha(
 			test: "POST 401 expired captcha",
 			status: 401,
 			captcha: async () => {
-				const initialChallengeTtl = CaptchaService.challengeTtl;
-				CaptchaService.challengeTtl = -1;
-				const challenge = await getEnv().app.get(CaptchaService).createChallenge();
-				CaptchaService.challengeTtl = initialChallengeTtl;
+				const env = getEnv();
+
+				const initialChallengeTtl = env.configService.get("CAPTCHA_CHALLENGE_TTL_SECONDS");
+				env.configService.set("CAPTCHA_CHALLENGE_TTL_SECONDS", -1);
+
+				const challenge = await env.app.get(CaptchaService).createChallenge(1);
+
+				env.configService.set("CAPTCHA_CHALLENGE_TTL_SECONDS", initialChallengeTtl);
+
 				const solution = await solveChallenge({
 					challenge,
 					deriveKey,
@@ -264,7 +287,7 @@ export function testCaptcha(
 			},
 		},
 	]) {
-		test(testName, async () => {
+		doTest(testName, async () => {
 			let captcha: Captcha | object | string | null | undefined;
 			if (typeof getCaptcha === "function") {
 				captcha = await getCaptcha();
@@ -276,7 +299,7 @@ export function testCaptcha(
 			if (response.status !== status) {
 				console.error(response.body);
 			}
-			expect(response.status).toBe(status);
+			assert.strictEqual(response.status, status);
 		});
 	}
 }

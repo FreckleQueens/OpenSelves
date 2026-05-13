@@ -1,4 +1,5 @@
-import { describe, expect, test } from "@jest/globals";
+import assert from "node:assert";
+import test, { describe } from "node:test";
 import { API_VERSION } from "openselves-common";
 
 import { type TestEnv, setupTestSuite } from "./utils.js";
@@ -8,7 +9,7 @@ describe("/status", () => {
 
 	setupTestSuite((testEnv) => {
 		env = testEnv;
-	}, true);
+	});
 
 	test("GET", async () => {
 		const response = await env.request
@@ -18,13 +19,14 @@ describe("/status", () => {
 			.expect("X-OpenSelves-Version", API_VERSION)
 			.expect(200);
 
-		expect(response.body).toBeDefined();
-		expect(response.body.ready).toBe(true);
-		expect(response.body.version).toBeDefined();
-		expect(typeof response.body.version).toBe("string");
-		expect(response.body.version).toMatch(/^((([1-9][0-9]*)|0)\.){2}(([1-9][0-9]*)|0)$/);
-		expect(response.body.version).toBe(API_VERSION);
-		expect(response.body.maxUploadSize).toBe(
+		assert.notStrictEqual(response.body, undefined);
+		assert.strictEqual(response.body.ready, true);
+		assert.notStrictEqual(response.body.version, undefined);
+		assert.strictEqual(typeof response.body.version, "string");
+		assert.match(response.body.version, /^((([1-9][0-9]*)|0)\.){2}(([1-9][0-9]*)|0)$/);
+		assert.strictEqual(response.body.version, API_VERSION);
+		assert.strictEqual(
+			response.body.maxUploadSize,
 			env.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
 		);
 	});
@@ -36,6 +38,6 @@ describe("/status", () => {
 			.expect("Content-Type", /json/)
 			.expect("X-OpenSelves-Version", API_VERSION)
 			.expect(406);
-		expect(response.body.expectedVersion).toBe(API_VERSION);
+		assert.strictEqual(response.body.expectedVersion, API_VERSION);
 	});
 });

@@ -1,4 +1,5 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Req } from "@nestjs/common";
+import { type Request } from "express";
 
 import { Public } from "../auth/decorators/public.decorator.js";
 import { CaptchaService } from "./captcha.service.js";
@@ -9,7 +10,9 @@ export class CaptchaController {
 
 	@Public()
 	@Get("challenge")
-	public async generateChallenge() {
-		return await this.captchaService.createChallenge();
+	public async generateChallenge(@Req() request: Request) {
+		await this.captchaService.increaseGenericFactorsFromRequest(request);
+		const factor = await this.captchaService.getFactorFromRequest(request);
+		return await this.captchaService.createChallenge(factor);
 	}
 }

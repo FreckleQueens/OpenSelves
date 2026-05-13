@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { API_VERSION } from "openselves-common";
 
 import { AppModule, configureApp } from "./app.module.js";
@@ -11,7 +12,7 @@ async function bootstrap() {
 	const logger = new Logger("bootstrap");
 	logger.log(`OpenSelves API version ${API_VERSION}`);
 
-	const app = await NestFactory.create(AppModule, {
+	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
 		logger: logger,
 	});
 	configureApp(app);
@@ -21,7 +22,8 @@ async function bootstrap() {
 	}
 
 	const configService = app.get(ConfigService<ConfigData>);
-	await app.listen(configService.get("LISTEN_PORT", 3000, { infer: true }));
+	const listenPort = configService.get("LISTEN_PORT", 3000, { infer: true });
+	await app.listen(listenPort);
 }
 bootstrap().catch((error) => {
 	console.error(error);

@@ -1,6 +1,5 @@
 import { CacheModule } from "@nestjs/cache-manager";
 import {
-	type INestApplication,
 	type MiddlewareConsumer,
 	Module,
 	type NestModule,
@@ -8,7 +7,9 @@ import {
 	ValidationPipe,
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import cookieParser from "cookie-parser";
+import type { Server } from "node:http";
 import { API_VERSION } from "openselves-common";
 
 import { AuthModule } from "./auth/auth.module.js";
@@ -50,10 +51,11 @@ export class AppModule implements NestModule {
 	}
 }
 
-export function configureApp(app: INestApplication) {
+export function configureApp(app: NestExpressApplication<Server>) {
 	const configService = app.get(ConfigService<ConfigData>);
-
 	configService.set("_APP_VERSION", API_VERSION);
+
+	app.set("trust proxy", "loopback");
 
 	app.useGlobalPipes(
 		new ValidationPipe({

@@ -1,20 +1,23 @@
-import { beforeAll, describe, expect, test } from "@jest/globals";
 import { eq } from "drizzle-orm";
+import assert from "node:assert";
+import test, { before, describe } from "node:test";
 import { type Log, type LogCreate, type Member, members, models } from "openselves-common/db";
 
-import { type TestEnv, setupTestSuite } from "./utils.js";
+import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pullEndpoint = "/sync/pull";
 
 describe("/sync/pull", () => {
-	let env: TestEnv;
+	let env: TestEnvWithUsers;
 	let members1: Member[];
 	let deletedMember1: Member;
 	let members2: Member[];
 	let logs1: Log[];
-	setupTestSuite((testEnv) => (env = testEnv));
+	setupTestSuiteWithUsers((testEnv) => {
+		env = testEnv;
+	});
 
-	beforeAll(async () => {
+	before(async () => {
 		let timestamp: number = Date.now() - 1000;
 		const getDate = () => new Date(timestamp++);
 		members1 = await env.db
@@ -165,7 +168,7 @@ describe("/sync/pull", () => {
 				.set("Cookie", env.users.cookies)
 				.expect(400)
 				.expect("Content-type", /json/);
-			expect(response.body.logs).toBeUndefined();
+			assert.strictEqual(response.body.logs, undefined);
 		});
 
 		async function callPull(timestamp: number | "init", expectCode: number, cookies: string) {
@@ -187,12 +190,12 @@ describe("/sync/pull", () => {
 			const date = new Date();
 			const response = await callPull(timestamp, expectCode, cookies);
 			const responseTimestamp = new Date(response.body.timestamp).getTime();
-			expect(Number.isFinite(responseTimestamp)).toBe(true);
-			expect((responseTimestamp - date.getTime()) / 1000).toBeCloseTo(0, 0);
+			assert.strictEqual(Number.isFinite(responseTimestamp), true);
+			assert(Math.abs((responseTimestamp - date.getTime()) / 1000) < 0.5);
 
 			const logs: unknown[] = response.body.logs;
-			expect(logs).toBeDefined();
-			expect(logs).toBeInstanceOf(Array);
+			assert.notStrictEqual(logs, undefined);
+			assert(Array.isArray(logs));
 			return logs;
 		}
 
@@ -202,37 +205,37 @@ describe("/sync/pull", () => {
 			const members = [...members1];
 			const logs = await callPullAndGetLogs("init", 200, env.users.cookies);
 
-			expect(logs.length).toBe(members.length + 1);
+			assert.strictEqual(logs.length, members.length + 1);
 			for (const member of members) {
 				const log: Log | undefined = logs.find(
 					(log) => log && typeof log === "object" && log["memberId"] === member.id,
 				) as Log;
-				expect(log).toBeDefined();
-				expect(log["operationType"]).toBe("create");
+				assert.notStrictEqual(log, undefined);
+				assert.strictEqual(log["operationType"], "create");
 
 				const { id, userId, createdAt, updatedAt, ...memberData } = member;
-				expect(log.data).toStrictEqual({
+				assert.deepStrictEqual(log.data, {
 					...memberData,
 					createdAt: createdAt.toISOString(),
 					updatedAt: updatedAt.toISOString(),
 				});
 
-				expect(typeof log.id).toBe("string");
-				expect(log.id.length).toBeGreaterThan(0);
+				assert.strictEqual(typeof log.id, "string");
+				assert(log.id.length > 0);
 
 				const executedAt = new Date(log.executedAt).getTime();
-				expect(Number.isFinite(executedAt)).toBe(true);
-				expect((executedAt - date.getTime()) / 1000).toBeCloseTo(0, 0);
+				assert.strictEqual(Number.isFinite(executedAt), true);
+				assert(Math.abs((executedAt - date.getTime()) / 1000) < 0.5);
 
-				expect(log.userId).toBeUndefined();
-				expect(log.deletedId).toBeUndefined();
+				assert.strictEqual(log.userId, undefined);
+				assert.strictEqual(log.deletedId, undefined);
 			}
 
 			const deleteLog = logs.find(
 				(log) => log && typeof log === "object" && log["memberId"] === deletedMember1.id,
 			);
-			expect(deleteLog).toBeDefined();
-			expect(deleteLog).toMatchObject({
+			assert.notStrictEqual(deleteLog, undefined);
+			assert.partialDeepStrictEqual(deleteLog, {
 				operationType: "delete",
 				data: null,
 			});
@@ -243,23 +246,23 @@ describe("/sync/pull", () => {
 
 			const logs = await callPullAndGetLogs(date.getTime(), 200, env.users.cookies);
 
-			expect(logs.length).toBe(logs1.length);
+			assert.strictEqual(logs.length, logs1.length);
 			for (let i = 0; i < logs.length; i++) {
 				const log: Log = logs[i] as Log;
 				const expectedSentLog = logs1.find((sentLog) => sentLog.id === log.id);
-				expect(expectedSentLog).toBeDefined();
+				assert.notStrictEqual(expectedSentLog, undefined);
 				const { userId, deletedId, executedAt, pushedAt, ...expectedLog }: Log =
 					expectedSentLog as Log;
 				let transformedExpectedLog = expectedLog;
 				if (expectedLog.operationType === "delete") {
 					const memberId = expectedSentLog?.deletedId?.split(".")[1];
-					expect(memberId).toBeDefined();
+					assert.notStrictEqual(memberId, undefined);
 					transformedExpectedLog = {
 						...expectedLog,
 						memberId: typeof memberId === "string" ? memberId : null,
 					};
 				}
-				expect(log).toStrictEqual({
+				assert.deepStrictEqual(log, {
 					...transformedExpectedLog,
 					executedAt: executedAt.toISOString(),
 				});
@@ -268,8 +271,8 @@ describe("/sync/pull", () => {
 
 		test("refuses negative timestamp 400", async () => {
 			const response = await callPull(-1, 400, env.users.cookies);
-			expect(response.body.timestamp).not.toBeDefined();
-			expect(response.body.logs).not.toBeDefined();
+			assert.strictEqual(response.body.timestamp, undefined);
+			assert.strictEqual(response.body.logs, undefined);
 		});
 
 		test("refuses timestamp in the future 400", async () => {
@@ -278,8 +281,8 @@ describe("/sync/pull", () => {
 				400,
 				env.users.cookies,
 			);
-			expect(response.body.timestamp).not.toBeDefined();
-			expect(response.body.logs).not.toBeDefined();
+			assert.strictEqual(response.body.timestamp, undefined);
+			assert.strictEqual(response.body.logs, undefined);
 		});
 	});
 });

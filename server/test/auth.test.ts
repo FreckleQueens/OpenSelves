@@ -1,16 +1,17 @@
-import { describe, expect, test } from "@jest/globals";
 import { JwtService } from "@nestjs/jwt";
 import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
+import assert from "node:assert";
+import test, { describe } from "node:test";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 import { sessions } from "openselves-common/db";
 import request from "supertest";
 
 import {
-	type TestEnv,
+	type TestEnvWithUsers,
 	convertResponseCookiesToRequestCookies,
 	extractCookie,
-	setupTestSuite,
+	setupTestSuiteWithUsers,
 	solveCaptcha,
 	testCaptcha,
 	waitFor,
@@ -19,11 +20,15 @@ import {
 const expectCookies = request.cookies;
 
 describe("Auth (e2e)", () => {
-	let env: TestEnv;
+	let env: TestEnvWithUsers;
 
-	setupTestSuite((testEnv) => {
-		env = testEnv;
-	}, true);
+	setupTestSuiteWithUsers(
+		(testEnv) => {
+			env = testEnv;
+		},
+		undefined,
+		true,
+	);
 
 	async function makeExpiredAccessToken(originalTokenForPayload: string) {
 		const jwtService = env.app.get(JwtService);
@@ -90,9 +95,9 @@ describe("Auth (e2e)", () => {
 								},
 							}),
 					);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
-				expect(response.body.userId).toBeDefined();
+				assert.strictEqual(response.body.accessToken, undefined);
+				assert.strictEqual(response.body.refreshToken, undefined);
+				assert.notStrictEqual(response.body.userId, undefined);
 
 				const accessToken = extractCookie(
 					"accessToken",
@@ -102,7 +107,7 @@ describe("Auth (e2e)", () => {
 				const accessTokenDuration = env.configService.getOrThrow("ACCESS_TOKEN_DURATION", {
 					infer: true,
 				});
-				expect(tokenPayload.exp - tokenPayload.iat).toBe(accessTokenDuration);
+				assert.strictEqual(tokenPayload.exp - tokenPayload.iat, accessTokenDuration);
 			});
 
 			for (const { test: testName, data, status } of [
@@ -160,13 +165,16 @@ describe("Auth (e2e)", () => {
 					if (response.status !== status) {
 						console.error(response.body);
 					}
-					expect(response.status).toBe(status);
+					assert.strictEqual(response.status, status);
 				});
 			}
 
 			testCaptcha(
 				() => env,
 				200,
+				(name, callback) => {
+					test(name, callback);
+				},
 				async (captcha) => {
 					return env.request.post("/auth/login").send({
 						email: env.users.user.email,
@@ -185,8 +193,8 @@ describe("Auth (e2e)", () => {
 					.expect(status)
 					.expect("Content-Type", /json/)
 					.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				assert.strictEqual(response.body.accessToken, undefined);
+				assert.strictEqual(response.body.refreshToken, undefined);
 			}
 
 			test("POST 200", async () => {
@@ -223,18 +231,18 @@ describe("Auth (e2e)", () => {
 								},
 							}),
 					);
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				assert.strictEqual(response.body.accessToken, undefined);
+				assert.strictEqual(response.body.refreshToken, undefined);
 
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
 				const oldAccessToken = extractCookie("accessToken", env.users.cookies);
 				const newAccessToken = extractCookie("accessToken", newCookies);
-				expect(newAccessToken).not.toBe(oldAccessToken);
+				assert.notStrictEqual(newAccessToken, oldAccessToken);
 
 				const oldRefreshToken = extractCookie("refreshToken", env.users.cookies);
 				const newRefreshToken = extractCookie("refreshToken", newCookies);
-				expect(newRefreshToken).not.toBe(oldRefreshToken);
+				assert.notStrictEqual(newRefreshToken, oldRefreshToken);
 
 				await env.request
 					.get("/user/" + env.users.user.id)
@@ -300,8 +308,8 @@ describe("Auth (e2e)", () => {
 								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
 							}),
 					); // TODO@supertest
-				expect(response.body.accessToken).not.toBeDefined();
-				expect(response.body.refreshToken).not.toBeDefined();
+				assert.strictEqual(response.body.accessToken, undefined);
+				assert.strictEqual(response.body.refreshToken, undefined);
 
 				// /auth/refresh already tested
 			});
@@ -359,7 +367,7 @@ describe("Auth (e2e)", () => {
 				.set("Cookie", `accessToken=${expiredAccessToken}`)
 				.expect(401)
 				.expect("Content-Type", /json/);
-			expect(response.body.name).toBe(TOKEN_EXPIRED_ERROR);
+			assert.strictEqual(response.body.name, TOKEN_EXPIRED_ERROR);
 		});
 	});
 
@@ -375,7 +383,7 @@ describe("Auth (e2e)", () => {
 				})
 				.expect(201)
 				.expect("Content-Type", /json/);
-			expect(Object.keys(response.body)).toEqual(["id", "email", "createdAt"]);
+			assert.deepStrictEqual(Object.keys(response.body), ["id", "email", "createdAt"]);
 		});
 
 		for (const testCase of [
@@ -449,6 +457,9 @@ describe("Auth (e2e)", () => {
 		testCaptcha(
 			() => env,
 			201,
+			(name, callback) => {
+				test(name, callback);
+			},
 			async (captcha) => {
 				return env.request.post("/user").send({
 					email: createId() + "@example.com",
@@ -465,7 +476,7 @@ describe("Auth (e2e)", () => {
 				.set("Cookie", env.users.cookies)
 				.expect(200)
 				.expect("Content-Type", /json/);
-			expect(response.body).toEqual({
+			assert.deepStrictEqual(response.body, {
 				id: env.users.user.id,
 				email: env.users.user.email,
 				createdAt: env.users.user.createdAt,
@@ -497,8 +508,8 @@ describe("Auth (e2e)", () => {
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
-			expect(response.body.email).toBe(env.users.user.email);
-			expect(response.body.email).not.toBe(newEmail);
+			assert.strictEqual(response.body.email, env.users.user.email);
+			assert.notStrictEqual(response.body.email, newEmail);
 		});
 
 		test("PATCH email 200", async () => {
@@ -513,8 +524,8 @@ describe("Auth (e2e)", () => {
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
-			expect(response.body.email).toBe(newEmail);
-			expect(response.body.email).not.toBe(env.users.user.email);
+			assert.strictEqual(response.body.email, newEmail);
+			assert.notStrictEqual(response.body.email, env.users.user.email);
 		});
 
 		test("PATCH unauthenticated 401", async () => {
@@ -547,8 +558,8 @@ describe("Auth (e2e)", () => {
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
-			expect(response.body.email).toBe(env.users.user.email);
-			expect(response.body.email).not.toBe(newEmail);
+			assert.strictEqual(response.body.email, env.users.user.email);
+			assert.notStrictEqual(response.body.email, newEmail);
 		});
 
 		test("PATCH password 200", async () => {
