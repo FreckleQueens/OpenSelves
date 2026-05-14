@@ -76,6 +76,7 @@ jobs:
       - run: yarn workspace openselves-client test
         env:
           PUBLIC_URL: http://127.0.0.1:3000
+          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
           ALLOWED_ORIGINS: http://127.0.0.1:4173
@@ -141,6 +142,7 @@ jobs:
       - run: yarn workspace openselves-server test
         env:
           PUBLIC_URL: http://127.0.0.1:3000
+          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
           TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"

@@ -10,11 +10,12 @@ import {
 	Patch,
 	Post,
 	Req,
+	Res,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DrizzleQueryError } from "drizzle-orm";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { type PartialBy } from "openselves-common";
 import { type User } from "openselves-common/db";
 
@@ -23,6 +24,7 @@ import { Public } from "../decorators/public.decorator.js";
 import { CreateUserDto } from "./data/create-user.dto.js";
 import { FindOneParams } from "./data/find-one.params.js";
 import { UpdateUserDto } from "./data/update-user.dto.js";
+import { VerifyEmailParams } from "./data/verify-email.params.js";
 import { UserService } from "./user.service.js";
 
 @Controller("user")
@@ -136,11 +138,25 @@ export class UserController {
 		}
 	}
 
+	@Public()
+	@Get(":id/verify-email/:token")
+	public async verifyEmail(@Param() params: VerifyEmailParams, @Res() res: Response) {
+		if (!(await this.userService.verifyUserEmail(params.id, params.token))) {
+			throw new NotFoundException("User and/or token not found");
+		}
+		return res.redirect(
+			301,
+			this.configService.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
+				"/email-verification-success",
+		);
+	}
+
 	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">) {
 		return {
 			id: user.id,
 			email: user.email,
 			createdAt: user.createdAt,
+			isEmailVerified: user.isEmailVerified,
 		};
 	}
 }

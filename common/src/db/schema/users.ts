@@ -1,10 +1,15 @@
-import { camelCase, text } from "drizzle-orm/pg-core";
+import { boolean, camelCase, text } from "drizzle-orm/pg-core";
 import { idPrimaryKey, timestamps } from "./utils.js";
+import { sql } from "drizzle-orm";
 
 export const users = camelCase.table("users", {
 	...idPrimaryKey,
 	email: text().notNull().unique(),
 	passwordHash: text().notNull(),
+	isEmailVerified: boolean().default(false),
+	emailVerificationToken: text()
+		.notNull()
+		.default(sql`concat(md5(random()::text), md5(random()::text))`),
 	...timestamps,
 });
 export type User = typeof users.$inferSelect;

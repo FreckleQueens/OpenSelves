@@ -4,6 +4,7 @@ export interface ConfigData {
 	CLI_ENV: "production" | "development";
 
 	PUBLIC_URL: string;
+	CLIENT_PUBLIC_URL: string;
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
 	TEST_DB_URL: string;
@@ -52,6 +53,12 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	CLI_ENV: Joi.string().valid("production", "development").default("production"),
 
 	PUBLIC_URL: Joi.string()
+		.uri({
+			allowRelative: false,
+			scheme: ["http", "https"],
+		})
+		.required(),
+	CLIENT_PUBLIC_URL: Joi.string()
 		.uri({
 			allowRelative: false,
 			scheme: ["http", "https"],

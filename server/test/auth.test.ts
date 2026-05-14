@@ -383,7 +383,12 @@ describe("Auth (e2e)", () => {
 				})
 				.expect(201)
 				.expect("Content-Type", /json/);
-			assert.deepStrictEqual(Object.keys(response.body), ["id", "email", "createdAt"]);
+			assert.deepStrictEqual(Object.keys(response.body), [
+				"id",
+				"email",
+				"createdAt",
+				"isEmailVerified",
+			]);
 		});
 
 		for (const testCase of [
@@ -480,6 +485,7 @@ describe("Auth (e2e)", () => {
 				id: env.users.user.id,
 				email: env.users.user.email,
 				createdAt: env.users.user.createdAt,
+				isEmailVerified: false,
 			});
 		});
 

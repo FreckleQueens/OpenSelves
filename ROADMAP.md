@@ -181,10 +181,13 @@ deadline or ETA
     - [x] same ip (beware of reverse proxy with x-forwarded-for header)
     - [ ] same email (for actions that send emails)
     - [ ] same user (for heavy authenticated actions)
-    - [ ] configurable total /captcha/challenge number call threshold
+    - [ ] configurable total (any user) /captcha/challenge call number threshold
 - [ ] email verification
-  - [ ] basic verification link
+  - [x] basic verification link
+  - [ ] send the link via email directly
   - [ ] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
+  - [ ] add unverified email warning
+  - [ ] periodically delete accounts that didn't verify their email 7 days after registration
 - [ ] password recovery
 - [ ] change password
 - [ ] change email
