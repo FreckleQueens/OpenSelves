@@ -12,8 +12,10 @@
 	let {
 		// eslint-disable-next-line no-useless-assignment
 		value = $bindable(),
+		autoVerify = false,
 	}: {
 		value: string | undefined;
+		autoVerify?: boolean;
 	} = $props();
 
 	let altchaWidget: AltchaWidgetElement | undefined = $state();
@@ -29,6 +31,7 @@
 			hideLogo: true,
 			hideFooter: true,
 			humanInteractionSignature: false,
+			auto: autoVerify ? "onload" : "off",
 		});
 
 		if (!altchaWidget) {

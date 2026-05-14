@@ -56,6 +56,7 @@
 	});
 	let activeForm = $state(forms.login.name);
 	let registerSuccessDialogOpen = $state(false);
+	let isWorking = $state(false);
 
 	const load = requireGuest();
 	let loaded = $state(false);
@@ -66,52 +67,69 @@
 		scheduleOnlineCheck(0);
 	});
 
+	$effect(() => {
+		const form = forms[activeForm];
+		if (form.autoVerifyCaptcha && form.data["captcha"]) {
+			submitForm(form);
+		}
+	});
+
 	const onSubmit = async (e: SubmitEvent) => {
 		e.preventDefault();
 		return submitActiveForm();
 	};
 
 	async function submitActiveForm() {
-		let response: Response;
-		try {
-			response = await call(forms[activeForm].endpoint, {
-				method: "POST",
-				data: forms[activeForm].data,
-				returnRawResponse: true,
-			});
+		return submitForm(forms[activeForm]);
+	}
 
-			if (!response) {
-				appState.isApiReachable = false;
-				scheduleOnlineCheck();
+	async function submitForm(form: AuthFormData) {
+		isWorking = true;
+		try {
+			let response: Response;
+			try {
+				response = await call(form.endpoint, {
+					method: "POST",
+					data: form.data,
+					returnRawResponse: true,
+				});
+
+				if (!response) {
+					appState.isApiReachable = false;
+					scheduleOnlineCheck();
+					return;
+				}
+			} catch (error) {
+				console.trace(error);
+				if (
+					error &&
+					typeof error === "object" &&
+					"message" in error &&
+					typeof error.message === "string"
+				) {
+					form.generalError = error.message;
+				}
 				return;
 			}
-		} catch (error) {
-			console.trace(error);
-			if (
-				error &&
-				typeof error === "object" &&
-				"message" in error &&
-				typeof error.message === "string"
-			) {
-				forms[activeForm].generalError = error.message;
-			}
-			return;
-		}
-		const result = await response.json();
+			const result = await response.json();
 
-		if (!response.ok) {
-			forms[activeForm].generalError = result.message;
-			return;
+			if (!response.ok) {
+				form.generalError = result.message;
+				return;
+			}
+			console.log(result);
+			await form.onSuccess(result);
+		} finally {
+			isWorking = false;
 		}
-		console.log(result);
-		return forms[activeForm].onSuccess(result);
 	}
 
 	async function loginFromRegistration() {
-		forms.login.data = { ...forms.register.data };
+		isWorking = true;
+		forms.login.data = { ...forms.register.data, captcha: "" };
+		forms.login.autoVerifyCaptcha = true;
 		activeForm = forms.login.name;
 		registerSuccessDialogOpen = false;
-		return submitActiveForm();
 	}
 </script>
 
@@ -165,7 +183,17 @@
 						<LoginFields bind:formState={forms.login} />
 
 						<Block class="mt-0">
-							<Button type="submit" tonal>Login</Button>
+							<Button
+								type="submit"
+								tonal
+								disabled={!forms.login.data["captcha"] || isWorking}
+							>
+								{#if isWorking}
+									<Preloader />
+								{:else}
+									Login
+								{/if}
+							</Button>
 						</Block>
 					</form>
 				{:else if activeForm === "register"}
@@ -173,7 +201,17 @@
 						<RegisterFields bind:formState={forms.register} />
 
 						<Block class="mt-0">
-							<Button type="submit" tonal>Register</Button>
+							<Button
+								type="submit"
+								tonal
+								disabled={!forms.register.data["captcha"] || isWorking}
+							>
+								{#if isWorking}
+									<Preloader />
+								{:else}
+									Register
+								{/if}
+							</Button>
 						</Block>
 					</form>
 				{/if}

@@ -48,7 +48,10 @@
 	<List>
 		<ListItem>
 			{#snippet inner()}
-				<Captcha bind:value={formState.data["captcha"]} />
+				<Captcha
+					bind:value={formState.data["captcha"]}
+					autoVerify={formState.autoVerifyCaptcha}
+				/>
 			{/snippet}
 		</ListItem>
 	</List>

@@ -13,6 +13,7 @@ export type AuthFormData = FormValidationState & {
 	endpoint: string;
 	data: Record<string, string>;
 	onSuccess: (result: object) => Promise<unknown> | unknown;
+	autoVerifyCaptcha?: boolean;
 };
 
 export function bindNativeInputValidation(
