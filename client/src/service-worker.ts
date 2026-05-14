@@ -59,7 +59,7 @@ self.addEventListener("fetch", (event) => {
 					const response = await cache.match(url.pathname);
 					console.debug("cache-first hit", url.pathname);
 
-					if (response) {
+					if (response && response.status === 200) {
 						return response;
 					}
 				}
