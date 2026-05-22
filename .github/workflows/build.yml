@@ -54,6 +54,7 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
+      - run: sudo ln -s /usr/local/bin/mailpit /usr/sbin/sendmail
       - run: yarn install --immutable
       - run: yarn ci:build
       - run: yarn workspace openselves-server db:migrate
@@ -130,6 +131,7 @@ jobs:
           node-version: 25.x
       - run: corepack enable
       - run: sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
+      - run: sudo ln -s /usr/local/bin/mailpit /usr/sbin/sendmail
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
         with:
