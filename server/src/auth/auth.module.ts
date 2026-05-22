@@ -8,6 +8,7 @@ import { CaptchaModule } from "../captcha/captcha.module.js";
 import { type ConfigData } from "../config.data.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
+import { MailService } from "./mail/mail.service.js";
 import { SessionService } from "./session/session.service.js";
 import { UserController } from "./user/user.controller.js";
 import { UserService } from "./user/user.service.js";
@@ -36,6 +37,7 @@ import { UserService } from "./user/user.service.js";
 			provide: APP_GUARD,
 			useClass: AuthGuard,
 		},
+		MailService,
 		UserService,
 		SessionService,
 	],

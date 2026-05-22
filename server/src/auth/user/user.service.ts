@@ -9,6 +9,8 @@ import { type User, type UserCreate, type relations, users } from "openselves-co
 import type { ConfigData } from "../../config.data.js";
 import { InjectDb } from "../../db/db.service.js";
 import type { DB } from "../../db/drizzle.js";
+import { Mail } from "../mail/mail.js";
+import { MailService } from "../mail/mail.service.js";
 
 @Injectable()
 export class UserService {
@@ -17,6 +19,7 @@ export class UserService {
 		@Inject(CACHE_MANAGER)
 		private readonly cache: Cache,
 		@InjectDb() private readonly db: DB,
+		private readonly mailService: MailService,
 	) {}
 
 	async getUser(
@@ -48,7 +51,7 @@ export class UserService {
 
 	async createUser(data: UserCreate): Promise<User> {
 		const createdUser = (await this.db.insert(users).values(data).returning())[0];
-		this.sendEmailVerificationEmail(createdUser);
+		await this.sendEmailVerificationEmail(createdUser);
 		return createdUser;
 	}
 
@@ -91,13 +94,34 @@ export class UserService {
 		return isVerified;
 	}
 
-	private sendEmailVerificationEmail(createdUser: User) {
+	private async sendEmailVerificationEmail(createdUser: User) {
 		const link =
 			this.config.getOrThrow("PUBLIC_URL", { infer: true }) +
 			"/user/" +
 			createdUser.id +
 			"/verify-email/" +
 			createdUser.emailVerificationToken;
-		console.debug("User created, email verification link:", link);
+		await this.mailService.send(
+			new Mail(
+				createdUser.email,
+				this.config.getOrThrow("EMAIL_FROM_ADDRESS", { infer: true }),
+				this.config.getOrThrow("EMAIL_FROM_NAME", { infer: true }),
+				"Verify your account's email address",
+				[
+					"Hi!",
+					"",
+					"Thanks for creating an account on " +
+						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+					"If it was not you, you can safely disregard this email.",
+					"If it was you, please open the following link in your browser to validate your email address:",
+					link,
+					"",
+					"This email is intended for " +
+						createdUser.email +
+						" and was sent by the OpenSelves instance at " +
+						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+				].join("\n"),
+			),
+		);
 	}
 }

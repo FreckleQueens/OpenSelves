@@ -184,8 +184,9 @@ deadline or ETA
     - [ ] configurable total (any user) /captcha/challenge call number threshold
 - [ ] email verification
   - [x] basic verification link
-  - [ ] send the link via email directly
+  - [x] send the link via email directly (basic text email) -> use sendmail (system provided program and config)
   - [ ] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
+  - [ ] allow user to re-send verification email
   - [ ] add unverified email warning
   - [ ] periodically delete accounts that didn't verify their email 7 days after registration
 - [ ] password recovery
@@ -251,6 +252,11 @@ a short-lived one
 - [ ] switch between light theme, dark theme and system theme manually
 - [ ] add primary color theme options
 - [ ] add monochrome and vibrant colors toggles
+
+## To plan
+- [ ] Add rich html version of emails
+- [ ] Translate emails
+- [ ] Translate server-side form validation
 
 ---
 

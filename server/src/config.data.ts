@@ -23,6 +23,8 @@ export interface ConfigData {
 	CAPTCHA_SECRET: string;
 	CAPTCHA_KEY_SECRET: string;
 	CAPTCHA_CHALLENGE_TTL_SECONDS: number;
+	EMAIL_FROM_ADDRESS: string;
+	EMAIL_FROM_NAME: string;
 
 	MAX_UPLOAD_SIZE: number;
 	TMP_UPLOAD_DIR?: string;
@@ -114,6 +116,8 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		.max(3600)
 		.integer()
 		.default(5 * 60),
+	EMAIL_FROM_ADDRESS: Joi.string().required().email(),
+	EMAIL_FROM_NAME: Joi.string().optional().default("OpenSelves"),
 
 	MAX_UPLOAD_SIZE: Joi.number().min(0).default(0),
 	TMP_UPLOAD_DIR: Joi.string(),

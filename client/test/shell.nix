@@ -2,6 +2,7 @@
   pkgs.mkShell {
     nativeBuildInputs = with pkgs; [
       playwright-driver.browsers
+      mailpit
     ];
 
     shellHook = ''

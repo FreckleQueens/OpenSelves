@@ -8910,6 +8910,7 @@ __metadata:
     class-transformer: "npm:^0.5.1"
     class-validator: "npm:^0.15.1"
     commander: "npm:^14.0.3"
+    concurrently: "npm:^9.2.1"
     cookie-parser: "npm:^1.4.7"
     drizzle-kit: "npm:1.0.0-rc.1"
     drizzle-orm: "npm:1.0.0-rc.1"
