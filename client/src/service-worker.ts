@@ -19,7 +19,7 @@ const ASSETS = [
 const CACHE_FIRST_PATHS = ["/attachment"];
 
 self.addEventListener("install", async (event) => {
-	console.debug("install");
+	console.debug("install version", version);
 
 	event.waitUntil(
 		(async () => {
@@ -31,7 +31,7 @@ self.addEventListener("install", async (event) => {
 	await self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
-	console.debug("activate");
+	console.debug("activate version", version);
 
 	event.waitUntil(
 		(async () => {
@@ -43,7 +43,7 @@ self.addEventListener("activate", (event) => {
 	);
 });
 self.addEventListener("fetch", (event) => {
-	console.debug("fetch");
+	console.debug("fetch version", version);
 
 	const url = new URL(event.request.url);
 	if (event.request.method === "GET" && url.pathname !== "/status") {
@@ -52,7 +52,7 @@ self.addEventListener("fetch", (event) => {
 				const cache = await self.caches.open(CACHE);
 
 				if (
-					!["/service-worker.ts", "/manifest.json"].includes(url.pathname) &&
+					!["/service-worker.js", "/manifest.json"].includes(url.pathname) &&
 					(ASSETS.includes(url.pathname) ||
 						CACHE_FIRST_PATHS.find((path) => url.pathname.startsWith(path)))
 				) {
