@@ -8,7 +8,7 @@ import { deriveKey } from "altcha-lib/algorithms/argon2id";
 import { inArray } from "drizzle-orm";
 import methods from "methods";
 import assert from "node:assert";
-import { after, before, beforeEach } from "node:test";
+import { after, afterEach, before, beforeEach } from "node:test";
 import { API_VERSION } from "openselves-common";
 import { type User, users } from "openselves-common/db";
 import type { ValueFromArray } from "rxjs";
@@ -20,6 +20,7 @@ import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DBClass, DbService } from "../src/db/db.service.js";
 import type { DB } from "../src/db/drizzle.js";
+import { QueueService } from "../src/queue/queue.service.js";
 
 export type Captcha = {
 	challenge: Challenge;
@@ -160,6 +161,17 @@ export function setupTestSuiteWithUsers(
 			env.users = await createUsers(env, env.users);
 		});
 	}
+
+	afterEach(async () => {
+		const queueService = env.app.get(QueueService);
+		await queueService.flushJobs();
+		try {
+			assert(queueService.isIdle());
+			assert.strictEqual(queueService.getFailedJobs(), 0);
+		} finally {
+			queueService.resetFailedJobs();
+		}
+	});
 }
 
 export async function waitFor(timeInMs: number) {

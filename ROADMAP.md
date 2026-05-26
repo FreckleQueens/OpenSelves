@@ -185,7 +185,7 @@ deadline or ETA
 - [ ] email verification
   - [x] basic verification link
   - [x] send the link via email directly (basic text email) -> use sendmail (system provided program and config)
-  - [ ] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
+  - [x] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
   - [ ] allow user to re-send verification email
   - [ ] add unverified email warning
   - [ ] periodically delete accounts that didn't verify their email 7 days after registration
@@ -214,6 +214,7 @@ a short-lived one
     - [ ] throttle requests using @nestjs/throttler
     - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
     - [ ] turn on Secure flag on cookies (except in dev and test mode)
+    - [ ] lock rows in sync engine operations transaction
 
 ## 0.9.0 - Exclusive-offline mode
 - [ ] add data export to json
@@ -224,6 +225,7 @@ a short-lived one
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
 
 ## 0.10.0 - UI tweaks
+- [ ] remove dependency on @capacitor/assets
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
 - [ ] show proper language names in language switcher
 - [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)

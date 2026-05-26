@@ -3,7 +3,7 @@ export interface IMail {
 	readonly from: string;
 	readonly fromName: string;
 	readonly subject: string;
-	getBody(): Promise<string>;
+	readonly body: string;
 }
 
 export class Mail implements IMail {
@@ -12,10 +12,6 @@ export class Mail implements IMail {
 		public readonly from: string,
 		public readonly fromName: string,
 		public readonly subject: string,
-		private readonly body: string,
+		public readonly body: string,
 	) {}
-
-	public getBody(): Promise<string> {
-		return Promise.resolve(this.body);
-	}
 }

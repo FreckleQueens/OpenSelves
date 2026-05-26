@@ -6,6 +6,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { CaptchaMiddleware } from "../captcha/captcha.middleware.js";
 import { CaptchaModule } from "../captcha/captcha.module.js";
 import { type ConfigData } from "../config.data.js";
+import { QueueModule } from "../queue/queue.module.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
 import { MailService } from "./mail/mail.service.js";
@@ -31,6 +32,7 @@ import { UserService } from "./user/user.service.js";
 			},
 		}),
 		CaptchaModule,
+		QueueModule,
 	],
 	providers: [
 		{

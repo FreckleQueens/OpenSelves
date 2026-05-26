@@ -3,12 +3,14 @@ import { members } from "./members.js";
 import { sessions } from "./sessions.js";
 import { users } from "./users.js";
 import { fronts } from "./fronts.js";
+import { serverJobs } from "./server-jobs.js";
 
 export * from "./users.js";
 export * from "./sessions.js";
 export * from "./logs.js";
 export * from "./members.js";
 export * from "./fronts.js";
+export * from "./server-jobs.js";
 
 export const models = {
 	users,
@@ -16,4 +18,5 @@ export const models = {
 	logs,
 	members,
 	fronts,
+	serverJobs,
 };
