@@ -4,18 +4,18 @@ import {
 	Controller,
 	Delete,
 	Get,
+	HttpCode,
 	InternalServerErrorException,
 	NotFoundException,
 	Param,
 	Patch,
 	Post,
 	Req,
-	Res,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DrizzleQueryError } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { type PartialBy } from "openselves-common";
 import { type User } from "openselves-common/db";
 
@@ -138,17 +138,14 @@ export class UserController {
 		}
 	}
 
+	@Post(":id/verify-email/:token")
 	@Public()
-	@Get(":id/verify-email/:token")
-	public async verifyEmail(@Param() params: VerifyEmailParams, @Res() res: Response) {
+	@HttpCode(200)
+	public async verifyEmail(@Param() params: VerifyEmailParams) {
 		if (!(await this.userService.verifyUserEmail(params.id, params.token))) {
 			throw new NotFoundException("User and/or token not found");
 		}
-		return res.redirect(
-			301,
-			this.configService.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
-				"/email-verification-success",
-		);
+		return {};
 	}
 
 	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">) {

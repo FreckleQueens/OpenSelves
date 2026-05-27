@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
+	import { transformErrorToReadable } from "$lib";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppUpdateDialog from "$lib/components/AppUpdateDialog.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
@@ -22,8 +23,6 @@
 	} from "konsta/svelte";
 	import { type Snippet } from "svelte";
 	import { fly } from "svelte/transition";
-
-	import { transformErrorToReadable } from "../../hooks.client.ts";
 
 	let {
 		children,

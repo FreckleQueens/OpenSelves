@@ -8,3 +8,14 @@ export enum MenuItem {
 }
 
 export type ClickEventHandler = (event: MouseEvent) => Promise<void> | void;
+
+export function transformErrorToReadable(error: unknown) {
+	return {
+		val: error?.toString?.(),
+		name: error?.["name"],
+		message: error?.["message"],
+		fileName: error?.["fileName"],
+		lineNumber: error?.["lineNumber"],
+		stack: error?.["stack"],
+	};
+}

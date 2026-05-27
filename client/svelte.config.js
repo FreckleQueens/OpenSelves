@@ -27,6 +27,9 @@ const config = {
 		paths: {
 			relative: false,
 		},
+		prerender: {
+			entries: ["*", "/verify-email/[userId]/[token]"],
+		},
 		version: {
 			name: execSync("git rev-parse HEAD").toString().trim(),
 		},

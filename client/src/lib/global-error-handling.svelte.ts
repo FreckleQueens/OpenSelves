@@ -1,4 +1,4 @@
-import { transformErrorToReadable } from "../hooks.client";
+import { transformErrorToReadable } from "$lib";
 
 export const globalError: unknown[] = $state([]);
 

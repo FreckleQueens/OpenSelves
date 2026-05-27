@@ -28,7 +28,7 @@ describe("Email verification", () => {
 	});
 
 	describe("/user/:id/verify-email/:token", () => {
-		test("GET verifies user email 301", async () => {
+		test("POST verifies user email 200", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
 					id: env.users.user.id,
@@ -39,15 +39,10 @@ describe("Email verification", () => {
 			assert(dbUser.emailVerificationToken);
 
 			await env.request
-				.get(
+				.post(
 					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
 				)
-				.expect(301)
-				.expect(
-					"Location",
-					env.configService.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
-						"/email-verification-success",
-				);
+				.expect(200);
 
 			const userResponse = await env.request
 				.get("/user/" + env.users.user.id)
@@ -58,21 +53,21 @@ describe("Email verification", () => {
 			});
 		});
 
-		test("GET bad token length 400", async () => {
+		test("POST bad token length 400", async () => {
 			await env.request
-				.get("/user/" + env.users.user.id + "/verify-email/badtokenlength")
+				.post("/user/" + env.users.user.id + "/verify-email/badtokenlength")
 				.expect(400);
 		});
 
-		test("GET wrong token 404", async () => {
+		test("POST wrong token 404", async () => {
 			const invalidToken = crypto.randomUUID().replaceAll("-", "").repeat(2);
 			assert.strictEqual(invalidToken.length, 64);
 			await env.request
-				.get("/user/" + env.users.user.id + "/verify-email/" + invalidToken)
+				.post("/user/" + env.users.user.id + "/verify-email/" + invalidToken)
 				.expect(404);
 		});
 
-		test("GET wrong user 404", async () => {
+		test("POST wrong user 404", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
 					id: env.users.user.id,
@@ -80,7 +75,7 @@ describe("Email verification", () => {
 			});
 			assert(dbUser);
 			await env.request
-				.get(
+				.post(
 					"/user/" +
 						dbUser.id.split("").reverse().join("") +
 						"/verify-email/" +
@@ -89,7 +84,7 @@ describe("Email verification", () => {
 				.expect(404);
 		});
 
-		test("GET doesn't modify the user the second time 301", async () => {
+		test("POST doesn't modify the user the second time 200", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
 					id: env.users.user.id,
@@ -97,7 +92,7 @@ describe("Email verification", () => {
 			});
 			assert(dbUser);
 
-			await env.request.get(
+			await env.request.post(
 				"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
 			);
 
@@ -111,15 +106,10 @@ describe("Email verification", () => {
 			// Make sure the second request doesn't happen in the same millisecond
 			await new Promise((resolve) => setTimeout(resolve, 1));
 			await env.request
-				.get(
+				.post(
 					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
 				)
-				.expect(301)
-				.expect(
-					"Location",
-					env.configService.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
-						"/email-verification-success",
-				);
+				.expect(200);
 
 			const dbUser2 = await env.db.query.users.findFirst({
 				where: {

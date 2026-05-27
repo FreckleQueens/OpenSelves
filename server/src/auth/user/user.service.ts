@@ -94,16 +94,16 @@ export class UserService {
 		return isVerified;
 	}
 
-	private async sendEmailVerificationEmail(createdUser: User) {
+	private async sendEmailVerificationEmail(user: Omit<User, "passwordHash">) {
 		const link =
-			this.config.getOrThrow("PUBLIC_URL", { infer: true }) +
-			"/user/" +
-			createdUser.id +
+			this.config.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
 			"/verify-email/" +
-			createdUser.emailVerificationToken;
+			user.id +
+			"/" +
+			user.emailVerificationToken;
 		await this.mailService.send(
 			new Mail(
-				createdUser.email,
+				user.email,
 				this.config.getOrThrow("EMAIL_FROM_ADDRESS", { infer: true }),
 				this.config.getOrThrow("EMAIL_FROM_NAME", { infer: true }),
 				"Verify your account's email address",
@@ -117,7 +117,7 @@ export class UserService {
 					link,
 					"",
 					"This email is intended for " +
-						createdUser.email +
+						user.email +
 						" and was sent by the OpenSelves instance at " +
 						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
 				].join("\n"),
