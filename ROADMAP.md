@@ -186,7 +186,7 @@ deadline or ETA
   - [x] basic verification link
   - [x] send the link via email directly (basic text email) -> use sendmail (system provided program and config)
   - [x] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
-  - [ ] allow user to re-send verification email
+  - [x] allow user to re-send verification email
   - [ ] add unverified email warning
   - [ ] periodically delete accounts that didn't verify their email 7 days after registration
 - [ ] password recovery
@@ -294,6 +294,10 @@ a short-lived one
 ---
 
 ## Ideas for future releases
+- data trust and privacy
+  - encrypt and decrypt synced data in client
+  - sign sync operations in client and verify incoming operations
+  - move reduction and conflict resolution algorithm to client?
 - save a backup of remote (url) images (member pfp) in IDB as data uris
 - warn the user when the remote image doesn't load and allow them to use the backup image instead
 - Member onboarding procedure (needs thought out UX)

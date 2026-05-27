@@ -94,6 +94,10 @@ export class UserService {
 		return isVerified;
 	}
 
+	public async resendVerificationEmail(user: Omit<User, "passwordHash">) {
+		await this.sendEmailVerificationEmail(user);
+	}
+
 	private async sendEmailVerificationEmail(user: Omit<User, "passwordHash">) {
 		const link =
 			this.config.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +

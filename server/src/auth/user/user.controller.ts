@@ -3,6 +3,7 @@ import {
 	ConflictException,
 	Controller,
 	Delete,
+	ForbiddenException,
 	Get,
 	HttpCode,
 	InternalServerErrorException,
@@ -14,9 +15,10 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Throttle } from "@nestjs/throttler";
 import { DrizzleQueryError } from "drizzle-orm";
 import type { Request } from "express";
-import { type PartialBy } from "openselves-common";
+import { type GetUserResult, type PartialBy } from "openselves-common";
 import { type User } from "openselves-common/db";
 
 import { type ConfigData } from "../../config.data.js";
@@ -148,7 +150,34 @@ export class UserController {
 		return {};
 	}
 
-	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">) {
+	@Post(":id/resend-verification-email")
+	@HttpCode(200)
+	@Throttle({
+		default: {
+			ttl: 15 * 60 * 1000, // 15min
+			limit: 15,
+		},
+		user: {
+			ttl: 15 * 60 * 1000, // 15min
+			limit: 1,
+		},
+	})
+	public async resendVerificationEmail(@Param() params: FindOneParams, @Req() request: Request) {
+		const authenticatedUserId = request.accessTokenPayload.user.id;
+		if (params.id !== authenticatedUserId) {
+			throw new ForbiddenException();
+		}
+
+		const user = await this.userService.getUser({ id: authenticatedUserId });
+		if (!user) {
+			throw new NotFoundException("User not found");
+		}
+
+		await this.userService.resendVerificationEmail(user);
+		return {};
+	}
+
+	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">): GetUserResult {
 		return {
 			id: user.id,
 			email: user.email,

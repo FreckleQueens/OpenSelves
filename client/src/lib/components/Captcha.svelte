@@ -55,7 +55,8 @@
 	};
 </script>
 
-<altcha-widget bind:this={altchaWidget} style="--altcha-max-width:100%"></altcha-widget>
+<altcha-widget bind:this={altchaWidget} style="--altcha-max-width:100%; flex-shrink: 0;"
+></altcha-widget>
 
 <style>
 	@media (prefers-color-scheme: dark) {

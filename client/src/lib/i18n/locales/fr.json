@@ -92,6 +92,7 @@
 	"This will mark all front entries as ended.": "Cela marquera toutes les présences comme terminées.",
 	"Unknown": "Inconnu.e",
 	"Unknown member": "Membre inconnu.e",
+	"Verification email sent. (please wait {time} before trying again)": "Email de confirmation envoyé. (Vvuillez attendre {time} avant d'essayer à nouveau)",
 	"Waiting for {apiState.url}...": "En attente de {apiState.url}...",
 	"What language do you prefer?": "Quelle langue préférez-vous ?",
 	"You are logged in as user #{user.id}, {user.email}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email}",

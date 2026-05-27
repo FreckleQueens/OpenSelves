@@ -1,7 +1,13 @@
 import assert from "node:assert";
 import test, { describe } from "node:test";
 
-import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
+import { QueueService } from "../src/queue/queue.service.js";
+import {
+	type TestEnvWithUsers,
+	setupTestSuiteWithUsers,
+	solveCaptcha,
+	testCaptcha,
+} from "./utils.js";
 
 describe("Email verification", () => {
 	let env: TestEnvWithUsers;
@@ -120,5 +126,116 @@ describe("Email verification", () => {
 
 			assert.strictEqual(dbUser1.updatedAt.getTime(), dbUser2.updatedAt.getTime());
 		});
+	});
+
+	describe("/user/:id/resend-verification-email", () => {
+		test("POST 200", async () => {
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+		});
+
+		test("POST wrong user 403", async () => {
+			await env.request
+				.post(`/user/${env.users.user2.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(403);
+		});
+
+		test("POST twice in a row 429", async () => {
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(429);
+		});
+
+		test("POST once, flush, once 429", async () => {
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+			await env.app.get(QueueService).flushJobs();
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(429);
+		});
+
+		test("POST twice with 15min delay with different users 200", async () => {
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+			await env.request
+				.post(`/user/${env.users.user2.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies2)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+		});
+
+		test("POST already verified 403", async () => {
+			const dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			await env.request
+				.post(
+					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+				)
+				.expect(200);
+			await env.request
+				.post(`/user/${env.users.user.id}/resend-verification-email`)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+				})
+				.expect(200);
+		});
+
+		testCaptcha(
+			() => env,
+			200,
+			(testName, testCallback) => {
+				test(testName, testCallback);
+			},
+			async (captcha) => {
+				return env.request
+					.post(`/user/${env.users.user.id}/resend-verification-email`)
+					.set("Cookie", env.users.cookies)
+					.send({
+						captcha,
+					});
+			},
+		);
 	});
 });

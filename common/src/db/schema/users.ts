@@ -6,7 +6,7 @@ export const users = camelCase.table("users", {
 	...idPrimaryKey,
 	email: text().notNull().unique(),
 	passwordHash: text().notNull(),
-	isEmailVerified: boolean().default(false),
+	isEmailVerified: boolean().notNull().default(false),
 	emailVerificationToken: text()
 		.notNull()
 		.default(sql`concat(md5(random()::text), md5(random()::text))`),

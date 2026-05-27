@@ -34,6 +34,7 @@
 		"@nestjs/core": "^11.1.21",
 		"@nestjs/jwt": "^11.0.2",
 		"@nestjs/platform-express": "^11.1.21",
+		"@nestjs/throttler": "^6.5.0",
 		"@paralleldrive/cuid2": "^3.3.0",
 		"altcha-lib": "^2.0.3",
 		"argon2": "^0.44.0",
