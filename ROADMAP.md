@@ -182,13 +182,13 @@ deadline or ETA
     - [ ] same email (for actions that send emails)
     - [ ] same user (for heavy authenticated actions)
     - [ ] configurable total (any user) /captcha/challenge call number threshold
-- [ ] email verification
+- [x] email verification
   - [x] basic verification link
   - [x] send the link via email directly (basic text email) -> use sendmail (system provided program and config)
   - [x] queue emails and never send 2 emails simultaneously (number of simultaneous jobs could be increased in future updates)
   - [x] allow user to re-send verification email
   - [x] add unverified email warning
-  - [ ] periodically delete accounts that didn't verify their email 7 days after registration
+  - [x] periodically delete accounts that didn't verify their email 7 days after registration
 - [ ] password recovery
 - [ ] change password
 - [ ] change email

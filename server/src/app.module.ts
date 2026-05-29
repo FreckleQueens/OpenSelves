@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { ScheduleModule } from "@nestjs/schedule";
 import cookieParser from "cookie-parser";
 import type { Server } from "node:http";
 import { API_VERSION } from "openselves-common";
@@ -33,6 +34,7 @@ import { VersionMiddleware } from "./version.middleware.js";
 			isGlobal: true,
 		}),
 		DbModule,
+		ScheduleModule.forRoot(),
 		SyncModule,
 	],
 	controllers: [StatusController],

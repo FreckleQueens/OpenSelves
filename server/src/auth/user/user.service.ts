@@ -2,7 +2,8 @@ import * as argon2 from "argon2";
 import { CACHE_MANAGER, Cache } from "@nestjs/cache-manager";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { type RelationsFilterColumns, and, eq } from "drizzle-orm";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
 import type { DBQueryConfigWith, RelationsRecord } from "drizzle-orm/relations";
 import { type User, type UserCreate, type relations, users } from "openselves-common/db";
 
@@ -22,7 +23,7 @@ export class UserService {
 		private readonly mailService: MailService,
 	) {}
 
-	async getUser(
+	public async getUser(
 		where: RelationsFilterColumns<typeof users._.columns>,
 		options: {
 			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
@@ -37,7 +38,7 @@ export class UserService {
 		return userWithoutPassword;
 	}
 
-	async getUserWithPassword(
+	public async getUserWithPassword(
 		where: RelationsFilterColumns<typeof users._.columns>,
 		options: {
 			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
@@ -49,17 +50,20 @@ export class UserService {
 		});
 	}
 
-	async createUser(data: UserCreate): Promise<User> {
+	public async createUser(data: UserCreate): Promise<User> {
 		const createdUser = (await this.db.insert(users).values(data).returning())[0];
 		await this.sendEmailVerificationEmail(createdUser);
 		return createdUser;
 	}
 
-	async updateUser(userId: User["id"], data: Partial<UserCreate>): Promise<User | undefined> {
+	public async updateUser(
+		userId: User["id"],
+		data: Partial<UserCreate>,
+	): Promise<User | undefined> {
 		return (await this.db.update(users).set(data).where(eq(users.id, userId)).returning())[0];
 	}
 
-	async deleteUser(userId: User["id"]): Promise<User | undefined> {
+	public async deleteUser(userId: User["id"]): Promise<User | undefined> {
 		return (await this.db.delete(users).where(eq(users.id, userId)).returning())[0];
 	}
 
@@ -96,6 +100,29 @@ export class UserService {
 
 	public async resendVerificationEmail(user: Omit<User, "passwordHash">) {
 		await this.sendEmailVerificationEmail(user);
+	}
+
+	@Cron(CronExpression.EVERY_DAY_AT_3AM)
+	public async cullUnverifiedUsers() {
+		console.log("Culling unverified accounts...");
+		const unverifiedAccountCullingDelay = this.config.getOrThrow(
+			"UNVERIFIED_ACCOUNT_CULLING_DELAY",
+			{ infer: true },
+		);
+		const deletedUsers = await this.db
+			.delete(users)
+			.where(
+				and(
+					eq(users.isEmailVerified, false),
+					lt(users.createdAt, new Date(Date.now() - unverifiedAccountCullingDelay)),
+				),
+			)
+			.returning();
+		if (deletedUsers.length) {
+			console.log("Successfully culled", deletedUsers.length, "users.");
+		} else {
+			console.log("No user to cull.");
+		}
 	}
 
 	private async sendEmailVerificationEmail(user: Omit<User, "passwordHash">) {
