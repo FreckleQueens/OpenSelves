@@ -172,8 +172,10 @@ export async function callRaw(
 		}
 
 		if (response.status === 401 && responseBody.name === TOKEN_EXPIRED_ERROR) {
-			if (!(await refreshAuth())) {
-				return CallResult.SESSION_EXPIRED;
+			const result = await refreshAuth();
+			console.debug("refreshAuth", result);
+			if (result === CallResult.SESSION_EXPIRED) {
+				return result;
 			}
 
 			continue;
@@ -228,8 +230,8 @@ export async function call(
 	}
 }
 
-let refreshingAuthPromise: Promise<void> | null = null;
-async function refreshAuth(): Promise<boolean> {
+let refreshingAuthPromise: Promise<boolean | CallResult.SESSION_EXPIRED> | null = null;
+async function refreshAuth(): Promise<boolean | CallResult.SESSION_EXPIRED> {
 	while (refreshingAuthPromise) {
 		try {
 			await refreshingAuthPromise;
@@ -239,7 +241,7 @@ async function refreshAuth(): Promise<boolean> {
 	}
 
 	try {
-		await (refreshingAuthPromise = (async () => {
+		return await (refreshingAuthPromise = (async () => {
 			const authResponse = await fetch(`${apiState.url}/auth/refresh`, {
 				method: "POST",
 				credentials: "include",
@@ -253,11 +255,13 @@ async function refreshAuth(): Promise<boolean> {
 				authResponseBody.name === SESSION_EXPIRED_ERROR
 			) {
 				console.warn("Session expired with response", authResponseBody);
-				throw undefined;
+				return CallResult.SESSION_EXPIRED;
 			}
+
+			return authResponse.ok;
 		})());
-		return true;
-	} catch {
+	} catch (e) {
+		console.error(e);
 		return false;
 	} finally {
 		refreshingAuthPromise = null;
