@@ -1,5 +1,8 @@
-export type ApiResultValue = string | boolean | Date;
-export type ApiResultValuePrimitiveType = StringConstructor | BooleanConstructor;
+export type ApiResultValue = string | boolean | number | Date;
+export type ApiResultValuePrimitiveType =
+	| StringConstructor
+	| BooleanConstructor
+	| NumberConstructor;
 export type ApiResultValueType = ApiResultValuePrimitiveType | DateConstructor;
 export type ApiResultFields = Record<string, ApiResultValueType>;
 export type ApiResult<Fields extends ApiResultFields> = {
@@ -7,6 +10,15 @@ export type ApiResult<Fields extends ApiResultFields> = {
 		? ReturnType<Fields[p]>
 		: InstanceType<Fields[p]>;
 };
+
+export const GetStatus = {
+	ready: Boolean,
+	version: String,
+	maxUploadSize: Number,
+	areRegistrationsOpen: Boolean,
+	unverifiedAccountCullingDelay: Number,
+};
+export type GetStatusResult = ApiResult<typeof GetStatus>;
 
 export const GetUser = {
 	id: String,
@@ -33,7 +45,7 @@ export function parseApiResult<Fields extends ApiResultFields>(
 			throw new Error("Missing field " + key, { cause: value });
 		}
 
-		if (type === String || type === Boolean) {
+		if (type === String || type === Boolean || type === Number) {
 			if (typeof value[key] !== type.name.toLowerCase()) {
 				throw new Error("Field " + key + " is not of type " + type.name, { cause: value });
 			}

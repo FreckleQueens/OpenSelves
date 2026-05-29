@@ -29,6 +29,11 @@ describe("/status", () => {
 			response.body.maxUploadSize,
 			env.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
 		);
+		assert.strictEqual(response.body.areRegistrationsOpen, false);
+		assert.strictEqual(
+			response.body.unverifiedAccountCullingDelay,
+			env.configService.getOrThrow("UNVERIFIED_ACCOUNT_CULLING_DELAY", { infer: true }),
+		);
 	});
 
 	test("GET incorrect version", async () => {

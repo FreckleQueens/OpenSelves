@@ -10,37 +10,53 @@ import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
 import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { API_VERSION, SESSION_EXPIRED_ERROR, TOKEN_EXPIRED_ERROR } from "openselves-common";
+import {
+	API_VERSION,
+	GetStatus,
+	type GetStatusResult,
+	GetUser,
+	SESSION_EXPIRED_ERROR,
+	TOKEN_EXPIRED_ERROR,
+	parseApiResult,
+} from "openselves-common";
 
 export const apiState: {
 	url: string;
-	maxUploadSize: number | undefined;
-	areRegistrationsOpen: boolean | undefined;
 	mismatchedRemoteVersion: string | undefined;
+	status: GetStatusResult | undefined;
 } = $state({
 	url:
 		dev || PUBLIC_TEST_ENVIRONMENT === "1"
 			? PUBLIC_DEFAULT_API_URL_DEV
 			: PUBLIC_DEFAULT_API_URL,
-	maxUploadSize: undefined,
-	areRegistrationsOpen: undefined,
+	status: undefined,
 	mismatchedRemoteVersion: undefined,
 });
 
 export const SERVER_URL_STORAGE_KEY = "serverUrl";
-export const SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY = "maxUploadSize";
+export const SERVER_STATUS_STORAGE_KEY = "serverStatus";
+export const USER_DATA_STORAGE_KEY = "userData";
 
 export async function setServerUrl(newUrl: string) {
 	apiState.url = newUrl;
 	await PersistentStorage.getInstance().setRaw(SERVER_URL_STORAGE_KEY, newUrl);
 }
 
-export async function setMaxUploadSize(maxUploadSize: number) {
-	apiState.maxUploadSize = maxUploadSize;
-	await PersistentStorage.getInstance().setRaw(
-		SERVER_MAX_UPLOAD_SIZE_STORAGE_KEY,
-		maxUploadSize.toString(),
-	);
+export async function setApiStatus(status: GetStatusResult) {
+	apiState.status = status;
+	await PersistentStorage.getInstance().setRaw(SERVER_STATUS_STORAGE_KEY, JSON.stringify(status));
+}
+
+export async function refreshUserData() {
+	if (!appState.isAuthenticated) {
+		throw new Error("Cannot use while not authenticated.");
+	}
+
+	const storage = PersistentStorage.getInstance();
+	const userId = storage.getUserId();
+	const response = await call(`/user/${userId}`);
+	appState.userData = parseApiResult(GetUser, response);
+	await storage.set(USER_DATA_STORAGE_KEY, JSON.stringify(appState.userData));
 }
 
 export type CallOptions<RawResponse extends true | false> = {
@@ -255,14 +271,13 @@ async function isApiReachable(): Promise<boolean> {
 			headers: baseApiRequestHeaders,
 		});
 		if (response.ok) {
-			const responseBody = await response.json();
-			if (responseBody.ready === true && responseBody.version === API_VERSION) {
+			const status = parseApiResult(GetStatus, await response.json());
+			if (status.ready && status.version === API_VERSION) {
 				console.debug("online");
-				await setMaxUploadSize(responseBody.maxUploadSize);
-				apiState.areRegistrationsOpen = !!responseBody.areRegistrationsOpen;
+				await setApiStatus(status);
 				return true;
 			}
-			debugData.push(responseBody);
+			debugData.push(status);
 		}
 		debugData.push(response);
 	} catch (error) {

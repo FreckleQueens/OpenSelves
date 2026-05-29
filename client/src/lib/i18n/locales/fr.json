@@ -1,6 +1,7 @@
 {
 	"({LOCAL_VERSION} => {REMOTE_VERSION})": "({LOCAL_VERSION} => {REMOTE_VERSION})",
 	"A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.": "Une esperluette stylisée colorisée par un dégradé d'orange à rose de haut en bas. Deux formes de coeur superposées y sont cachées.",
+	"Email not verified. Your account is at risk of being deleted in {time}.": "Adresse mail non-vérifiée. Votre compte pourrait être supprimé dans {time}.",
 	"Account settings": "Paramètres de compte",
 	"Actions": "Actions",
 	"Add a color": "Ajouter une couleur",

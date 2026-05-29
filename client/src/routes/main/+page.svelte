@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { call, handleLogout } from "$lib/api.svelte";
+	import { call, handleLogout, refreshUserData } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
@@ -9,14 +9,12 @@
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, BlockTitle, Button, List, ListItem, Preloader } from "konsta/svelte";
-	import { GetUser, type GetUserResult, parseApiResult } from "openselves-common";
 	import { onMount } from "svelte";
 
 	import ResendVerificationEmail from "./ResendVerificationEmail.svelte";
 
 	let storage: PersistentStorage | undefined = $state();
 	let userId: string | undefined = $derived(storage?.getUserIdOptional());
-	let user: GetUserResult | undefined = $state();
 
 	requireAuth();
 	onMount(() => {
@@ -24,10 +22,8 @@
 	});
 
 	$effect(() => {
-		if (appState.syncWorkerOnline && userId) {
-			call(`/user/${userId}`).then((response) => {
-				user = parseApiResult(GetUser, response);
-			});
+		if (appState.syncWorkerOnline) {
+			refreshUserData();
 		}
 	});
 
@@ -55,8 +51,14 @@
 
 	<BlockTitle medium>Status</BlockTitle>
 	<Block strong>
-		{#if appState.syncWorkerOnline && user}
-			<p>{t("You are logged in as user #{user.id}, {user.email}", user.id, user.email)}</p>
+		{#if appState.syncWorkerOnline && appState.userData}
+			<p>
+				{t(
+					"You are logged in as user #{user.id}, {user.email}",
+					appState.userData.id,
+					appState.userData.email,
+				)}
+			</p>
 		{:else if !appState.syncWorkerOnline && userId}
 			<p>{t("Offline - #{user.id}", userId)}</p>
 		{:else}
@@ -67,7 +69,7 @@
 	<BlockTitle medium>Actions</BlockTitle>
 	<Block strong>
 		<List nested>
-			<ResendVerificationEmail bind:user />
+			<ResendVerificationEmail bind:user={appState.userData} />
 			<ListItem>
 				{#snippet text()}
 					<Button

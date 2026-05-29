@@ -20,6 +20,7 @@ export interface ConfigData {
 	REFRESH_TOKEN_SIZE: number;
 
 	REGISTRATION_PASSWORD: string | undefined;
+	UNVERIFIED_ACCOUNT_CULLING_DELAY: number;
 	CAPTCHA_SECRET: string;
 	CAPTCHA_KEY_SECRET: string;
 	CAPTCHA_CHALLENGE_TTL_SECONDS: number;
@@ -96,6 +97,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	REFRESH_TOKEN_SIZE: Joi.number().min(16).required(),
 
 	REGISTRATION_PASSWORD: Joi.string().min(8),
+	UNVERIFIED_ACCOUNT_CULLING_DELAY: Joi.number().default(604800000),
 	CAPTCHA_SECRET: Joi.string().min(32).not("CHANGE_ME").required().messages({
 		"any.invalid": "Please set CAPTCHA_SECRET environment variable to secure random string",
 		"any.required": "Please set CAPTCHA_SECRET environment variable to secure random string",

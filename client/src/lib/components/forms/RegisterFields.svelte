@@ -47,7 +47,7 @@
 		</ListInput>
 	</List>
 
-	{#if !apiState.areRegistrationsOpen}
+	{#if apiState.status && !apiState.status.areRegistrationsOpen}
 		<BlockTitle>Authorization</BlockTitle>
 		<List>
 			<ListInput

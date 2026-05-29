@@ -84,7 +84,7 @@
 
 		const maxDataUrlSize = 8192;
 		const maxSizeForDataUrl = (maxDataUrlSize * 3) / 4;
-		const maxFileSize = Math.max(apiState.maxUploadSize || 0, maxSizeForDataUrl);
+		const maxFileSize = Math.max(apiState.status?.maxUploadSize || 0, maxSizeForDataUrl);
 		if (file.size > maxFileSize) {
 			formState.errors["image"] = t(
 				"This file is too big! (max {file.size})",

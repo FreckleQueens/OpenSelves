@@ -1,5 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { GetStatusResult } from "openselves-common";
 
 import { Public } from "./auth/decorators/public.decorator.js";
 import type { ConfigData } from "./config.data.js";
@@ -10,7 +11,7 @@ export class StatusController {
 
 	@Public()
 	@Get("")
-	public status() {
+	public status(): GetStatusResult {
 		return {
 			ready: true,
 			version: this.configService.getOrThrow("_APP_VERSION", {
@@ -18,6 +19,10 @@ export class StatusController {
 			}),
 			maxUploadSize: this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }),
 			areRegistrationsOpen: !this.configService.get("REGISTRATION_PASSWORD", { infer: true }),
+			unverifiedAccountCullingDelay: this.configService.getOrThrow(
+				"UNVERIFIED_ACCOUNT_CULLING_DELAY",
+				{ infer: true },
+			),
 		};
 	}
 }

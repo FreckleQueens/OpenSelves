@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import { transformErrorToReadable } from "$lib";
+	import { apiState } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppUpdateDialog from "$lib/components/AppUpdateDialog.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
@@ -10,6 +11,7 @@
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
+	import humanizeDuration from "humanize-duration";
 	import {
 		Block,
 		BlockTitle,
@@ -153,12 +155,31 @@
 	{#if bottomNav}
 		{@render bottomNav()}
 	{/if}
+
 	{#if appState.isAuthenticated && !appState.syncWorkerOnline}
 		<div
 			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
 			transition:fly={{ duration: 150, y: 16 }}
 		>
 			<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
+		</div>
+	{/if}
+
+	{#if apiState.status && appState.userData && !appState.userData.isEmailVerified}
+		{@const willBeDeletedAt =
+			appState.userData.createdAt.getTime() + apiState.status.unverifiedAccountCullingDelay}
+		<div
+			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
+			transition:fly={{ duration: 150, y: 16 }}
+		>
+			<DangerIcon before class="text-brand-red" />
+			{t(
+				"Email not verified. Your account is at risk of being deleted in {time}.",
+				humanizeDuration(Math.max(willBeDeletedAt - Date.now(), 0), {
+					largest: 1,
+					round: true,
+				}),
+			)}
 		</div>
 	{/if}
 </div>
