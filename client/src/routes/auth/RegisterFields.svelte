@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { apiState } from "$lib/api.svelte";
+	import { apiState } from "$lib/api.svelte.js";
 	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
-	import type { AuthFormData } from "$lib/forms";
+	import type { OSFormData } from "$lib/forms";
 	import { BlockTitle, List, ListInput, ListItem } from "konsta/svelte";
 
-	let { formState = $bindable() }: { formState: AuthFormData } = $props();
+	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
 
 <FormFields bind:formState>

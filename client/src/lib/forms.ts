@@ -1,3 +1,5 @@
+import { call, scheduleOnlineCheck } from "$lib/api.svelte";
+import { appState } from "$lib/appState.svelte";
 import { onMount } from "svelte";
 
 export type FormFieldsValidationState = {
@@ -8,7 +10,7 @@ export type FormValidationState = FormFieldsValidationState & {
 	generalError: string;
 };
 
-export type AuthFormData = FormValidationState & {
+export type OSFormData = FormValidationState & {
 	name: string;
 	endpoint: string;
 	data: Record<string, string>;
@@ -38,4 +40,40 @@ export function bindNativeInputValidation(
 			});
 		}
 	});
+}
+
+export async function submitOSForm(form: OSFormData) {
+	let response: Response;
+	try {
+		response = await call(form.endpoint, {
+			method: "POST",
+			data: form.data,
+			returnRawResponse: true,
+		});
+
+		if (!response) {
+			appState.isApiReachable = false;
+			scheduleOnlineCheck();
+			return;
+		}
+	} catch (error) {
+		console.trace(error);
+		if (
+			error &&
+			typeof error === "object" &&
+			"message" in error &&
+			typeof error.message === "string"
+		) {
+			form.generalError = error.message;
+		}
+		return;
+	}
+	const result = await response.json();
+
+	if (!response.ok) {
+		form.generalError = result.message;
+		return;
+	}
+	console.log(result);
+	await form.onSuccess(result);
 }

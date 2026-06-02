@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import type { Request } from "express";
 
 import { CaptchaMiddleware } from "../captcha/captcha.middleware.js";
 import { CaptchaModule } from "../captcha/captcha.module.js";
@@ -11,7 +12,6 @@ import { QueueModule } from "../queue/queue.module.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
 import { MailService } from "./mail/mail.service.js";
-import { AccessTokenPayload } from "./session/data/access-token-payload.data.js";
 import { SessionService } from "./session/session.service.js";
 import { UserController } from "./user/user.controller.js";
 import { UserService } from "./user/user.service.js";
@@ -46,13 +46,32 @@ import { UserService } from "./user/user.service.js";
 				name: "user",
 				limit: 900,
 				ttl: 5 * 60 * 1000, // 5min
-				getTracker(request: Record<string, unknown>): Promise<string> {
-					let userId: string | undefined = undefined;
-					if (request && typeof request === "object" && "accessTokenPayload" in request) {
-						userId = (request.accessTokenPayload as AccessTokenPayload)?.user?.id;
+				getTracker(_, context): Promise<string> {
+					const request = context.switchToHttp().getRequest<Request>();
+					return Promise.resolve(request.accessTokenPayload?.user.id || "anonymous");
+				},
+			},
+			{
+				name: "email",
+				limit: Infinity,
+				ttl: 1000, // 1s
+				skipIf: (context) => {
+					const request = context.switchToHttp().getRequest<Request>();
+					return !request.body || !("email" in request.body);
+				},
+				getTracker(_, context): Promise<string> {
+					const request = context.switchToHttp().getRequest<Request>();
+					const requestBody = request.body as unknown;
+
+					if (
+						requestBody &&
+						typeof requestBody === "object" &&
+						typeof requestBody["email"] === "string"
+					) {
+						return Promise.resolve(requestBody["email"]);
 					}
-					const tracker = userId || "anonymous";
-					return Promise.resolve(tracker);
+
+					return Promise.resolve("anonymous");
 				},
 			},
 		]),
@@ -84,6 +103,7 @@ export class AuthModule implements NestModule {
 				path: "/user/:id/resend-verification-email",
 				method: RequestMethod.POST,
 			},
+			"/user/recover-password",
 		);
 	}
 }

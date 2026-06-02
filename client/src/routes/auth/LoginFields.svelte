@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { resolve } from "$app/paths";
 	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
-	import type { AuthFormData } from "$lib/forms";
-	import { BlockTitle, List, ListInput, ListItem } from "konsta/svelte";
+	import type { OSFormData } from "$lib/forms";
+	import { BlockTitle, Link, List, ListInput, ListItem } from "konsta/svelte";
 
-	let { formState = $bindable() }: { formState: AuthFormData } = $props();
+	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
 
 <FormFields bind:formState>
@@ -43,6 +44,16 @@
 				<PasswordIcon input />
 			{/snippet}
 		</ListInput>
+		<ListItem>
+			{#snippet after()}
+				<Link
+					href={resolve("/auth/recover-password") +
+						(formState.data["email"] ? "?email=" + formState.data["email"] : "")}
+				>
+					Forgot password?
+				</Link>
+			{/snippet}
+		</ListItem>
 	</List>
 
 	<List>

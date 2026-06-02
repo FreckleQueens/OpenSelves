@@ -189,7 +189,7 @@ deadline or ETA
   - [x] allow user to re-send verification email
   - [x] add unverified email warning
   - [x] periodically delete accounts that didn't verify their email 7 days after registration
-- [ ] password recovery
+- [x] password recovery
 - [ ] change password
 - [ ] change email
 - [ ] add a warning about data being accessible even after a logout

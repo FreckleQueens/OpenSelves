@@ -10,6 +10,7 @@ export const users = camelCase.table("users", {
 	emailVerificationToken: text()
 		.notNull()
 		.default(sql`concat(md5(random()::text), md5(random()::text))`),
+	passwordRecoveryToken: text(),
 	...timestamps,
 });
 export type User = typeof users.$inferSelect;

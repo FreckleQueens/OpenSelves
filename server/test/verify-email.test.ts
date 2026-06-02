@@ -4,6 +4,7 @@ import test, { describe } from "node:test";
 import { QueueService } from "../src/queue/queue.service.js";
 import {
 	type TestEnvWithUsers,
+	generateDummyToken,
 	setupTestSuiteWithUsers,
 	solveCaptcha,
 	testCaptcha,
@@ -66,8 +67,7 @@ describe("Email verification", () => {
 		});
 
 		test("POST wrong token 404", async () => {
-			const invalidToken = crypto.randomUUID().replaceAll("-", "").repeat(2);
-			assert.strictEqual(invalidToken.length, 64);
+			const invalidToken = generateDummyToken();
 			await env.request
 				.post("/user/" + env.users.user.id + "/verify-email/" + invalidToken)
 				.expect(404);
@@ -184,7 +184,7 @@ describe("Email verification", () => {
 				.expect(429);
 		});
 
-		test("POST twice with 15min delay with different users 200", async () => {
+		test("POST twice with different users 200", async () => {
 			await env.request
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)

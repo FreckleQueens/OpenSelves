@@ -28,7 +28,11 @@ const config = {
 			relative: false,
 		},
 		prerender: {
-			entries: ["*", "/verify-email/[userId]/[token]"],
+			entries: [
+				"*",
+				"/verify-email/[userId]/[token]",
+				"/auth/recover-password/[userId]/[token]",
+			],
 		},
 		version: {
 			name: execSync("git rev-parse HEAD").toString().trim(),

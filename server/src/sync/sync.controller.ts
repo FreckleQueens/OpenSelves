@@ -10,6 +10,7 @@ import {
 	Post,
 	Put,
 	Req,
+	UnauthorizedException,
 	UploadedFiles,
 	UseInterceptors,
 } from "@nestjs/common";
@@ -49,6 +50,10 @@ export class SyncController {
 		)
 		attachments: Express.Multer.File[] = [],
 	) {
+		if (!request.accessTokenPayload) {
+			throw new UnauthorizedException();
+		}
+
 		try {
 			for (const attachment of attachments) {
 				const log = pushDto.logs.find((log) =>
@@ -110,6 +115,10 @@ export class SyncController {
 	@Post("pull")
 	@HttpCode(HttpStatus.OK)
 	public async pull(@Body() pullDto: PullDto, @Req() request: Request) {
+		if (!request.accessTokenPayload) {
+			throw new UnauthorizedException();
+		}
+
 		const userId = request.accessTokenPayload.user.id;
 
 		let timestamp: number;

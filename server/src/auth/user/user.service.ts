@@ -3,6 +3,7 @@ import { CACHE_MANAGER, Cache } from "@nestjs/cache-manager";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
+import { randomBytes } from "crypto";
 import { type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
 import type { DBQueryConfigWith, RelationsRecord } from "drizzle-orm/relations";
 import { type User, type UserCreate, type relations, users } from "openselves-common/db";
@@ -10,7 +11,6 @@ import { type User, type UserCreate, type relations, users } from "openselves-co
 import type { ConfigData } from "../../config.data.js";
 import { InjectDb } from "../../db/db.service.js";
 import type { DB } from "../../db/drizzle.js";
-import { Mail } from "../mail/mail.js";
 import { MailService } from "../mail/mail.service.js";
 
 @Injectable()
@@ -102,6 +102,60 @@ export class UserService {
 		await this.sendEmailVerificationEmail(user);
 	}
 
+	public async recoverPassword(userId: string, token: string, password: string) {
+		const user = (
+			await this.db
+				.update(users)
+				.set({
+					passwordHash: await this.hashPassword(password),
+					passwordRecoveryToken: null,
+				})
+				.where(and(eq(users.id, userId), eq(users.passwordRecoveryToken, token)))
+				.returning()
+		)[0];
+		return !!user;
+	}
+
+	/**
+	 * @return true if user was found, false if user was not found
+	 */
+	public async sendPasswordRecoveryEmail(email: string): Promise<boolean> {
+		const user = (
+			await this.db
+				.update(users)
+				.set({
+					passwordRecoveryToken: Buffer.from(randomBytes(32)).toString("hex"),
+				})
+				.where(eq(users.email, email))
+				.returning()
+		)[0];
+		if (!user) {
+			return false;
+		}
+
+		const link =
+			this.config.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
+			"/auth/recover-password/" +
+			user.id +
+			"/" +
+			user.passwordRecoveryToken;
+		await this.mailService.sendServiceEmail(
+			user.email,
+			"Account password recovery",
+			[
+				"Hi!",
+				"",
+				"Password recovery was requested for the account associated with your email address on " +
+					this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+				"If it was not you, you can safely disregard this email.",
+				"If it was you, please open the following link to change your password:",
+				link,
+			].join("\n"),
+		);
+
+		return true;
+	}
+
 	@Cron(CronExpression.EVERY_DAY_AT_3AM)
 	public async cullUnverifiedUsers() {
 		console.log("Culling unverified accounts...");
@@ -132,27 +186,18 @@ export class UserService {
 			user.id +
 			"/" +
 			user.emailVerificationToken;
-		await this.mailService.send(
-			new Mail(
-				user.email,
-				this.config.getOrThrow("EMAIL_FROM_ADDRESS", { infer: true }),
-				this.config.getOrThrow("EMAIL_FROM_NAME", { infer: true }),
-				"Verify your account's email address",
-				[
-					"Hi!",
-					"",
-					"Thanks for creating an account on " +
-						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
-					"If it was not you, you can safely disregard this email.",
-					"If it was you, please open the following link in your browser to validate your email address:",
-					link,
-					"",
-					"This email is intended for " +
-						user.email +
-						" and was sent by the OpenSelves instance at " +
-						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
-				].join("\n"),
-			),
+		await this.mailService.sendServiceEmail(
+			user.email,
+			"Verify your account's email address",
+			[
+				"Hi!",
+				"",
+				"Thanks for creating an account on " +
+					this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+				"If it was not you, you can safely disregard this email.",
+				"If it was you, please open the following link in your browser to validate your email address:",
+				link,
+			].join("\n"),
 		);
 	}
 }

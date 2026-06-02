@@ -315,3 +315,9 @@ export function testCaptcha(
 		});
 	}
 }
+
+export function generateDummyToken() {
+	const token = crypto.randomUUID().replaceAll("-", "").repeat(2);
+	assert.strictEqual(token.length, 64);
+	return token;
+}

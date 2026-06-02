@@ -2,15 +2,13 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { apiState, call, scheduleOnlineCheck } from "$lib/api.svelte";
-	import { appState } from "$lib/appState.svelte";
+	import { scheduleOnlineCheck } from "$lib/api.svelte";
+	import ApiReachableGate from "$lib/components/ApiReachableGate.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LoginFields from "$lib/components/forms/LoginFields.svelte";
-	import RegisterFields from "$lib/components/forms/RegisterFields.svelte";
 	import LoginIcon from "$lib/components/icons/LoginIcon.svelte";
 	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
-	import type { AuthFormData } from "$lib/forms";
+	import { type OSFormData, submitOSForm } from "$lib/forms";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
 	import { requireGuest } from "$lib/routing-utils";
 	import {
@@ -27,9 +25,12 @@
 	import { onMount } from "svelte";
 	import { fly } from "svelte/transition";
 
+	import LoginFields from "./LoginFields.svelte";
+	import RegisterFields from "./RegisterFields.svelte";
+
 	const storage = PersistentStorage.getInstance();
 
-	const forms: Record<string, AuthFormData> = $state({
+	const forms: Record<string, OSFormData> = $state({
 		login: {
 			name: "login",
 			errors: {},
@@ -83,42 +84,10 @@
 		return submitForm(forms[activeForm]);
 	}
 
-	async function submitForm(form: AuthFormData) {
+	async function submitForm(form: OSFormData) {
 		isWorking = true;
 		try {
-			let response: Response;
-			try {
-				response = await call(form.endpoint, {
-					method: "POST",
-					data: form.data,
-					returnRawResponse: true,
-				});
-
-				if (!response) {
-					appState.isApiReachable = false;
-					scheduleOnlineCheck();
-					return;
-				}
-			} catch (error) {
-				console.trace(error);
-				if (
-					error &&
-					typeof error === "object" &&
-					"message" in error &&
-					typeof error.message === "string"
-				) {
-					form.generalError = error.message;
-				}
-				return;
-			}
-			const result = await response.json();
-
-			if (!response.ok) {
-				form.generalError = result.message;
-				return;
-			}
-			console.log(result);
-			await form.onSuccess(result);
+			await submitOSForm(form);
 		} finally {
 			isWorking = false;
 		}
@@ -151,7 +120,7 @@
 		OpenSelves
 	</BlockTitle>
 
-	{#if appState.isApiReachable}
+	<ApiReachableGate>
 		<Block>
 			<Segmented strong rounded class="text-4xl">
 				<SegmentedButton
@@ -217,14 +186,7 @@
 				{/if}
 			</div>
 		</Block>
-	{:else}
-		<Block class="text-center">
-			<div class="m-8">
-				{t("Waiting for {apiState.url}...", apiState.url)}
-			</div>
-			<Preloader />
-		</Block>
-	{/if}
+	</ApiReachableGate>
 
 	<Dialog opened={registerSuccessDialogOpen}>
 		{#snippet title()}

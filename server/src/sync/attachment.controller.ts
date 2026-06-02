@@ -21,7 +21,7 @@ export class AttachmentController {
 		@Param("logId") logId: string,
 		@Param("fieldName") fieldName: string,
 	) {
-		if (userId !== request.accessTokenPayload.user.id) {
+		if (userId !== request.accessTokenPayload?.user.id) {
 			throw new NotFoundException();
 		}
 

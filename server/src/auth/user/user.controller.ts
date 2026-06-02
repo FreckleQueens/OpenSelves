@@ -25,6 +25,8 @@ import { type ConfigData } from "../../config.data.js";
 import { Public } from "../decorators/public.decorator.js";
 import { CreateUserDto } from "./data/create-user.dto.js";
 import { FindOneParams } from "./data/find-one.params.js";
+import { RecoverPasswordDto } from "./data/recover-password.dto.js";
+import { SendPasswordRecoveryEmailDto } from "./data/send-password-recovery-email.dto.js";
 import { UpdateUserDto } from "./data/update-user.dto.js";
 import { VerifyEmailParams } from "./data/verify-email.params.js";
 import { UserService } from "./user.service.js";
@@ -38,7 +40,7 @@ export class UserController {
 
 	@Get(":id")
 	public async getUserById(@Req() request: Request, @Param() params: FindOneParams) {
-		if (request.accessTokenPayload.user.id !== params.id) {
+		if (request.accessTokenPayload?.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
@@ -93,7 +95,7 @@ export class UserController {
 		@Param() params: FindOneParams,
 		@Body() updateUserDto: UpdateUserDto,
 	) {
-		if (request.accessTokenPayload.user.id !== params.id) {
+		if (request.accessTokenPayload?.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
@@ -130,7 +132,7 @@ export class UserController {
 
 	@Delete(":id")
 	public async deleteUser(@Req() request: Request, @Param() params: FindOneParams) {
-		if (request.accessTokenPayload.user.id !== params.id) {
+		if (request.accessTokenPayload?.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
 
@@ -163,7 +165,7 @@ export class UserController {
 		},
 	})
 	public async resendVerificationEmail(@Param() params: FindOneParams, @Req() request: Request) {
-		const authenticatedUserId = request.accessTokenPayload.user.id;
+		const authenticatedUserId = request.accessTokenPayload?.user.id;
 		if (params.id !== authenticatedUserId) {
 			throw new ForbiddenException();
 		}
@@ -174,6 +176,49 @@ export class UserController {
 		}
 
 		await this.userService.resendVerificationEmail(user);
+		return {};
+	}
+
+	@Post(":id/recover-password")
+	@Public()
+	@HttpCode(200)
+	public async recoverPassword(
+		@Param() params: FindOneParams,
+		@Body() recoverPasswordDto: RecoverPasswordDto,
+	) {
+		if (
+			!(await this.userService.recoverPassword(
+				params.id,
+				recoverPasswordDto.token,
+				recoverPasswordDto.newPassword,
+			))
+		) {
+			throw new NotFoundException("User and/or token not found");
+		}
+		return {};
+	}
+
+	@Post("recover-password")
+	@HttpCode(200)
+	@Public()
+	@Throttle({
+		default: {
+			ttl: 15 * 60 * 1000, // 15min
+			limit: 15,
+		},
+		email: {
+			ttl: 15 * 60 * 1000, // 15min
+			limit: 1,
+		},
+	})
+	public async sendPasswordRecoveryEmail(
+		@Body() sendPasswordRecoveryEmailDto: SendPasswordRecoveryEmailDto,
+	) {
+		if (
+			!(await this.userService.sendPasswordRecoveryEmail(sendPasswordRecoveryEmailDto.email))
+		) {
+			throw new NotFoundException("User not found with this email address.");
+		}
 		return {};
 	}
 
