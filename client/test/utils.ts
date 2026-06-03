@@ -28,7 +28,7 @@ export async function registerAndLoginUser(
 	await form.getByRole("button", { name: "Register" }).click();
 	await page.locator("#auto-login-button").click();
 
-	await page.waitForURL("/main");
+	await page.waitForURL("/front");
 
 	return {
 		email,

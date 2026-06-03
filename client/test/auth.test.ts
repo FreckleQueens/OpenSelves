@@ -19,12 +19,14 @@ test("register", async ({ page }) => {
 	await form.getByRole("button", { name: "Register" }).click();
 	await page.locator("#auto-login-button").click();
 
-	await page.waitForURL("/main");
+	await page.waitForURL("/front");
+	await page.goto("/account");
 	await expect(page.locator("body")).toContainText(email);
 });
 
 test("login", async ({ page }) => {
 	const user = await registerAndLoginUser(page);
+	await page.goto("/account");
 	await page.locator("#logout-button").click();
 	await page.waitForURL("/land");
 
@@ -37,6 +39,7 @@ test("login", async ({ page }) => {
 	await page.waitForSelector(".altcha[data-state='verified']");
 	await form.getByRole("button", { name: "Login" }).click();
 
-	await page.waitForURL("/main");
+	await page.waitForURL("/front");
+	await page.goto("/account");
 	await expect(page.locator("body")).toContainText(user.email);
 });
