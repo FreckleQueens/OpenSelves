@@ -190,7 +190,7 @@ deadline or ETA
   - [x] add unverified email warning
   - [x] periodically delete accounts that didn't verify their email 7 days after registration
 - [x] password recovery
-- [ ] change password
+- [x] change password
 - [ ] change email
 - [ ] add a warning about data being accessible even after a logout
   - [ ] add a warning popup
@@ -235,6 +235,7 @@ a short-lived one
 - [ ] ListInput: make clear button better (example: member edit form color field)
 - [ ] bug: click on a member's card image captures click events, preventing from performing card click action
 - [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
+- [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check

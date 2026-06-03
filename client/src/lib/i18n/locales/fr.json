@@ -24,6 +24,7 @@
 	"Copy": "Copier",
 	"Credentials": "Identifiants",
 	"Current front": "Présences actuelles",
+	"Current password": "Mot de passe actuel",
 	"Currently fronting": "Présences actuelles",
 	"Danger zone": "Zone dangereuse",
 	"Delete": "Supprimer",
@@ -111,6 +112,7 @@
 	"You can now login with your new password.": "Vous pouvez désormais vous connecter avec votre nouveau mot de passe.",
 	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte.",
 	"Your email was not verified.": "Votre adresse email n'a pas été vérifiée.",
+	"Your password was changed successfully.": "Votre mot de passe a été modifié avec succès.",
 	"front": "présence",
 	"member": "membre",
 	"{member.name}'s profile picture": "Image de profil appartenant à {member.name}"

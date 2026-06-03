@@ -7,17 +7,21 @@
 	let {
 		children,
 		formState = $bindable(),
-	}: { children: Snippet; formState: FormValidationState } = $props();
+	}: { children: Snippet; formState: FormValidationState | undefined } = $props();
 
 	let inputsContainer: HTMLElement;
-	bindNativeInputValidation(() => inputsContainer, formState);
+	$effect(() => {
+		if (formState) {
+			bindNativeInputValidation(() => inputsContainer, formState);
+		}
+	});
 </script>
 
 <div bind:this={inputsContainer}>
 	{@render children()}
 </div>
 
-{#if formState.generalError}
+{#if formState && formState.generalError}
 	<Card class="k-color-brand-red">
 		<p class="flex items-center">
 			<ErrorIcon class="text-xl mr-2 inline" />

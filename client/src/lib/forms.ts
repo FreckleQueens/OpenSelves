@@ -13,6 +13,7 @@ export type FormValidationState = FormFieldsValidationState & {
 export type OSFormData = FormValidationState & {
 	name: string;
 	endpoint: string;
+	method?: "GET" | "POST" | "PUT" | "PATCH";
 	data: Record<string, string>;
 	onSuccess: (result: object) => Promise<unknown> | unknown;
 	autoVerifyCaptcha?: boolean;
@@ -46,7 +47,7 @@ export async function submitOSForm(form: OSFormData) {
 	let response: Response;
 	try {
 		response = await call(form.endpoint, {
-			method: "POST",
+			method: form.method || "POST",
 			data: form.data,
 			returnRawResponse: true,
 		});

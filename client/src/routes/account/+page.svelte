@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { apiState, call, handleLogout, refreshUserData } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
+	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, BlockTitle, Button, List, ListItem, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
@@ -60,6 +62,14 @@
 	<Block strong>
 		<List nested>
 			<ResendVerificationEmail bind:user={appState.userData} />
+			<ListItem>
+				{#snippet text()}
+					<Button tonal href={resolve("/account/change-password")}>
+						<PasswordIcon button before />
+						Change password
+					</Button>
+				{/snippet}
+			</ListItem>
 			<ListItem>
 				{#snippet text()}
 					<Button
