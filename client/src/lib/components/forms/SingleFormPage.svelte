@@ -3,6 +3,7 @@
 	import ApiReachableGate from "$lib/components/ApiReachableGate.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
+	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
@@ -14,15 +15,17 @@
 		Dialog,
 		DialogButton,
 		List,
+		ListItem,
 		Preloader,
 	} from "konsta/svelte";
-	import { type Snippet, onMount } from "svelte";
+	import { type Snippet } from "svelte";
 
 	let {
 		children,
 		loaded = $bindable(),
 		formState = $bindable(),
 		formName,
+		formData = {},
 		endpoint,
 		method,
 		title,
@@ -31,24 +34,27 @@
 		successDialogContent,
 		successDialogContinueButton,
 		successDialogContinueAction,
+		captcha = false,
 	}: {
 		children: Snippet;
 		loaded: boolean;
 		formState?: OSFormData;
 		formName: string;
+		formData?: OSFormData["data"];
 		endpoint: string;
-		method: OSFormData["method"];
+		method?: OSFormData["method"];
 		title: string;
 		submitButtonText: string;
 		successDialogTitle: string;
 		successDialogContent: string;
 		successDialogContinueButton: string;
 		successDialogContinueAction: () => Promise<void> | void;
+		captcha?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
 	let _formState: OSFormData = $state({
-		data: {},
+		data: formData,
 		endpoint: endpoint,
 		method: method,
 		errors: {},
@@ -62,8 +68,10 @@
 	let isWorking = $state(false);
 	let successDialogOpen = $state(false);
 
-	onMount(async () => {
-		scheduleOnlineCheck(0);
+	$effect(() => {
+		if (loaded) {
+			scheduleOnlineCheck(0);
+		}
 	});
 
 	async function formOnSubmit(event: SubmitEvent) {
@@ -94,10 +102,31 @@
 					<List>
 						{@render children()}
 					</List>
+
+					{#if captcha}
+						<List>
+							<ListItem>
+								{#snippet inner()}
+									{#if formState}
+										<Captcha
+											bind:value={formState.data["captcha"]}
+											autoVerify={formState.autoVerifyCaptcha}
+										/>
+									{/if}
+								{/snippet}
+							</ListItem>
+						</List>
+					{/if}
 				</FormFields>
 
 				<Block class="mt-0">
-					<Button type="submit" tonal disabled={isWorking}>
+					<Button
+						type="submit"
+						tonal
+						disabled={!formState ||
+							(captcha && !formState.data["captcha"]) ||
+							isWorking}
+					>
 						{#if isWorking}
 							<Preloader />
 						{:else}
