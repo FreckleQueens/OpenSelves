@@ -8,7 +8,7 @@
 
 	(async () => {
 		if (appState.isAuthenticated) {
-			await goto(resolve("/main"));
+			await goto(resolve("/front"));
 		} else {
 			if (await PersistentStorage.getInstance().getRaw(USER_LANDED_STORAGE_KEY)) {
 				await goto(resolve("/auth"));

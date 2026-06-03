@@ -1,6 +1,7 @@
 {
 	"({LOCAL_VERSION} => {REMOTE_VERSION})": "({LOCAL_VERSION} => {REMOTE_VERSION})",
 	"A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.": "Une esperluette stylisée colorisée par un dégradé d'orange à rose de haut en bas. Deux formes de coeur superposées y sont cachées.",
+	"Account": "Compte",
 	"Account settings": "Paramètres de compte",
 	"Actions": "Actions",
 	"Add a color": "Ajouter une couleur",
@@ -105,7 +106,7 @@
 	"Verification email sent. (please wait {time} before trying again)": "Email de confirmation envoyé. (Vvuillez attendre {time} avant d'essayer à nouveau)",
 	"Waiting for {apiState.url}...": "En attente de {apiState.url}...",
 	"What language do you prefer?": "Quelle langue préférez-vous ?",
-	"You are logged in as user #{user.id}, {user.email}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email}",
+	"You are logged in as user #{user.id}, {user.email} on the OpenSelves instance at {apiUrl}": "Vous êtes connecté.e en tant qu'utilisateur.ice #{user.id}, {user.email} sur l'instance OpenSelves {apiUrl}",
 	"You can close this page.": "Vous pouvez fermer cette page.",
 	"You can now login with your new password.": "Vous pouvez désormais vous connecter avec votre nouveau mot de passe.",
 	"Your account has been created. Click \"Login\" to login with your account.": "Votre compte a été créé. Clickez sur \"Connexion\" pour vous connecter avec votre compte.",

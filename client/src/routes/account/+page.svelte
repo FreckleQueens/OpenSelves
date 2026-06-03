@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { call, handleLogout, refreshUserData } from "$lib/api.svelte";
+	import { apiState, call, handleLogout, refreshUserData } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
-	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
-	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, BlockTitle, Button, List, ListItem, Preloader } from "konsta/svelte";
@@ -37,16 +35,7 @@
 	}
 </script>
 
-<AppPage title="" activeMenuItem={MenuItem.HOME}>
-	<BlockTitle large>App settings</BlockTitle>
-
-	<BlockTitle medium>Language</BlockTitle>
-	<Block strong>
-		<LanguageSwitcher />
-	</Block>
-
-	<AppInfo />
-
+<AppPage title="" activeMenuItem={MenuItem.ACCOUNT}>
 	<BlockTitle large>Account settings</BlockTitle>
 
 	<BlockTitle medium>Status</BlockTitle>
@@ -54,9 +43,10 @@
 		{#if appState.syncWorkerOnline && appState.userData}
 			<p>
 				{t(
-					"You are logged in as user #{user.id}, {user.email}",
+					"You are logged in as user #{user.id}, {user.email} on the OpenSelves instance at {apiUrl}",
 					appState.userData.id,
 					appState.userData.email,
+					apiState.url,
 				)}
 			</p>
 		{:else if !appState.syncWorkerOnline && userId}

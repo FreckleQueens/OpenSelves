@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { call } from "$lib/api.svelte";
+	import { call } from "$lib/api.svelte.js";
 	import Captcha from "$lib/components/Captcha.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import humanizeDuration from "humanize-duration";

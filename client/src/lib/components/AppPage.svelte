@@ -1,15 +1,18 @@
 <script lang="ts">
+	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { transformErrorToReadable } from "$lib";
 	import { apiState } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppUpdateDialog from "$lib/components/AppUpdateDialog.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
+	import AccountIcon from "$lib/components/icons/AccountIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
-	import HomeIcon from "$lib/components/icons/HomeIcon.svelte";
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
+	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
+	import type { OSIconProps } from "$lib/components/os-icon";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
 	import humanizeDuration from "humanize-duration";
 	import {
@@ -23,7 +26,7 @@
 		Panel,
 		Preloader,
 	} from "konsta/svelte";
-	import { type Snippet } from "svelte";
+	import { type Component, type Snippet } from "svelte";
 	import { fly } from "svelte/transition";
 
 	let {
@@ -56,6 +59,35 @@
 
 	let openMenu = $state(false);
 	let syncWorkerError: unknown = $derived(appState.syncWorkerError);
+
+	const menuItems: {
+		[k in MenuItem]: {
+			title: string;
+			href: string;
+			iconComponent: Component<OSIconProps>;
+		};
+	} = {
+		[MenuItem.FRONT]: {
+			title: t("Front"),
+			href: resolve("/front"),
+			iconComponent: FrontIcon,
+		},
+		[MenuItem.MEMBERS]: {
+			title: t("Members"),
+			href: resolve("/members"),
+			iconComponent: PeopleIcon,
+		},
+		[MenuItem.ACCOUNT]: {
+			title: t("Account"),
+			href: resolve("/account"),
+			iconComponent: AccountIcon,
+		},
+		[MenuItem.SETTINGS]: {
+			title: t("Settings"),
+			href: resolve("/settings"),
+			iconComponent: SettingsIcon,
+		},
+	};
 </script>
 
 <ErrorDialog
@@ -79,29 +111,14 @@
 		</BlockTitle>
 
 		<MenuList class="flex-1">
-			<MenuListItem title={t("Home")} active={activeMenuItem === MenuItem.HOME} href="/main">
-				{#snippet media()}
-					<HomeIcon class="text-xl" />
-				{/snippet}
-			</MenuListItem>
-			<MenuListItem
-				title={t("Front")}
-				active={activeMenuItem === MenuItem.FRONT}
-				href="/front"
-			>
-				{#snippet media()}
-					<FrontIcon class="text-xl" />
-				{/snippet}
-			</MenuListItem>
-			<MenuListItem
-				title={t("Members")}
-				active={activeMenuItem === MenuItem.MEMBERS}
-				href="/members"
-			>
-				{#snippet media()}
-					<PeopleIcon class="text-xl" />
-				{/snippet}
-			</MenuListItem>
+			{#each Object.values(menuItems) as entry, key (key)}
+				{@const Icon = entry.iconComponent}
+				<MenuListItem title={entry.title} active={activeMenuItem === key} href={entry.href}>
+					{#snippet media()}
+						<Icon class="text-xl" />
+					{/snippet}
+				</MenuListItem>
+			{/each}
 		</MenuList>
 
 		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />

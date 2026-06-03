@@ -2,9 +2,10 @@
 export const USER_LANDED_STORAGE_KEY = "userLanded";
 
 export enum MenuItem {
-	HOME,
 	FRONT,
 	MEMBERS,
+	ACCOUNT,
+	SETTINGS,
 }
 
 export type ClickEventHandler = (event: MouseEvent) => Promise<void> | void;
