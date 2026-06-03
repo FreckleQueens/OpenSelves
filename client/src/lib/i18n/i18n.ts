@@ -21,11 +21,11 @@ for (const locale of supportedLocales) {
 }
 
 globalThis.t = function translate(key: string, ...args: string[]): string {
-	const locale = localeState.locale;
-
-	if (!locale) {
-		throw new Error("Locale not set");
+	if (!localeState.locale) {
+		console.warn("Locale not set");
 	}
+
+	const locale = localeState.locale || DEFAULT_LOCALE;
 
 	if (locale !== DEFAULT_LOCALE) {
 		const localeMap = locales[locale];
