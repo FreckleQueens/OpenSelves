@@ -197,7 +197,7 @@ deadline or ETA
   - [ ] add an option to logout and wipe IDB
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one
-- [ ] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag (use var(--...) to change based on light/dark mode)
+- [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)

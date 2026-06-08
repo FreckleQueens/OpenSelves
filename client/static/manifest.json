@@ -17,9 +17,8 @@
 		}
 	],
 	"background_color": "#fff2e9",
-	"theme_color": "#df6800",
-	"display": "fullscreen",
-	"display_override": ["standalone", "minimal-ui"],
+	"display": "standalone",
+	"display_override": ["minimal-ui"],
 	"orientation": "portrait",
 	"start_url": "/",
 	"id": "/?pwa_version=5"
