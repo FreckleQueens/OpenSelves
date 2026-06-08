@@ -3,7 +3,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import assert from "node:assert";
 import test, { describe } from "node:test";
-import { TOKEN_EXPIRED_ERROR } from "openselves-common";
+import { GetUser, TOKEN_EXPIRED_ERROR, parseApiResult } from "openselves-common";
 import { sessions } from "openselves-common/db";
 import request from "supertest";
 
@@ -388,6 +388,7 @@ describe("Auth (e2e)", () => {
 				"email",
 				"createdAt",
 				"isEmailVerified",
+				"newEmailRequest",
 			]);
 		});
 
@@ -486,6 +487,7 @@ describe("Auth (e2e)", () => {
 				email: env.users.user.email,
 				createdAt: env.users.user.createdAt,
 				isEmailVerified: false,
+				newEmailRequest: "",
 			});
 		});
 
@@ -519,14 +521,49 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("PATCH email 200", async () => {
-			const newEmail = "new.jane@example.org";
+			let dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
 
+			const emailVerificationToken = dbUser.emailVerificationToken;
+			const newEmail = createId() + "@example.org";
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ email: newEmail })
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
 				.expect(200);
-			const response = await env.request
+
+			dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			// Changing email should never change isEmailVerified in DB
+			assert.strictEqual(dbUser.isEmailVerified, false);
+			assert.notEqual(dbUser.emailVerificationToken, emailVerificationToken);
+			assert.strictEqual(dbUser.emailVerificationToken.length, 64);
+
+			let response = await env.request
+				.get("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.expect(200);
+			const parsedBody = parseApiResult(GetUser, response.body);
+			assert.strictEqual(parsedBody.email, env.users.user.email);
+			// This should *not* correspond to isEmailVerified in DB, but instead should reflect the
+			//  presence of a to-be-verified new email address field
+			assert.strictEqual(parsedBody.isEmailVerified, false);
+
+			await env.request
+				.post(
+					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+				)
+				.expect(200);
+
+			response = await env.request
 				.get("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
 				.expect(200);
@@ -534,11 +571,162 @@ describe("Auth (e2e)", () => {
 			assert.notStrictEqual(response.body.email, env.users.user.email);
 		});
 
+		test("PATCH email doesn't set isEmailVerified back to false in DB 200", async () => {
+			let dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			await env.request
+				.post(
+					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+				)
+				.expect(200);
+
+			dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			assert.strictEqual(dbUser.isEmailVerified, true);
+
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.org" })
+				.expect(200);
+
+			dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			// Changing email should never set isEmailVerified back to false in DB
+			assert.strictEqual(dbUser.isEmailVerified, true);
+		});
+
+		test("PATCH email sets newEmailRequest in GET /user/:id 200", async () => {
+			const dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			await env.request
+				.post(
+					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+				)
+				.expect(200);
+
+			let apiGetUser = parseApiResult(
+				GetUser,
+				(
+					await env.request
+						.get("/user/" + env.users.user.id)
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+				).body,
+			);
+			assert.strictEqual(apiGetUser.newEmailRequest, "");
+
+			const newEmail = createId() + "@example.org";
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.expect(200);
+
+			apiGetUser = parseApiResult(
+				GetUser,
+				(
+					await env.request
+						.get("/user/" + env.users.user.id)
+						.set("Cookie", env.users.cookies)
+						.expect(200)
+				).body,
+			);
+			assert.strictEqual(apiGetUser.newEmailRequest, newEmail);
+		});
+
+		test("PATCH email twice without verifying 200", async () => {
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.com" })
+				.expect(200);
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.com" })
+				.expect(200);
+		});
+
+		test("PATCH email to existing email 409", async () => {
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: env.users.user2.email })
+				.expect(409);
+		});
+
+		test("PATCH email same email for 2 users 409", async () => {
+			const newEmail = createId() + "@example.org";
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.expect(200);
+			await env.request
+				.patch("/user/" + env.users.user2.id)
+				.set("Cookie", env.users.cookies2)
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.expect(200);
+
+			// Verify user 1 succeeds
+			let dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user.id,
+				},
+			});
+			assert(dbUser);
+			await env.request
+				.post("/user/" + dbUser.id + "/verify-email/" + dbUser.emailVerificationToken)
+				.expect(200);
+
+			// Verify user 2 fails
+			dbUser = await env.db.query.users.findFirst({
+				where: {
+					id: env.users.user2.id,
+				},
+			});
+			assert(dbUser);
+			await env.request
+				.post("/user/" + dbUser.id + "/verify-email/" + dbUser.emailVerificationToken)
+				.expect(409);
+		});
+
+		testCaptcha(
+			() => env,
+			200,
+			(testName, testCallback) => {
+				test(testName, testCallback);
+			},
+			(captcha) => {
+				return env.request
+					.patch("/user/" + env.users.user.id)
+					.set("Cookie", env.users.cookies)
+					.send({ captcha, email: createId() + "@example.org" });
+			},
+		);
+
 		test("PATCH unauthenticated 401", async () => {
 			const newEmail = "new.jane@example.org";
 			await env.request
 				.patch("/user/" + env.users.user.id)
-				.send({ email: newEmail })
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
@@ -548,7 +736,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies)
-				.send({ email: newEmail })
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
@@ -558,7 +746,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ email: newEmail })
+				.send({ captcha: await solveCaptcha(env), email: newEmail })
 				.expect(400);
 			const response = await env.request
 				.get("/user/" + env.users.user.id)
@@ -574,7 +762,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ oldPassword, newPassword })
+				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
 				.expect(200);
 		});
 
@@ -582,7 +770,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ newPassword: "87654321" })
+				.send({ captcha: await solveCaptcha(env), newPassword: "87654321" })
 				.expect(400);
 		});
 
@@ -590,7 +778,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ oldPassword: env.users.userPassword })
+				.send({ captcha: await solveCaptcha(env), oldPassword: env.users.userPassword })
 				.expect(400);
 		});
 
@@ -600,7 +788,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ oldPassword, newPassword })
+				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
 				.expect(401);
 		});
 
@@ -610,7 +798,15 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ oldPassword, newPassword })
+				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
+				.expect(400);
+		});
+
+		test("PATCH empty 400", async () => {
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({ captcha: await solveCaptcha(env) })
 				.expect(400);
 		});
 

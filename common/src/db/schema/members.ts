@@ -10,7 +10,7 @@ export const members = camelCase.table(
 			.references(() => users.id, {
 				onDelete: "cascade",
 			}),
-		...id,
+		...id(),
 		name: text().notNull(),
 		pronouns: text().notNull(),
 		description: text().notNull(),

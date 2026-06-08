@@ -100,6 +100,10 @@ export class AuthModule implements NestModule {
 				method: RequestMethod.POST,
 			},
 			{
+				path: "/user/:id",
+				method: RequestMethod.PATCH,
+			},
+			{
 				path: "/user/:id/resend-verification-email",
 				method: RequestMethod.POST,
 			},

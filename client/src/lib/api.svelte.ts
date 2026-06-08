@@ -39,12 +39,16 @@ export const USER_DATA_STORAGE_KEY = "userData";
 
 export async function setServerUrl(newUrl: string) {
 	apiState.url = newUrl;
-	await PersistentStorage.getInstance().setRaw(SERVER_URL_STORAGE_KEY, newUrl);
+	await PersistentStorage.getInstance().set(SERVER_URL_STORAGE_KEY, newUrl, true);
 }
 
 export async function setApiStatus(status: GetStatusResult) {
 	apiState.status = status;
-	await PersistentStorage.getInstance().setRaw(SERVER_STATUS_STORAGE_KEY, JSON.stringify(status));
+	await PersistentStorage.getInstance().set(
+		SERVER_STATUS_STORAGE_KEY,
+		JSON.stringify(status),
+		true,
+	);
 }
 
 export async function refreshUserData() {
@@ -219,6 +223,7 @@ export async function call(
 
 	switch (result) {
 		case CallResult.SESSION_EXPIRED:
+			console.debug("Got result", result, "from callRaw");
 			await handleLogout();
 			return undefined;
 		case CallResult.API_UNREACHABLE:

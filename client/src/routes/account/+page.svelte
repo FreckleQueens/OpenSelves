@@ -5,6 +5,7 @@
 	import { apiState, call, handleLogout, refreshUserData } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import LogoutIcon from "$lib/components/icons/LogoutIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import { requireAuth } from "$lib/routing-utils";
@@ -62,6 +63,14 @@
 	<Block strong>
 		<List nested>
 			<ResendVerificationEmail bind:user={appState.userData} />
+			<ListItem>
+				{#snippet text()}
+					<Button tonal href={resolve("/account/change-email")}>
+						<EmailIcon button before />
+						Change email
+					</Button>
+				{/snippet}
+			</ListItem>
 			<ListItem>
 				{#snippet text()}
 					<Button tonal href={resolve("/account/change-password")}>

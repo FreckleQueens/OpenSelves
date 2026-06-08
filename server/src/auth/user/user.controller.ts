@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	Body,
 	ConflictException,
 	Controller,
@@ -18,10 +19,10 @@ import { ConfigService } from "@nestjs/config";
 import { Throttle } from "@nestjs/throttler";
 import { DrizzleQueryError } from "drizzle-orm";
 import type { Request } from "express";
-import { type GetUserResult, type PartialBy } from "openselves-common";
-import { type User } from "openselves-common/db";
+import type { GetUserResult, PartialBy } from "openselves-common";
+import type { ServerUserEmailChangeRequest, User } from "openselves-common/db";
 
-import { type ConfigData } from "../../config.data.js";
+import type { ConfigData } from "../../config.data.js";
 import { Public } from "../decorators/public.decorator.js";
 import { CreateUserDto } from "./data/create-user.dto.js";
 import { FindOneParams } from "./data/find-one.params.js";
@@ -44,7 +45,12 @@ export class UserController {
 			throw new UnauthorizedException();
 		}
 
-		const user = await this.userService.getUser({ id: params.id });
+		const user = await this.userService.getUser(
+			{ id: params.id },
+			{
+				emailChangeRequest: true,
+			},
+		);
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
@@ -86,7 +92,7 @@ export class UserController {
 			}
 			throw error;
 		}
-		return this.getUserResponseForOwner(createdUser);
+		return this.getUserResponseForOwner({ ...createdUser, emailChangeRequest: null });
 	}
 
 	@Patch(":id")
@@ -95,6 +101,10 @@ export class UserController {
 		@Param() params: FindOneParams,
 		@Body() updateUserDto: UpdateUserDto,
 	) {
+		if (!Object.values(updateUserDto).find((val) => !!val)) {
+			throw new BadRequestException("At least one field is required");
+		}
+
 		if (request.accessTokenPayload?.user.id !== params.id) {
 			throw new UnauthorizedException();
 		}
@@ -121,6 +131,7 @@ export class UserController {
 
 			patchData.passwordHash = await this.userService.hashPassword(updateUserDto.newPassword);
 		}
+
 		const updatedUser = await this.userService.updateUser(userId, patchData);
 		if (!updatedUser) {
 			throw new InternalServerErrorException(
@@ -146,7 +157,17 @@ export class UserController {
 	@Public()
 	@HttpCode(200)
 	public async verifyEmail(@Param() params: VerifyEmailParams) {
-		if (!(await this.userService.verifyUserEmail(params.id, params.token))) {
+		let result: boolean;
+		try {
+			result = await this.userService.verifyUserEmail(params.id, params.token);
+		} catch (error) {
+			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
+				throw new ConflictException("That email address is already taken");
+			} else {
+				throw error;
+			}
+		}
+		if (!result) {
 			throw new NotFoundException("User and/or token not found");
 		}
 		return {};
@@ -170,7 +191,12 @@ export class UserController {
 			throw new ForbiddenException();
 		}
 
-		const user = await this.userService.getUser({ id: authenticatedUserId });
+		const user = await this.userService.getUser(
+			{ id: authenticatedUserId },
+			{
+				emailChangeRequest: true,
+			},
+		);
 		if (!user) {
 			throw new NotFoundException("User not found");
 		}
@@ -222,12 +248,20 @@ export class UserController {
 		return {};
 	}
 
-	private getUserResponseForOwner(user: PartialBy<User, "passwordHash">): GetUserResult {
+	private getUserResponseForOwner(
+		user: PartialBy<
+			User & {
+				emailChangeRequest: ServerUserEmailChangeRequest | null;
+			},
+			"passwordHash"
+		>,
+	): GetUserResult {
 		return {
 			id: user.id,
 			email: user.email,
 			createdAt: user.createdAt,
 			isEmailVerified: user.isEmailVerified,
+			newEmailRequest: user.emailChangeRequest?.email || "",
 		};
 	}
 }

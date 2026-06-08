@@ -24,7 +24,7 @@ export const logs = camelCase.table(
 			.references(() => users.id, {
 				onDelete: "cascade",
 			}),
-		...id,
+		...id(),
 		memberId: text(),
 		frontId: text(),
 		operationType: logOperationType().notNull(),

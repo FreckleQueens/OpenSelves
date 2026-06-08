@@ -191,7 +191,7 @@ deadline or ETA
   - [x] periodically delete accounts that didn't verify their email 7 days after registration
 - [x] password recovery
 - [x] change password
-- [ ] change email
+- [x] change email
 - [ ] add a warning about data being accessible even after a logout
   - [ ] add a warning popup
   - [ ] add an option to logout and wipe IDB

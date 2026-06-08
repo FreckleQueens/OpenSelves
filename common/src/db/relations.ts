@@ -7,10 +7,17 @@ export const relations = defineRelations(models, (r) => ({
 		logs: r.many.logs(),
 		members: r.many.members(),
 		fronts: r.many.fronts(),
+		emailChangeRequest: r.one.serverUserEmailChangeRequest(),
 	},
 	sessions: {
 		user: r.one.users({
 			from: r.sessions.userId,
+			to: r.users.id,
+		}),
+	},
+	serverUserEmailChangeRequest: {
+		user: r.one.users({
+			from: r.serverUserEmailChangeRequest.userId,
 			to: r.users.id,
 		}),
 	},

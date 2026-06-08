@@ -11,7 +11,7 @@ export const fronts = camelCase.table(
 			.references(() => users.id, {
 				onDelete: "cascade",
 			}),
-		...id,
+		...id(),
 		memberId: text().notNull(),
 		startedAt: timestamp().notNull(),
 		endedAt: timestamp(),

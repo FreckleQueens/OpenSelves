@@ -10,7 +10,7 @@
 
 	async function goForward() {
 		const client = PersistentStorage.getInstance();
-		await client.setRaw(USER_LANDED_STORAGE_KEY, "1"); // truthy value
+		await client.set(USER_LANDED_STORAGE_KEY, "1", true); // truthy value
 		await goto(resolve("/"));
 	}
 </script>

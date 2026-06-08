@@ -10,7 +10,7 @@
 		if (appState.isAuthenticated) {
 			await goto(resolve("/front"));
 		} else {
-			if (await PersistentStorage.getInstance().getRaw(USER_LANDED_STORAGE_KEY)) {
+			if (await PersistentStorage.getInstance().get(USER_LANDED_STORAGE_KEY, true)) {
 				await goto(resolve("/auth"));
 			} else {
 				await goto(resolve("/land"));

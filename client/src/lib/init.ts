@@ -37,15 +37,15 @@ export async function initApp() {
 	});
 
 	// i18n
-	await setLocale((await storage.getRaw(LOCALE_STORAGE_KEY)) || DEFAULT_LOCALE, false);
+	await setLocale((await storage.get(LOCALE_STORAGE_KEY, true)) || DEFAULT_LOCALE, false);
 
 	// Server url
-	const storedUrl = await storage.getRaw(SERVER_URL_STORAGE_KEY);
+	const storedUrl = await storage.get(SERVER_URL_STORAGE_KEY, true);
 	if (storedUrl) {
 		apiState.url = storedUrl;
 	}
 
-	const storedStatus = await storage.getRaw(SERVER_STATUS_STORAGE_KEY);
+	const storedStatus = await storage.get(SERVER_STATUS_STORAGE_KEY, true);
 	if (storedStatus) {
 		apiState.status = parseApiResult(GetStatus, JSON.parse(storedStatus));
 	} else {
@@ -53,12 +53,20 @@ export async function initApp() {
 	}
 
 	if (appState.isAuthenticated) {
-		const storedUserData = await PersistentStorage.getInstance().get(USER_DATA_STORAGE_KEY);
+		const storedUserData = await storage.get(USER_DATA_STORAGE_KEY);
 		if (storedUserData) {
-			appState.userData = parseApiResult(GetUser, JSON.parse(storedUserData));
+			try {
+				appState.userData = parseApiResult(GetUser, JSON.parse(storedUserData));
+			} catch {
+				await storage.delete(USER_DATA_STORAGE_KEY);
+			}
 		}
 
-		if (!appState.userData || !appState.userData.isEmailVerified) {
+		if (
+			!appState.userData ||
+			!appState.userData.isEmailVerified ||
+			appState.userData.newEmailRequest
+		) {
 			await refreshUserData();
 		}
 	}

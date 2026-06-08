@@ -9,7 +9,7 @@ export const sessions = camelCase.table("sessions", {
 		.references(() => users.id, {
 			onDelete: "cascade",
 		}),
-	...timestamps,
+	...timestamps(),
 });
 export type Session = typeof sessions.$inferSelect;
 export type SessionCreate = typeof sessions.$inferInsert;

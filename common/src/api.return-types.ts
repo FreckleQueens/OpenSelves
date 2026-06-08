@@ -25,6 +25,7 @@ export const GetUser = {
 	email: String,
 	createdAt: Date,
 	isEmailVerified: Boolean,
+	newEmailRequest: String,
 } satisfies ApiResultFields;
 export type GetUserResult = ApiResult<typeof GetUser>;
 

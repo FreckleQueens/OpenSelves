@@ -38,9 +38,9 @@
 
 	onMount(async () => {
 		canPrompt =
-			apiState.mismatchedRemoteVersion !== (await storage.getRaw(DO_NOT_ASK_AGAIN_KEY));
+			apiState.mismatchedRemoteVersion !== (await storage.get(DO_NOT_ASK_AGAIN_KEY, true));
 		alreadyAsked =
-			apiState.mismatchedRemoteVersion === (await storage.getRaw(ALREADY_ASKED_KEY));
+			apiState.mismatchedRemoteVersion === (await storage.get(ALREADY_ASKED_KEY, true));
 	});
 
 	async function reload() {
@@ -49,9 +49,11 @@
 
 	async function close() {
 		canPrompt = false;
-		await storage.setRaw(ALREADY_ASKED_KEY, apiState.mismatchedRemoteVersion);
-		if (doNotAskAgain) {
-			await storage.setRaw(DO_NOT_ASK_AGAIN_KEY, apiState.mismatchedRemoteVersion);
+		if (apiState.mismatchedRemoteVersion) {
+			await storage.set(ALREADY_ASKED_KEY, apiState.mismatchedRemoteVersion, true);
+			if (doNotAskAgain) {
+				await storage.set(DO_NOT_ASK_AGAIN_KEY, apiState.mismatchedRemoteVersion, true);
+			}
 		}
 	}
 </script>

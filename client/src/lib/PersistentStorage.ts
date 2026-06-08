@@ -24,7 +24,7 @@ export abstract class PersistentStorage {
 	private _userId?: string;
 
 	public async init(): Promise<void> {
-		this.userId = await this.getRaw(CURRENT_USER_ID_KEY);
+		this.userId = await this.get(CURRENT_USER_ID_KEY, true);
 	}
 
 	public getUserId(): string {
@@ -64,8 +64,6 @@ export abstract class PersistentStorage {
 		return this.getRaw(absolute ? path : `${this.getUserId()}.${path}`);
 	}
 
-	public abstract getRaw(path: string): Promise<string | undefined>;
-
 	public async set(path: string, value: string, absolute: boolean = false): Promise<void> {
 		await this.setRaw(absolute ? path : `${this.getUserId()}.${path}`, value);
 	}
@@ -74,7 +72,13 @@ export abstract class PersistentStorage {
 		return this.set(`${userId}.${path}`, value, true);
 	}
 
-	public abstract setRaw(path: string, value: string | undefined): Promise<void>;
+	public async delete(path: string, absolute: boolean = false): Promise<void> {
+		await this.setRaw(absolute ? path : `${this.getUserId()}.${path}`, undefined);
+	}
+
+	protected abstract getRaw(path: string): Promise<string | undefined>;
+
+	protected abstract setRaw(path: string, value: string | undefined): Promise<void>;
 
 	private get userId(): string | undefined {
 		return this._userId;
@@ -89,13 +93,13 @@ export abstract class PersistentStorage {
 export class IDBStorage extends PersistentStorage {
 	private idb: IDB = IDB.getInstance();
 
-	public async getRaw(path: string): Promise<string | undefined> {
+	protected async getRaw(path: string): Promise<string | undefined> {
 		const entries = await this.idb.storageEntry.getByField("key", path);
 		const entry = entries[0];
 		return entry ? entry.value : undefined;
 	}
 
-	public async setRaw(path: string, value: string | undefined): Promise<void> {
+	protected async setRaw(path: string, value: string | undefined): Promise<void> {
 		if (value === undefined) {
 			await this.idb.storageEntry.delete([path]);
 		} else {

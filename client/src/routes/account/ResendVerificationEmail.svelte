@@ -60,7 +60,7 @@
 	}
 </script>
 
-{#if user && !user.isEmailVerified && timeToSendVerificationEmailAvailability !== undefined}
+{#if user && (!user.isEmailVerified || user.newEmailRequest) && timeToSendVerificationEmailAvailability !== undefined}
 	<ListItem>
 		{#snippet text()}
 			{#if timeToSendVerificationEmailAvailability !== undefined && timeToSendVerificationEmailAvailability <= 0}

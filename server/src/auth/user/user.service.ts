@@ -1,12 +1,20 @@
 import * as argon2 from "argon2";
 import { CACHE_MANAGER, Cache } from "@nestjs/cache-manager";
-import { Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { randomBytes } from "crypto";
-import { type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
-import type { DBQueryConfigWith, RelationsRecord } from "drizzle-orm/relations";
-import { type User, type UserCreate, type relations, users } from "openselves-common/db";
+import { type BuildQueryResult, type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
+import { type DBQueryConfigWith } from "drizzle-orm/relations";
+import {
+	type ServerUserEmailChangeRequest,
+	type User,
+	type UserCreate,
+	type UserUpdate,
+	type relations,
+	serverUserEmailChangeRequest,
+	users,
+} from "openselves-common/db";
 
 import type { ConfigData } from "../../config.data.js";
 import { InjectDb } from "../../db/db.service.js";
@@ -23,13 +31,26 @@ export class UserService {
 		private readonly mailService: MailService,
 	) {}
 
-	public async getUser(
+	public async getUser<
+		With extends DBQueryConfigWith<typeof relations, (typeof relations.users)["relations"]>,
+	>(
 		where: RelationsFilterColumns<typeof users._.columns>,
-		options: {
-			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
-		} = {},
-	): Promise<Omit<User, "passwordHash"> | undefined> {
-		const userWithPassword = await this.getUserWithPassword(where, options);
+		withRelations?: With,
+	): Promise<
+		| Omit<
+				BuildQueryResult<
+					typeof relations,
+					typeof relations.users,
+					{
+						where: RelationsFilterColumns<typeof users._.columns>;
+						with: With;
+					}
+				>,
+				"passwordHash"
+		  >
+		| undefined
+	> {
+		const userWithPassword = await this.getUserWithPassword(where, withRelations);
 		if (!userWithPassword) {
 			return undefined;
 		}
@@ -38,29 +59,95 @@ export class UserService {
 		return userWithoutPassword;
 	}
 
-	public async getUserWithPassword(
+	public async getUserWithPassword<
+		With extends
+			| DBQueryConfigWith<typeof relations, (typeof relations.users)["relations"]>
+			| undefined,
+	>(
 		where: RelationsFilterColumns<typeof users._.columns>,
-		options: {
-			with?: DBQueryConfigWith<typeof relations, RelationsRecord>;
-		} = {},
-	): Promise<User | undefined> {
+		withRelations?: With,
+	): Promise<
+		| BuildQueryResult<
+				typeof relations,
+				typeof relations.users,
+				{
+					where: RelationsFilterColumns<typeof users._.columns>;
+					with: With;
+				}
+		  >
+		| undefined
+	> {
 		return this.db.query.users.findFirst({
 			where: where,
-			with: options?.with,
+			with: withRelations,
 		});
 	}
 
 	public async createUser(data: UserCreate): Promise<User> {
+		data = { ...data };
+		data.emailVerificationToken = this.generateSecureToken();
 		const createdUser = (await this.db.insert(users).values(data).returning())[0];
-		await this.sendEmailVerificationEmail(createdUser);
+		await this.sendEmailVerificationEmail({ ...createdUser, emailChangeRequest: null });
 		return createdUser;
 	}
 
 	public async updateUser(
 		userId: User["id"],
 		data: Partial<UserCreate>,
-	): Promise<User | undefined> {
-		return (await this.db.update(users).set(data).where(eq(users.id, userId)).returning())[0];
+	): Promise<
+		| (User & {
+				emailChangeRequest: ServerUserEmailChangeRequest | null;
+		  })
+		| undefined
+	> {
+		return await this.db.transaction(async (tx) => {
+			data = { ...data };
+
+			let emailChangeRequest: ServerUserEmailChangeRequest | null = null;
+			if ("email" in data) {
+				const existingUserWithEmail = await tx.query.users.findFirst({
+					where: {
+						email: data.email,
+					},
+				});
+				if (existingUserWithEmail) {
+					throw new ConflictException("This email address is already taken");
+				}
+
+				emailChangeRequest = (
+					await tx
+						.insert(serverUserEmailChangeRequest)
+						.values({
+							userId,
+							email: data.email,
+						})
+						.onConflictDoUpdate({
+							target: serverUserEmailChangeRequest.userId,
+							set: {
+								email: data.email,
+							},
+						})
+						.returning()
+				)[0];
+				delete data.email;
+				data.emailVerificationToken = this.generateSecureToken();
+			}
+
+			const updatedUser = (
+				await tx.update(users).set(data).where(eq(users.id, userId)).returning()
+			)[0];
+			if (!updatedUser) {
+				throw new Error("Couldn't update user");
+			}
+
+			const updatedUserWithEmailChangeRequest = { ...updatedUser, emailChangeRequest };
+
+			if (updatedUser && emailChangeRequest) {
+				await this.sendEmailVerificationEmail(updatedUserWithEmailChangeRequest);
+			}
+
+			return updatedUserWithEmailChangeRequest;
+		});
 	}
 
 	public async deleteUser(userId: User["id"]): Promise<User | undefined> {
@@ -81,24 +168,55 @@ export class UserService {
 			return true;
 		}
 
-		const updatedUsers = await this.db
-			.update(users)
-			.set({
+		return await this.db.transaction(async (tx) => {
+			const updateData: UserUpdate = {
 				isEmailVerified: true,
-			})
-			.where(
-				and(eq(users.id, userId), eq(users.emailVerificationToken, emailVerificationToken)),
-			)
-			.returning();
+			};
 
-		const isVerified = updatedUsers.length > 0;
-		if (isVerified) {
-			await this.cache.set(cacheKey, true);
-		}
-		return isVerified;
+			const user = await tx.query.users.findFirst({
+				where: {
+					id: userId,
+					emailVerificationToken: emailVerificationToken,
+				},
+				with: {
+					emailChangeRequest: true,
+				},
+			});
+			if (!user) {
+				return false;
+			}
+
+			if (user.emailChangeRequest) {
+				updateData.email = user.emailChangeRequest.email;
+				await tx
+					.delete(serverUserEmailChangeRequest)
+					.where(eq(serverUserEmailChangeRequest.userId, user.emailChangeRequest.userId));
+			}
+
+			const updatedUsers = await tx
+				.update(users)
+				.set(updateData)
+				.where(eq(users.id, userId))
+				.returning();
+
+			const isVerified = updatedUsers.length > 0;
+			if (isVerified) {
+				await this.cache.set(cacheKey, true);
+			} else {
+				throw new Error("Couldn't update user");
+			}
+			return isVerified;
+		});
 	}
 
-	public async resendVerificationEmail(user: Omit<User, "passwordHash">) {
+	public async resendVerificationEmail(
+		user: Omit<
+			User & {
+				emailChangeRequest: ServerUserEmailChangeRequest | null;
+			},
+			"passwordHash"
+		>,
+	) {
 		await this.sendEmailVerificationEmail(user);
 	}
 
@@ -124,7 +242,7 @@ export class UserService {
 			await this.db
 				.update(users)
 				.set({
-					passwordRecoveryToken: Buffer.from(randomBytes(32)).toString("hex"),
+					passwordRecoveryToken: this.generateSecureToken(),
 				})
 				.where(eq(users.email, email))
 				.returning()
@@ -179,25 +297,56 @@ export class UserService {
 		}
 	}
 
-	private async sendEmailVerificationEmail(user: Omit<User, "passwordHash">) {
+	private async sendEmailVerificationEmail(
+		user: Omit<
+			User & {
+				emailChangeRequest: ServerUserEmailChangeRequest | null;
+			},
+			"passwordHash"
+		>,
+	) {
 		const link =
 			this.config.getOrThrow("CLIENT_PUBLIC_URL", { infer: true }) +
 			"/verify-email/" +
 			user.id +
 			"/" +
 			user.emailVerificationToken;
-		await this.mailService.sendServiceEmail(
-			user.email,
-			"Verify your account's email address",
-			[
-				"Hi!",
-				"",
-				"Thanks for creating an account on " +
-					this.config.getOrThrow("PUBLIC_URL", { infer: true }),
-				"If it was not you, you can safely disregard this email.",
-				"If it was you, please open the following link in your browser to validate your email address:",
-				link,
-			].join("\n"),
-		);
+
+		if (user.emailChangeRequest) {
+			await this.mailService.sendServiceEmail(
+				user.emailChangeRequest.email,
+				"Verify your account's new email address",
+				[
+					"Hi!",
+					"",
+					"A request was made to change an account's email address on " +
+						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+					"The previous email address is " + user.email,
+					"",
+					"If it was not you, you can safely disregard this email.",
+					"If it was you, please open the following link in your browser to validate your email address:",
+					link,
+				].join("\n"),
+			);
+		} else {
+			await this.mailService.sendServiceEmail(
+				user.email,
+				"Verify your account's email address",
+				[
+					"Hi!",
+					"",
+					"Thanks for creating an account on " +
+						this.config.getOrThrow("PUBLIC_URL", { infer: true }),
+					"",
+					"If it was not you, you can safely disregard this email.",
+					"If it was you, please open the following link in your browser to validate your email address:",
+					link,
+				].join("\n"),
+			);
+		}
+	}
+
+	private generateSecureToken() {
+		return Buffer.from(randomBytes(32)).toString("hex");
 	}
 }
