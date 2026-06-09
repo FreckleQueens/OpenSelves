@@ -4,8 +4,10 @@ import {
 	SERVER_URL_STORAGE_KEY,
 	USER_DATA_STORAGE_KEY,
 	apiState,
+	needsApiLogout,
 	refreshUserData,
 	scheduleOnlineCheck,
+	tryApiLogout,
 } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
 import { DEFAULT_LOCALE } from "$lib/i18n/i18n";
@@ -69,5 +71,9 @@ export async function initApp() {
 		) {
 			await refreshUserData();
 		}
+	}
+
+	if (await needsApiLogout()) {
+		await tryApiLogout(5000, false);
 	}
 }

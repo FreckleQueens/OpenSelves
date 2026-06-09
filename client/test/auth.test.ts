@@ -28,6 +28,7 @@ test("login", async ({ page }) => {
 	const user = await registerAndLoginUser(page);
 	await page.goto("/account");
 	await page.locator("#logout-button").click();
+	await page.locator("#logout-wipe-data-button").click();
 	await page.waitForURL("/land");
 
 	await page.goto("/auth");

@@ -39,6 +39,10 @@ export class SyncWorker {
 		}
 	}
 
+	public hasPushBacklog() {
+		return this._hasPushBacklog;
+	}
+
 	public setHasPushBacklog() {
 		console.debug("push backlog notified, will try to push");
 		this._hasPushBacklog = true;

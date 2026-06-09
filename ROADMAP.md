@@ -192,12 +192,15 @@ deadline or ETA
 - [x] password recovery
 - [x] change password
 - [x] change email
-- [ ] add a warning about data being accessible even after a logout
-  - [ ] add a warning popup
-  - [ ] add an option to logout and wipe IDB
+- [x] add a warning about data being accessible even after a logout
+  - [x] add a warning popup
+  - [x] add an option to logout and wipe IDB
+- [ ] display list of unauthenticated users with locally stored data in auth settings
+- [ ] add warning popup when user is logged out without wiping data
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
+- [ ] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)

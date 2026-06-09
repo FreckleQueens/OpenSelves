@@ -8,6 +8,7 @@ import {
 } from "$env/static/public";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
+import { IDB } from "$lib/idb";
 import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import {
@@ -224,7 +225,8 @@ export async function call(
 	switch (result) {
 		case CallResult.SESSION_EXPIRED:
 			console.debug("Got result", result, "from callRaw");
-			await handleLogout();
+			await tryLogout(false);
+			await goto(resolve("/"));
 			return undefined;
 		case CallResult.API_UNREACHABLE:
 		case CallResult.WRONG_VERSION:
@@ -296,14 +298,67 @@ async function isApiReachable(): Promise<boolean> {
 	return false;
 }
 
-export async function handleLogout() {
+export async function tryLogout(
+	wipeData: boolean,
+	forceWipe: boolean = false,
+	apiLogoutNeeded: boolean = false,
+): Promise<boolean> {
 	if (onlineCheckTimeout !== undefined) {
 		clearTimeout(onlineCheckTimeout);
 		onlineCheckTimeout = undefined;
 	}
 	await SyncWorker.getInstance().shutdown();
-	await PersistentStorage.getInstance().setOffline();
-	await goto(resolve("/"));
+	const storage = PersistentStorage.getInstance();
+	const userId = storage.getUserId();
+
+	if (wipeData) {
+		if (!forceWipe && SyncWorker.getInstance().hasPushBacklog()) {
+			if (appState.isApiReachable && appState.isAuthenticated) {
+				SyncWorker.getInstance().resume();
+			}
+			scheduleOnlineCheck();
+			return false;
+		} else {
+			await IDB.getInstance().wipeUserData(userId);
+		}
+	}
+
+	await storage.setOffline();
+
+	if (apiLogoutNeeded) {
+		await tryApiLogout();
+	}
+	return true;
+}
+
+let logoutAttemptTimeout: number | undefined = undefined;
+const NEEDS_API_LOGOUT_STORAGE_KEY = "needsApiLogout";
+export async function needsApiLogout(): Promise<boolean> {
+	return !!(await PersistentStorage.getInstance().get(NEEDS_API_LOGOUT_STORAGE_KEY, true));
+}
+export async function tryApiLogout(delay: number = 0, firstCall: boolean = true) {
+	console.debug("Scheduling api logout...");
+	clearTimeout(logoutAttemptTimeout);
+	const storage = PersistentStorage.getInstance();
+	if (firstCall) {
+		await storage.set(NEEDS_API_LOGOUT_STORAGE_KEY, "1", true);
+	}
+
+	logoutAttemptTimeout = window.setTimeout(async () => {
+		if (appState.isApiReachable) {
+			const result = await call("/auth/logout", {
+				method: "POST",
+			});
+			if (result && typeof result === "object") {
+				console.debug("Api logout success!");
+				await storage.delete(NEEDS_API_LOGOUT_STORAGE_KEY, true);
+				return;
+			}
+		}
+
+		console.debug("Api logout failure.");
+		return tryApiLogout(5000, false);
+	}, delay);
 }
 
 let onlineCheckTimeout: number | undefined = undefined;
