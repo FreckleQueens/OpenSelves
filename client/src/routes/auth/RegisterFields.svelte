@@ -1,17 +1,21 @@
 <script lang="ts">
 	import { apiState } from "$lib/api.svelte.js";
-	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import type { OSFormData } from "$lib/forms";
-	import { BlockTitle, List, ListInput, ListItem } from "konsta/svelte";
+	import { BlockTitle, List, ListInput } from "konsta/svelte";
 
 	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
 
-<FormFields bind:formState>
+<FormFields
+	bind:formState
+	captcha
+	captchaAction="sendEmail"
+	bind:captchaActionValue={formState.data["email"]}
+>
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput
@@ -70,12 +74,4 @@
 			</ListInput>
 		</List>
 	{/if}
-
-	<List>
-		<ListItem>
-			{#snippet inner()}
-				<Captcha bind:value={formState.data["captcha"]} />
-			{/snippet}
-		</ListItem>
-	</List>
 </FormFields>

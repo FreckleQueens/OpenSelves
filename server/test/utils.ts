@@ -55,14 +55,15 @@ async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	}
 	const userPassword = "12345678";
 	async function createAndLoginUser() {
+		const email = createId() + "@example.com";
 		const user = (
 			await env.request
 				.post("/user")
 				.send({
-					email: createId() + "@example.com",
+					email: email,
 					password: userPassword,
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(201)
 		).body;
@@ -199,13 +200,23 @@ export function extractCookie(cookieName: string, cookies: string) {
 	return value;
 }
 
-export async function solveCaptcha(env: CreateUsersEnv): Promise<Captcha> {
-	const response = await env.request.get("/captcha/challenge");
+export async function solveCaptcha(
+	env: CreateUsersEnv,
+	action?: string,
+	actionValue?: string,
+	expectedCode: number = 200,
+): Promise<Captcha | null> {
+	const actionPathSuffix = action ? `/${action}/${actionValue}` : "";
+	const response = await env.request.get("/captcha/challenge" + actionPathSuffix);
 
-	if (response.status !== 200) {
+	if (response.status !== expectedCode) {
 		console.error(response.body);
 	}
-	assert.strictEqual(response.status, 200);
+	assert.strictEqual(response.status, expectedCode);
+
+	if (expectedCode !== 200) {
+		return null;
+	}
 
 	const challenge = response.body;
 	const solution = await solveChallenge({
@@ -227,14 +238,22 @@ export function testCaptcha(
 	getEnv: () => TestEnv,
 	successCode: number,
 	doTest: (testName: string, testCallback: () => Promise<void> | void) => void,
-	callback: (captcha: Captcha | object | string | null | undefined) => Promise<request.Response>,
+	callback: (
+		captcha: Captcha | object | string | null | undefined,
+		actionValue?: string,
+	) => Promise<request.Response>,
+	action?: string,
+	getActionValue?: () => string,
+	invalidActionValue?: string,
+	isActionValueConstant: boolean = false,
 ) {
 	let usedCaptcha: Captcha | null = null;
-	for (const { test: testName, status, captcha: getCaptcha } of [
+	const cases = [
 		{
 			test: `POST ${successCode} valid captcha`,
 			status: successCode,
-			captcha: async () => (usedCaptcha = await solveCaptcha(getEnv())),
+			captcha: async (actionValue?: string) =>
+				(usedCaptcha = await solveCaptcha(getEnv(), action, actionValue)),
 		},
 		{
 			test: `POST 401 already used captcha challenge`,
@@ -270,21 +289,28 @@ export function testCaptcha(
 		{
 			test: "POST 401 no solution captcha",
 			status: 401,
-			captcha: async () => {
-				const captcha = await solveCaptcha(getEnv());
+			captcha: async (actionValue?: string) => {
+				const captcha = await solveCaptcha(getEnv(), action, actionValue);
 				return { ...captcha, solution: {} };
 			},
 		},
 		{
 			test: "POST 401 expired captcha",
 			status: 401,
-			captcha: async () => {
+			captcha: async (actionValue?: string) => {
 				const env = getEnv();
 
 				const initialChallengeTtl = env.configService.get("CAPTCHA_CHALLENGE_TTL_SECONDS");
 				env.configService.set("CAPTCHA_CHALLENGE_TTL_SECONDS", -1);
 
-				const challenge = await env.app.get(CaptchaService).createChallenge(1);
+				let email: string | undefined;
+				if (action === "sendEmail") {
+					if (!actionValue) {
+						throw new Error("Missing actionValue");
+					}
+					email = actionValue;
+				}
+				const challenge = await env.app.get(CaptchaService).createChallenge(1, email);
 
 				env.configService.set("CAPTCHA_CHALLENGE_TTL_SECONDS", initialChallengeTtl);
 
@@ -298,15 +324,72 @@ export function testCaptcha(
 				};
 			},
 		},
-	]) {
+	];
+
+	if (action) {
+		cases.push({
+			test: "POST 400 missing captcha action",
+			status: 400,
+			captcha: async () => (usedCaptcha = await solveCaptcha(getEnv())),
+		});
+		cases.push({
+			test: "POST 400 wrong captcha action",
+			status: 400,
+			captcha: async (actionValue?: string) =>
+				(usedCaptcha = await solveCaptcha(getEnv(), "wrongAction", actionValue, 400)),
+		});
+		if (getActionValue) {
+			cases.push({
+				test: "POST 400 missing captcha actionValue",
+				status: 400,
+				captcha: async () =>
+					(usedCaptcha = await solveCaptcha(getEnv(), action, undefined, 400)),
+			});
+
+			if (invalidActionValue) {
+				cases.push({
+					test: "POST 400 invalid captcha actionValue",
+					status: 400,
+					captcha: async () => {
+						return (usedCaptcha = await solveCaptcha(
+							getEnv(),
+							action,
+							invalidActionValue,
+							400,
+						));
+					},
+				});
+			}
+
+			if (!isActionValueConstant) {
+				cases.push({
+					test: "POST 400 wrong captcha actionValue",
+					status: 400,
+					captcha: async (expectedActionValue?: string) => {
+						const wrongActionValue = getActionValue();
+						assert.notStrictEqual(wrongActionValue, expectedActionValue);
+						return (usedCaptcha = await solveCaptcha(
+							getEnv(),
+							action,
+							wrongActionValue,
+						));
+					},
+				});
+			}
+		}
+	}
+
+	for (const { test: testName, status, captcha: getCaptcha } of cases) {
 		doTest(testName, async () => {
+			const actionValue = getActionValue?.();
+
 			let captcha: Captcha | object | string | null | undefined;
 			if (typeof getCaptcha === "function") {
-				captcha = await getCaptcha();
+				captcha = await getCaptcha(actionValue);
 			} else {
 				captcha = getCaptcha;
 			}
-			const response = await callback(captcha);
+			const response = await callback(captcha, actionValue);
 
 			if (response.status !== status) {
 				console.error(response.body);

@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { call } from "$lib/api.svelte.js";
-	import Captcha from "$lib/components/Captcha.svelte";
+	import OSForm from "$lib/components/forms/OSForm.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import humanizeDuration from "humanize-duration";
-	import { Button, ListItem } from "konsta/svelte";
+	import { ListItem } from "konsta/svelte";
 	import type { GetUserResult } from "openselves-common";
 	import { onMount } from "svelte";
 
@@ -12,12 +11,15 @@
 
 	let { user = $bindable() }: { user: GetUserResult | undefined } = $props();
 	let storage: PersistentStorage | undefined = $state();
-	let captcha: string | undefined = $state();
 	let verificationEmailSentAt: number | undefined = $state();
 	let timeToSendVerificationEmailAvailability: number | undefined = $derived(
 		verificationEmailSentAt !== undefined
 			? verificationEmailSentAt + 15 * 60 * 1000 - Date.now()
 			: undefined,
+	);
+	let canResend: boolean = $derived(
+		timeToSendVerificationEmailAvailability !== undefined &&
+			timeToSendVerificationEmailAvailability <= 0,
 	);
 
 	onMount(async () => {
@@ -36,18 +38,10 @@
 		return () => window.clearInterval(interval);
 	});
 
-	async function resendVerificationEmailButtonOnclick() {
+	async function onSuccess() {
 		if (!user) {
 			throw new Error("user is not defined");
 		}
-
-		await call(`/user/${user.id}/resend-verification-email`, {
-			method: "POST",
-			data: {
-				captcha,
-			},
-		});
-
 		if (!storage) {
 			throw new Error("storage is not defined");
 		}
@@ -61,22 +55,21 @@
 </script>
 
 {#if user && (!user.isEmailVerified || user.newEmailRequest) && timeToSendVerificationEmailAvailability !== undefined}
-	<ListItem>
+	<ListItem class="resend-verification-email-comp">
 		{#snippet text()}
-			{#if timeToSendVerificationEmailAvailability !== undefined && timeToSendVerificationEmailAvailability <= 0}
-				<div class="flex items-center gap-8">
-					<Captcha bind:value={captcha} />
-					<Button
-						id="resend-verification-email-button"
-						tonal
-						raised
-						onclick={resendVerificationEmailButtonOnclick}
-						disabled={!captcha}
-					>
-						<EmailIcon button before />
-						Resend verification email
-					</Button>
-				</div>
+			{#if canResend}
+				<OSForm
+					formName="resend-verification-email"
+					endpoint={`/user/${user.id}/resend-verification-email`}
+					submitWorkingStatus={t("Sending email...")}
+					submitButtonIcon={EmailIcon}
+					submitButtonText={t("Resend verification email")}
+					captcha
+					captchaAction="sendEmail"
+					captchaActionValue={user.newEmailRequest || user.email}
+					{onSuccess}
+					inline
+				/>
 			{:else}
 				{t(
 					"Verification email sent. (please wait {time} before trying again)",

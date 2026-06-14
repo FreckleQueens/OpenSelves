@@ -74,6 +74,7 @@ describe("/captcha/generate", async () => {
 			"keySignature",
 			"nonce",
 			"salt",
+			"data",
 		]) {
 			assert.notStrictEqual(challenge.parameters[param], undefined);
 		}
@@ -132,5 +133,31 @@ describe("/captcha/generate", async () => {
 			EXPECTED_MIN_COUNTER * 2,
 			EXPECTED_MIN_COUNTER,
 		]);
+	});
+
+	test("POST same email multiple 200", async () => {
+		for (let i = 0; i < 10; i++) {
+			const response = await env.request
+				.get("/captcha/challenge/sendEmail/same@same.example.com")
+				.set("X-Forwarded-For", `${i}.${i}.${i}.${i}`)
+				.expect("Content-Type", /json/)
+				.expect(200);
+			const solution: Solution | null = await solveChallenge({
+				challenge: response.body,
+				deriveKey,
+				timeout: 1000,
+				counterStart: i + 1,
+			});
+			assert.notStrictEqual(solution, null);
+			assert.strictEqual(solution?.counter, Math.min(i * 2 + 1, 10));
+		}
+
+		assert.strictEqual(fn.mock.callCount(), 10);
+		for (let i = 0; i < 10; i++) {
+			assert.deepStrictEqual(fn.mock.calls[i].arguments, [
+				EXPECTED_MIN_COUNTER * Math.min(i * 2 + 1, 10) * 2,
+				EXPECTED_MIN_COUNTER * Math.min(i * 2 + 1, 10),
+			]);
+		}
 	});
 });

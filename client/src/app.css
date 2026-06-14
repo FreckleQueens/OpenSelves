@@ -22,6 +22,7 @@
 	--color-brand-link: #6184d8;
 	--color-brand-green: #28a460;
 	--color-brand-red: #d72638;
+	--color-brand-yellow: #ffcc00;
 }
 
 .k-material .material\:bg-md-light-surface-darker {
@@ -31,5 +32,14 @@
 @media (prefers-color-scheme: dark) {
 	.k-material .material\:dark\:bg-md-dark-surface-darker {
 		background-color: oklab(from var(--color-md-dark-surface) calc(l * 0.8) a b);
+	}
+}
+
+.k-card.border-md-light-outline {
+	border: 1px solid oklch(from var(--color-md-light-surface-1) calc(l * 0.975) c h);
+}
+@media (prefers-color-scheme: dark) {
+	.k-card.dark\:border-md-dark-outline {
+		border-color: oklch(from var(--color-md-dark-surface-1) calc(l * 1.2) c h);
 	}
 }

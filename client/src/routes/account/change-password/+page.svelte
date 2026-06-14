@@ -27,10 +27,12 @@
 	method="PATCH"
 	title={t("Change password")}
 	submitButtonText={t("Change password")}
+	submitWorkingStatus={t("Changing password...")}
 	successDialogTitle={t("Password changed")}
 	successDialogContent={t("Your password was changed successfully.")}
 	successDialogContinueButton={t("Continue")}
 	successDialogContinueAction={() => goto(resolve("/account"))}
+	captcha
 >
 	{#if formState}
 		<ListInput

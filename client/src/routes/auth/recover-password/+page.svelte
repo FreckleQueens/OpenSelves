@@ -30,6 +30,7 @@
 	endpoint="/user/recover-password"
 	title={t("Forgot password")}
 	submitButtonText={t("Send password recovery email")}
+	submitWorkingStatus={t("Requesting password recovery...")}
 	successDialogTitle={t("Email sent")}
 	successDialogContent={t(
 		"Please check your inbox for {emailAddress}. If you don't receive it in a few minutes, don't forget to check your spam.",
@@ -38,6 +39,8 @@
 	successDialogContinueButton={t("Go to login")}
 	successDialogContinueAction={() => goto(resolve("/auth"))}
 	captcha
+	captchaAction="sendEmail"
+	captchaActionValue={formState?.data["email"] || ""}
 >
 	{#if formState}
 		<ListInput

@@ -46,7 +46,7 @@ export class AppModule implements NestModule {
 			.apply(VersionMiddleware)
 			.exclude("/attachment/*path")
 			.exclude({
-				path: "/captcha/challenge",
+				path: "/captcha/challenge{/*path}",
 				method: RequestMethod.GET,
 			})
 			.forRoutes("*");

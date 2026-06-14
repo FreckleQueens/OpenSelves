@@ -134,7 +134,7 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(200);
 		});
@@ -144,7 +144,7 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user2.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
 				})
 				.expect(403);
 		});
@@ -154,14 +154,14 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(200);
 			await env.request
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(429);
 		});
@@ -171,7 +171,7 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(200);
 			await env.app.get(QueueService).flushJobs();
@@ -179,7 +179,7 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(429);
 		});
@@ -189,14 +189,14 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(200);
 			await env.request
 				.post(`/user/${env.users.user2.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies2)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
 				})
 				.expect(200);
 		});
@@ -217,7 +217,7 @@ describe("Email verification", () => {
 				.post(`/user/${env.users.user.id}/resend-verification-email`)
 				.set("Cookie", env.users.cookies)
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(200);
 		});
@@ -236,6 +236,10 @@ describe("Email verification", () => {
 						captcha,
 					});
 			},
+			"sendEmail",
+			() => env.users.user.email,
+			undefined,
+			true,
 		);
 	});
 });

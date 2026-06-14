@@ -35,7 +35,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
@@ -55,44 +55,47 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 				})
 				.expect(400);
 		});
 
 		test("POST not a valid email 400", async () => {
+			const email = "notavalidemail";
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
-					email: "notavalidemail",
+					captcha: await solveCaptcha(env, "sendEmail", email, 400),
+					email: email,
 				})
 				.expect(400);
 		});
 
 		test("POST wrong email 404", async () => {
+			const email = "doesnotexist@example.com";
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
-					email: "doesnotexist@example.com",
+					captcha: await solveCaptcha(env, "sendEmail", email),
+					email: email,
 				})
 				.expect(404);
 		});
 
 		test("POST twice the same email 429", async () => {
+			const email = "doesnotexist2@example.com";
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
-					email: "doesnotexist2@example.com",
+					captcha: await solveCaptcha(env, "sendEmail", email),
+					email: email,
 				})
 				.expect(404);
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
-					email: "doesnotexist2@example.com",
+					captcha: await solveCaptcha(env, "sendEmail", email),
+					email: email,
 				})
 				.expect(429);
 		});
@@ -101,7 +104,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
@@ -109,7 +112,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(429);
@@ -119,14 +122,14 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
 					email: env.users.user2.email,
 				})
 				.expect(200);
@@ -143,6 +146,10 @@ describe("Password recovery", () => {
 					.post("/user/recover-password")
 					.send({ captcha, email: env.users.user.email });
 			},
+			"sendEmail",
+			() => env.users.user.email,
+			undefined,
+			true,
 		);
 	});
 
@@ -151,7 +158,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
@@ -204,7 +211,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
@@ -231,7 +238,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);
@@ -263,7 +270,7 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
 					email: env.users.user.email,
 				})
 				.expect(200);

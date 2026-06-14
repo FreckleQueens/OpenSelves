@@ -179,7 +179,7 @@ deadline or ETA
   - [x] protect against replay attacks by caching solved challenges in memory for their TTL
   - [ ] increase work requirement by n when criteria met n times before 600s release period (memory cache):
     - [x] same ip (beware of reverse proxy with x-forwarded-for header)
-    - [ ] same email (for actions that send emails)
+    - [x] same email (for actions that send emails)
     - [ ] same user (for heavy authenticated actions)
     - [ ] configurable total (any user) /captcha/challenge call number threshold
 - [x] email verification
@@ -211,6 +211,7 @@ a short-lived one
     - [ ] drop prior unsynced create and update operations when deleting a record
     - [ ] leverage @capacitor/background-runner
     - [ ] leverage Background Sync API when available
+    - [ ] detect unused translations and fail build
 - [ ] server
     - [ ] purge logs that don't have an effect anymore
     - [ ] use @nestjs/cache-manager to cache s3 get responses
@@ -262,7 +263,7 @@ a short-lived one
 ## To plan
 - [ ] Add rich html version of emails
 - [ ] Translate emails
-- [ ] Translate server-side form validation
+- [ ] Translate form validation errors received from server
 
 ---
 

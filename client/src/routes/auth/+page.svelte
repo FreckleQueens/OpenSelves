@@ -5,6 +5,7 @@
 	import { scheduleOnlineCheck } from "$lib/api.svelte";
 	import ApiReachableGate from "$lib/components/ApiReachableGate.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import SubmitButton from "$lib/components/forms/SubmitButton.svelte";
 	import LoginIcon from "$lib/components/icons/LoginIcon.svelte";
 	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
@@ -14,15 +15,13 @@
 	import {
 		Block,
 		BlockTitle,
-		Button,
 		Dialog,
 		DialogButton,
 		Link,
-		Preloader,
 		Segmented,
 		SegmentedButton,
 	} from "konsta/svelte";
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { fly } from "svelte/transition";
 
 	import LoginFields from "./LoginFields.svelte";
@@ -37,6 +36,7 @@
 			generalError: "",
 			endpoint: "/auth/login",
 			data: {},
+			submitWorkingStatus: t("Authenticating..."),
 			onSuccess: async (result: object) => {
 				if (!("userId" in result && result.userId)) {
 					throw new Error("Bad response from server");
@@ -52,12 +52,12 @@
 			generalError: "",
 			endpoint: "/user",
 			data: {},
+			submitWorkingStatus: t("Creating account..."),
 			onSuccess: () => (registerSuccessDialogOpen = true),
 		},
 	});
 	let activeForm = $state(forms.login.name);
 	let registerSuccessDialogOpen = $state(false);
-	let isWorking = $state(false);
 
 	const load = requireGuest();
 	let loaded = $state(false);
@@ -68,37 +68,21 @@
 		scheduleOnlineCheck(0);
 	});
 
-	$effect(() => {
-		const form = forms[activeForm];
-		if (form.autoVerifyCaptcha && form.data["captcha"]) {
-			submitForm(form);
-		}
-	});
-
 	const onSubmit = async (e: SubmitEvent) => {
 		e.preventDefault();
 		return submitActiveForm();
 	};
 
 	async function submitActiveForm() {
-		return submitForm(forms[activeForm]);
-	}
-
-	async function submitForm(form: OSFormData) {
-		isWorking = true;
-		try {
-			await submitOSForm(form);
-		} finally {
-			isWorking = false;
-		}
+		return submitOSForm(forms[activeForm]);
 	}
 
 	async function loginFromRegistration() {
-		isWorking = true;
-		forms.login.data = { ...forms.register.data, captcha: "" };
-		forms.login.autoVerifyCaptcha = true;
+		forms.login.data = { ...forms.register.data };
 		activeForm = forms.login.name;
 		registerSuccessDialogOpen = false;
+		await tick();
+		await submitActiveForm();
 	}
 </script>
 
@@ -151,37 +135,13 @@
 					<form class="login" onsubmit={onSubmit} transition:fly={{ x: -200 }}>
 						<LoginFields bind:formState={forms.login} />
 
-						<Block class="mt-0">
-							<Button
-								type="submit"
-								tonal
-								disabled={!forms.login.data["captcha"] || isWorking}
-							>
-								{#if isWorking}
-									<Preloader />
-								{:else}
-									Login
-								{/if}
-							</Button>
-						</Block>
+						<SubmitButton bind:formState={forms.login}>Login</SubmitButton>
 					</form>
 				{:else if activeForm === "register"}
 					<form class="register" onsubmit={onSubmit} transition:fly={{ x: 200 }}>
 						<RegisterFields bind:formState={forms.register} />
 
-						<Block class="mt-0">
-							<Button
-								type="submit"
-								tonal
-								disabled={!forms.register.data["captcha"] || isWorking}
-							>
-								{#if isWorking}
-									<Preloader />
-								{:else}
-									Register
-								{/if}
-							</Button>
-						</Block>
+						<SubmitButton bind:formState={forms.register}>Register</SubmitButton>
 					</form>
 				{/if}
 			</div>

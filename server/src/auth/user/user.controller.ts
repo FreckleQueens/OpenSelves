@@ -59,7 +59,9 @@ export class UserController {
 
 	@Public({ allowAuthenticatedUsers: false })
 	@Post("")
-	public async createUser(@Body() createUserDto: CreateUserDto) {
+	public async createUser(@Req() request: Request, @Body() createUserDto: CreateUserDto) {
+		this.requireCaptchaSendEmailAction(request, createUserDto.email);
+
 		const expectedRegistrationPassword = this.configService.get("REGISTRATION_PASSWORD", {
 			infer: true,
 		});
@@ -107,6 +109,10 @@ export class UserController {
 
 		if (request.accessTokenPayload?.user.id !== params.id) {
 			throw new UnauthorizedException();
+		}
+
+		if (updateUserDto.email) {
+			this.requireCaptchaSendEmailAction(request, updateUserDto.email);
 		}
 
 		const userId = params.id;
@@ -201,6 +207,9 @@ export class UserController {
 			throw new NotFoundException("User not found");
 		}
 
+		const toEmail = this.userService.getUserEmailToVerify(user);
+		this.requireCaptchaSendEmailAction(request, toEmail);
+
 		await this.userService.resendVerificationEmail(user);
 		return {};
 	}
@@ -238,8 +247,11 @@ export class UserController {
 		},
 	})
 	public async sendPasswordRecoveryEmail(
+		@Req() request: Request,
 		@Body() sendPasswordRecoveryEmailDto: SendPasswordRecoveryEmailDto,
 	) {
+		this.requireCaptchaSendEmailAction(request, sendPasswordRecoveryEmailDto.email);
+
 		if (
 			!(await this.userService.sendPasswordRecoveryEmail(sendPasswordRecoveryEmailDto.email))
 		) {
@@ -263,5 +275,17 @@ export class UserController {
 			isEmailVerified: user.isEmailVerified,
 			newEmailRequest: user.emailChangeRequest?.email || "",
 		};
+	}
+
+	private requireCaptchaSendEmailAction(request: Request, expectedEmail: string) {
+		if (!request.sendEmailActionEmail) {
+			throw new BadRequestException("Missing captcha sendEmail action");
+		}
+
+		if (request.sendEmailActionEmail !== expectedEmail) {
+			throw new BadRequestException(
+				"Captcha sendEmail action value does not match request email",
+			);
+		}
 	}
 }

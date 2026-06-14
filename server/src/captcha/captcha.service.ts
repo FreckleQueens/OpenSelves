@@ -39,7 +39,16 @@ export const CAPTCHA_FACTORS: CaptchaFactor[] = [
 			return rawIp ? await captchaService.weakHashString(anonymiseIpAddr(rawIp)) : rawIp;
 		},
 		countMultiplier: 1,
-		ttlMs: 120 * 1000, // 2 minutes
+		ttlMs: 2 * 60 * 1000, // 2 minutes
+	},
+	{
+		cacheKeyPrefix: "email.",
+		cacheKey: async (request: Request, captchaService: CaptchaService) => {
+			const email = request.sendEmailActionEmail;
+			return email ? await captchaService.weakHashString(anonymiseEmailAddr(email)) : email;
+		},
+		countMultiplier: 2,
+		ttlMs: 15 * 60 * 1000, // 15 minutes
 	},
 ];
 
@@ -53,7 +62,7 @@ export class CaptchaService {
 		private readonly cache: Cache,
 	) {}
 
-	public async createChallenge(factor: number) {
+	public async createChallenge(factor: number, sendEmailActionEmail: string | undefined) {
 		if (factor < 1) {
 			throw new Error("factor cannot be less than 1");
 		}
@@ -81,6 +90,9 @@ export class CaptchaService {
 				infer: true,
 			}),
 			expiresAt: new Date(Date.now() + challengeTtl * 1000),
+			data: {
+				sendEmailActionEmail: sendEmailActionEmail || null,
+			},
 		};
 
 		if (
@@ -235,4 +247,12 @@ function anonymiseIpAddr(rawIp: string) {
 		throw new Error("Invalid ip bytes length " + ipBytes?.length);
 	}
 	return prefix;
+}
+
+function anonymiseEmailAddr(emailAddr: string) {
+	const [username, domain] = emailAddr.split("@");
+	const domainParts = domain.split(".");
+	const partialUsername = username.slice(0, Math.max(username.length / 2));
+	// tld.firstDomainPart.partialUsername
+	return [...domainParts.reverse().slice(0, 2), partialUsername].join(".");
 }

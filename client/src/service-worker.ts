@@ -43,7 +43,7 @@ self.addEventListener("activate", (event) => {
 	);
 });
 self.addEventListener("fetch", (event) => {
-	console.debug("fetch version", version);
+	console.debug("fetch version", version, event.request.url);
 
 	const url = new URL(event.request.url);
 	if (event.request.method === "GET" && url.pathname !== "/status") {
@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
 						CACHE_FIRST_PATHS.find((path) => url.pathname.startsWith(path)))
 				) {
 					const response = await cache.match(url.pathname);
-					console.debug("cache-first hit", url.pathname);
+					console.debug("> cache-first hit", response?.status, url.pathname);
 
 					if (response && response.status === 200) {
 						return response;
@@ -72,19 +72,20 @@ self.addEventListener("fetch", (event) => {
 					}
 
 					if (response.status === 200) {
-						console.log("new cache", url.pathname);
+						console.log("> new cache", url.pathname);
 						await cache.put(event.request, response.clone());
 					}
 
+					console.debug("> network fetched", response.status, url.pathname);
 					return response;
 				} catch (error) {
 					const response = await cache.match(event.request);
 
 					if (response) {
-						console.debug("fallback cache hit", url.pathname);
+						console.debug("> fallback cache hit", url.pathname);
 						return response;
 					} else {
-						console.debug("fallback cache miss", url.pathname);
+						console.debug("> fallback cache miss", url.pathname);
 						console.error(error);
 					}
 
@@ -94,7 +95,7 @@ self.addEventListener("fetch", (event) => {
 							originalUrl.slice(0, originalUrl.length - url.pathname.length) + "/",
 						);
 						if (fallbackResponse) {
-							console.debug("fallback to /", url.pathname);
+							console.debug("> fallback to /", url.pathname);
 							return fallbackResponse;
 						}
 					}

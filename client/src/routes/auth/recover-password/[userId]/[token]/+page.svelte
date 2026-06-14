@@ -30,6 +30,7 @@
 	endpoint={"/user/" + params["userId"] + "/recover-password"}
 	title={t("Change password")}
 	submitButtonText={t("Change password")}
+	submitWorkingStatus={t("Changing password...")}
 	successDialogTitle={t("Password changed")}
 	successDialogContent={t("You can now login with your new password.")}
 	successDialogContinueButton={t("Go to login")}

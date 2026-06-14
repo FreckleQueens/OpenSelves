@@ -4,6 +4,7 @@ declare global {
 	namespace Express {
 		export interface Request {
 			activeFactors: ActiveCaptchaFactorWithCurrentCount[];
+			sendEmailActionEmail?: string;
 		}
 	}
 }

@@ -373,13 +373,14 @@ describe("Auth (e2e)", () => {
 
 	describe("/user", () => {
 		test("POST 201", async () => {
+			const email = createId() + "@example.com";
 			const response = await env.request
 				.post("/user")
 				.send({
-					email: createId() + "@example.com",
+					email: email,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(201)
 				.expect("Content-Type", /json/);
@@ -393,10 +394,15 @@ describe("Auth (e2e)", () => {
 		});
 
 		for (const testCase of [
-			{ test: "Invalid email", email: "is_not_an_email", password: "12345678" },
+			{
+				test: "Invalid email",
+				email: "is_not_an_email",
+				password: "12345678",
+				captchaCode: 400,
+			},
 			{ test: "Password too short", email: "john@example.com", password: "123" },
 			{ test: "Missing password", email: "john@example.com" },
-			{ test: "Missing email", password: "12345678" },
+			{ test: "Missing email", password: "12345678", captchaCode: 400 },
 		]) {
 			test(`POST ${testCase.test} 400`, async () => {
 				await env.request
@@ -404,7 +410,12 @@ describe("Auth (e2e)", () => {
 					.send({
 						registrationPassword: env.registrationPassword,
 						...testCase,
-						captcha: await solveCaptcha(env),
+						captcha: await solveCaptcha(
+							env,
+							"sendEmail",
+							testCase.email,
+							testCase.captchaCode,
+						),
 					})
 					.expect(400)
 					.expect("Content-Type", /json/);
@@ -419,7 +430,7 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(201);
 			await env.request
@@ -428,33 +439,35 @@ describe("Auth (e2e)", () => {
 					email: email,
 					password: "87654321",
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(409)
 				.expect("Content-Type", /json/);
 		});
 
 		test("POST authenticated 401", async () => {
+			const email = "john@example.com";
 			await env.request
 				.post("/user")
 				.set("Cookie", env.users.cookies)
 				.send({
-					email: "john@example.com",
+					email: email,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
 
 		test("POST without general registration password 401", async () => {
+			const email = "john@example.com";
 			await env.request
 				.post("/user")
 				.send({
-					email: "john@example.com",
+					email: email,
 					password: "12345678",
-					captcha: await solveCaptcha(env),
+					captcha: await solveCaptcha(env, "sendEmail", email),
 				})
 				.expect(401)
 				.expect("Content-Type", /json/);
@@ -466,14 +479,17 @@ describe("Auth (e2e)", () => {
 			(name, callback) => {
 				test(name, callback);
 			},
-			async (captcha) => {
+			async (captcha, actionValue) => {
 				return env.request.post("/user").send({
-					email: createId() + "@example.com",
+					email: actionValue,
 					password: "12345678",
 					registrationPassword: env.registrationPassword,
 					captcha,
 				});
 			},
+			"sendEmail",
+			() => createId() + "@example.com",
+			createId(),
 		);
 
 		test("GET 200", async () => {
@@ -533,7 +549,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(200);
 
 			dbUser = await env.db.query.users.findFirst({
@@ -592,10 +608,11 @@ describe("Auth (e2e)", () => {
 			assert(dbUser);
 			assert.strictEqual(dbUser.isEmailVerified, true);
 
+			const email = createId() + "@example.org";
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.org" })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", email), email: email })
 				.expect(200);
 
 			dbUser = await env.db.query.users.findFirst({
@@ -636,7 +653,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(200);
 
 			apiGetUser = parseApiResult(
@@ -652,23 +669,24 @@ describe("Auth (e2e)", () => {
 		});
 
 		test("PATCH email twice without verifying 200", async () => {
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.com" })
-				.expect(200);
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: createId() + "@example.com" })
-				.expect(200);
+			for (let i = 0; i < 2; i++) {
+				const email = createId() + "@example.com";
+				await env.request
+					.patch("/user/" + env.users.user.id)
+					.set("Cookie", env.users.cookies)
+					.send({ captcha: await solveCaptcha(env, "sendEmail", email), email: email })
+					.expect(200);
+			}
 		});
 
 		test("PATCH email to existing email 409", async () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: env.users.user2.email })
+				.send({
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
+					email: env.users.user2.email,
+				})
 				.expect(409);
 		});
 
@@ -677,12 +695,12 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(200);
 			await env.request
 				.patch("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies2)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(200);
 
 			// Verify user 1 succeeds
@@ -714,19 +732,22 @@ describe("Auth (e2e)", () => {
 			(testName, testCallback) => {
 				test(testName, testCallback);
 			},
-			(captcha) => {
+			(captcha, actionValue) => {
 				return env.request
 					.patch("/user/" + env.users.user.id)
 					.set("Cookie", env.users.cookies)
-					.send({ captcha, email: createId() + "@example.org" });
+					.send({ captcha, email: actionValue });
 			},
+			"sendEmail",
+			() => createId() + "@example.org",
+			createId(),
 		);
 
 		test("PATCH unauthenticated 401", async () => {
 			const newEmail = "new.jane@example.org";
 			await env.request
 				.patch("/user/" + env.users.user.id)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
@@ -736,7 +757,7 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user2.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
 				.expect(401)
 				.expect("Content-Type", /json/);
 		});
@@ -746,7 +767,18 @@ describe("Auth (e2e)", () => {
 			await env.request
 				.patch("/user/" + env.users.user.id)
 				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), email: newEmail })
+				.send({
+					captcha: await solveCaptcha(env, "sendEmail", newEmail, 400),
+					email: newEmail,
+				})
+				.expect(400);
+			await env.request
+				.patch("/user/" + env.users.user.id)
+				.set("Cookie", env.users.cookies)
+				.send({
+					captcha: await solveCaptcha(env),
+					email: newEmail,
+				})
 				.expect(400);
 			const response = await env.request
 				.get("/user/" + env.users.user.id)

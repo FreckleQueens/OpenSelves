@@ -1,6 +1,8 @@
 import { call, scheduleOnlineCheck } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte";
-import { onMount } from "svelte";
+import type { CaptchaAction } from "$lib/components/captcha";
+import type { OSIconProps } from "$lib/components/os-icon";
+import { type Component, onMount } from "svelte";
 
 export type FormFieldsValidationState = {
 	errors: Record<string, string>;
@@ -16,7 +18,24 @@ export type OSFormData = FormValidationState & {
 	method?: "GET" | "POST" | "PUT" | "PATCH";
 	data: Record<string, string>;
 	onSuccess: (result: object) => Promise<unknown> | unknown;
-	autoVerifyCaptcha?: boolean;
+	beforeSubmit?: () => Promise<boolean> | boolean;
+	isWorking?: boolean;
+	workingStatus?: string;
+	submitWorkingStatus: string;
+};
+
+export type OSFormProps = {
+	formState?: OSFormData;
+	formName: string;
+	formData?: OSFormData["data"];
+	endpoint: string;
+	method?: OSFormData["method"];
+	submitWorkingStatus: string;
+	captcha?: boolean;
+	captchaAction?: CaptchaAction;
+	captchaActionValue?: string;
+	submitButtonIcon?: Component<OSIconProps>;
+	submitButtonText: string;
 };
 
 export function bindNativeInputValidation(
@@ -44,37 +63,47 @@ export function bindNativeInputValidation(
 }
 
 export async function submitOSForm(form: OSFormData) {
-	let response: Response;
+	form.isWorking = true;
 	try {
-		response = await call(form.endpoint, {
-			method: form.method || "POST",
-			data: form.data,
-			returnRawResponse: true,
-		});
-
-		if (!response) {
-			appState.isApiReachable = false;
-			scheduleOnlineCheck();
+		if (form.beforeSubmit && (await form.beforeSubmit()) !== true) {
 			return;
 		}
-	} catch (error) {
-		console.trace(error);
-		if (
-			error &&
-			typeof error === "object" &&
-			"message" in error &&
-			typeof error.message === "string"
-		) {
-			form.generalError = error.message;
-		}
-		return;
-	}
-	const result = await response.json();
 
-	if (!response.ok) {
-		form.generalError = result.message;
-		return;
+		form.workingStatus = form.submitWorkingStatus;
+
+		let response: Response;
+		try {
+			response = await call(form.endpoint, {
+				method: form.method || "POST",
+				data: form.data,
+				returnRawResponse: true,
+			});
+
+			if (!response) {
+				appState.isApiReachable = false;
+				scheduleOnlineCheck();
+				return;
+			}
+		} catch (error) {
+			console.trace(error);
+			if (
+				error &&
+				typeof error === "object" &&
+				"message" in error &&
+				typeof error.message === "string"
+			) {
+				form.generalError = error.message;
+			}
+			return;
+		}
+		const result = await response.json();
+
+		if (!response.ok) {
+			form.generalError = result.message;
+			return;
+		}
+		await form.onSuccess(result);
+	} finally {
+		form.isWorking = false;
 	}
-	console.log(result);
-	await form.onSuccess(result);
 }

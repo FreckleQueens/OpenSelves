@@ -27,6 +27,7 @@
 	method="PATCH"
 	title={t("Change email")}
 	submitButtonText={t("Change email")}
+	submitWorkingStatus={t("Requesting email change...")}
 	successDialogTitle={t("Verification needed")}
 	successDialogContent={t(
 		"Please check your inbox for {emailAddress}. If you don't receive it in a few minutes, don't forget to check your spam.",
@@ -35,6 +36,8 @@
 	successDialogContinueButton={t("Continue")}
 	successDialogContinueAction={() => goto(resolve("/account"))}
 	captcha
+	captchaAction="sendEmail"
+	captchaActionValue={formState?.data["email"] || ""}
 >
 	{#if formState}
 		<ListInput

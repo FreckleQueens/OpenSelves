@@ -86,7 +86,7 @@
 	You can close this page.
 
 	{#snippet buttons()}
-		<DialogButton strong onclick={goToAppButtonOnclick}>
+		<DialogButton id="success-continue-button" strong onclick={goToAppButtonOnclick}>
 			Go to app
 			<ContinueIcon after button />
 		</DialogButton>

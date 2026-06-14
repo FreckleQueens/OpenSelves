@@ -52,6 +52,7 @@
 	<!-- TODO: touch ripple -->
 	<Card
 		class={`member-card my-0 mx-0! w-full${onClick ? " cursor-pointer" : ""}${inline ? ` bg-transparent! p-0! border-0! inline-card-container` : ""}`}
+		outline
 		onclick={onClick ? onLinkClick : undefined}
 	>
 		<div class={`flex items-center ${small ? "h-10" : "h-14"}`}>
@@ -133,11 +134,5 @@
 	}
 	:global .member-entry .k-card.inline-card-container > * {
 		padding: 0;
-	}
-	:global .k-material .member-entry .k-card {
-		border: 1px solid oklch(from var(--color-md-light-surface-1) calc(l * 0.975) c h);
-		@media (prefers-color-scheme: dark) {
-			border-color: oklch(from var(--color-md-dark-surface-1) calc(l * 1.2) c h);
-		}
 	}
 </style>

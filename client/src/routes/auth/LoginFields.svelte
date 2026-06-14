@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { resolve } from "$app/paths";
-	import Captcha from "$lib/components/Captcha.svelte";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
@@ -10,7 +9,7 @@
 	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
 
-<FormFields bind:formState>
+<FormFields bind:formState captcha>
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>
 		<ListInput
@@ -52,17 +51,6 @@
 				>
 					Forgot password?
 				</Link>
-			{/snippet}
-		</ListItem>
-	</List>
-
-	<List>
-		<ListItem>
-			{#snippet inner()}
-				<Captcha
-					bind:value={formState.data["captcha"]}
-					autoVerify={formState.autoVerifyCaptcha}
-				/>
 			{/snippet}
 		</ListItem>
 	</List>

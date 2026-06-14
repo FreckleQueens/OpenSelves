@@ -6,7 +6,7 @@ export default defineConfig({
 		{ command: "mailpit", port: 1025 },
 		{
 			command:
-				"cd ../server && yarn build && INSECURE_EASY_CAPTCHA_FOR_TESTS=true yarn start:prod",
+				"cd ../server && yarn build && INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=http://127.0.0.1:4173 yarn start:prod",
 			port: 3000,
 		},
 	],

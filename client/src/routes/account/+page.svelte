@@ -13,25 +13,21 @@
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import ReloadIcon from "$lib/components/icons/ReloadIcon.svelte";
 	import SaveIcon from "$lib/components/icons/SaveIcon.svelte";
+	import SyncIcon from "$lib/components/icons/SyncIcon.svelte";
+	import SyncOffIcon from "$lib/components/icons/SyncOffIcon.svelte";
+	import VerifiedIcon from "$lib/components/icons/VerifiedIcon.svelte";
 	import { requireAuth } from "$lib/routing-utils";
-	import {
-		Block,
-		BlockTitle,
-		Button,
-		Dialog,
-		DialogButton,
-		List,
-		ListItem,
-		Preloader,
-	} from "konsta/svelte";
+	import { BlockTitle, Button, Dialog, DialogButton, ListItem, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
+	import AccountCard from "./AccountCard.svelte";
 	import ResendVerificationEmail from "./ResendVerificationEmail.svelte";
 
 	let storage: PersistentStorage | undefined = $state();
 	let userId: string | undefined = $derived(storage?.getUserIdOptional());
 	let showLogoutDialog: boolean = $state(false);
 	let showWipeConfirmDialog: boolean = $state(false);
+	let showTechnicalData: boolean = $state(false);
 
 	requireAuth();
 	onMount(() => {
@@ -66,44 +62,22 @@
 <AppPage title="" activeMenuItem={MenuItem.ACCOUNT}>
 	<BlockTitle large>Account settings</BlockTitle>
 
-	<BlockTitle medium>Status</BlockTitle>
-	<Block strong>
-		{#if appState.syncWorkerOnline && appState.userData}
-			<p>
-				{t(
-					"You are logged in as user #{user.id}, {user.email} on the OpenSelves instance at {apiUrl}",
-					appState.userData.id,
-					appState.userData.email,
-					apiState.url,
-				)}
-			</p>
-		{:else if !appState.syncWorkerOnline && userId}
-			<p>{t("Offline - #{user.id}", userId)}</p>
-		{:else}
-			<Preloader />
-		{/if}
-	</Block>
+	<AccountCard
+		id="online-status"
+		class={appState.isApiReachable && appState.userData ? "online" : "offline"}
+		title="Online account status"
+	>
+		{#snippet status()}
+			{#if appState.isAuthenticated}
+				<SyncIcon class="text-xl text-brand-green" />
+				<span>Synchronized</span>
+			{:else}
+				<SyncOffIcon class="text-xl text-gray-500" />
+				<span>Local-only</span>
+			{/if}
+		{/snippet}
 
-	<BlockTitle medium>Actions</BlockTitle>
-	<Block strong>
-		<List nested>
-			<ResendVerificationEmail bind:user={appState.userData} />
-			<ListItem>
-				{#snippet text()}
-					<Button tonal href={resolve("/account/change-email")}>
-						<EmailIcon button before />
-						Change email
-					</Button>
-				{/snippet}
-			</ListItem>
-			<ListItem>
-				{#snippet text()}
-					<Button tonal href={resolve("/account/change-password")}>
-						<PasswordIcon button before />
-						Change password
-					</Button>
-				{/snippet}
-			</ListItem>
+		{#snippet actions()}
 			<ListItem>
 				{#snippet text()}
 					<Button
@@ -118,8 +92,76 @@
 					</Button>
 				{/snippet}
 			</ListItem>
-		</List>
-	</Block>
+		{/snippet}
+
+		{#if appState.userData || userId}
+			{#if showTechnicalData}
+				<p>
+					{t("User id: #{user.id}", appState.userData?.id || userId || "")}
+				</p>
+				<p>
+					{t("Server URL: {apiUrl}", apiState.url)}
+				</p>
+			{:else}
+				<Button
+					href="javascript: void(0);"
+					onclick={() => (showTechnicalData = true)}
+					inline
+					clear
+					small>Show technical data</Button
+				>
+			{/if}
+		{:else}
+			<Preloader />
+		{/if}
+	</AccountCard>
+
+	{#if appState.userData}
+		<AccountCard
+			id="email-status"
+			class={appState.userData.isEmailVerified && !appState.userData.newEmailRequest
+				? "verified"
+				: "unverified"}
+			title="Email"
+		>
+			{#snippet status()}
+				{#if appState.userData && appState.userData.isEmailVerified && !appState.userData.newEmailRequest}
+					<VerifiedIcon class="text-xl text-brand-green" />
+					<span>Verified</span>
+				{:else}
+					<DangerIcon class="text-xl text-brand-yellow" />
+					<span>Unverified</span>
+				{/if}
+			{/snippet}
+
+			{#snippet actions()}
+				<ResendVerificationEmail bind:user={appState.userData} />
+				<ListItem>
+					{#snippet text()}
+						<Button tonal href={resolve("/account/change-email")}>
+							<EmailIcon button before />
+							Change email
+						</Button>
+					{/snippet}
+				</ListItem>
+			{/snippet}
+
+			{appState.userData.newEmailRequest || appState.userData.email}
+		</AccountCard>
+	{/if}
+
+	<AccountCard id="security" title="Security">
+		{#snippet actions()}
+			<ListItem>
+				{#snippet text()}
+					<Button tonal href={resolve("/account/change-password")}>
+						<PasswordIcon button before />
+						Change password
+					</Button>
+				{/snippet}
+			</ListItem>
+		{/snippet}
+	</AccountCard>
 </AppPage>
 
 <Dialog opened={showLogoutDialog} onBackdropClick={() => (showLogoutDialog = false)}>

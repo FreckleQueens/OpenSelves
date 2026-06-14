@@ -28,6 +28,11 @@ export class CaptchaMiddleware implements NestMiddleware {
 			throw new UnauthorizedException("Captcha is invalid or has expired.");
 		}
 
+		const email = payload.challenge.parameters.data?.["sendEmailActionEmail"];
+		if (typeof email === "string") {
+			request.sendEmailActionEmail = email;
+		}
+
 		next();
 	}
 

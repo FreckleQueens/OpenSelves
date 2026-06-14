@@ -154,6 +154,17 @@ export class UserService {
 		return (await this.db.delete(users).where(eq(users.id, userId)).returning())[0];
 	}
 
+	public getUserEmailToVerify(
+		user: Omit<
+			User & {
+				emailChangeRequest?: ServerUserEmailChangeRequest | null;
+			},
+			"passwordHash"
+		>,
+	): string {
+		return user.emailChangeRequest?.email || user.email;
+	}
+
 	public async hashPassword(password: string) {
 		return argon2.hash(password);
 	}

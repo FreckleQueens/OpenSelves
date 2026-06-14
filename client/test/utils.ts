@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import { type Locator, expect } from "@playwright/test";
+import assert from "node:assert";
 import type { Page } from "playwright";
 
 export const getMemberEntry = (root: Page | Locator, member: { name: string }) =>
@@ -23,8 +24,6 @@ export async function registerAndLoginUser(
 	await form.locator("input[name=email]").fill(email);
 	await form.locator("input[name=password]").fill(password);
 	await form.locator('input[name="registrationPassword"]').fill("12345678");
-	await form.locator('.altcha input[type="checkbox"] + svg').click();
-	await page.waitForSelector(".altcha[data-state='verified']");
 	await form.getByRole("button", { name: "Register" }).click();
 	await page.locator("#auto-login-button").click();
 
@@ -63,4 +62,61 @@ export async function getLogsCount(page: Page) {
 		const idb = window.openselves.IDB.getInstance();
 		return (await idb.log.getByField("userId", userId)).length;
 	});
+}
+
+export async function gotoLastEmailLink(page: Page): Promise<void> {
+	const fetchUrl = "http://localhost:8025/view/latest.txt";
+	const response = await fetch(fetchUrl);
+
+	if (!response) {
+		throw new Error("No response from fetch " + fetchUrl);
+	}
+
+	if (!response.ok) {
+		throw new Error("Fetch returned non ok status " + response.status, { cause: response });
+	}
+
+	let body: string;
+	try {
+		body = await response.text();
+	} catch {
+		throw new Error("Couldn't parse response body as text", { cause: response });
+	}
+
+	const lines = body.split("\n");
+	const verificationLink = lines.find((line) => line.startsWith("http"));
+	assert(verificationLink);
+
+	const gotoResponse = await page.goto(verificationLink);
+	assert(gotoResponse);
+	assert(gotoResponse.ok());
+}
+
+export async function logout(page: Page) {
+	if (!page.url().endsWith("/account")) {
+		await page.goto("/account");
+	}
+
+	await page.locator("#logout-button").click();
+	await page.locator("#logout-wipe-data-button").click();
+	await page.waitForURL("/land");
+}
+
+export async function verifyEmail(page: Page) {
+	if (!page.url().endsWith("/account")) {
+		await page.goto("/account");
+	}
+
+	await page.waitForSelector("#email-status");
+	assert(await page.isVisible("#email-status.unverified"));
+	assert(!(await page.isVisible("#email-status.verified")));
+
+	await gotoLastEmailLink(page);
+	await page.locator("#success-continue-button").click();
+	await page.waitForURL("/front");
+
+	await page.goto("/account");
+	await page.waitForSelector("#email-status");
+	assert(!(await page.isVisible("#email-status.unverified")));
+	assert(await page.isVisible("#email-status.verified"));
 }
