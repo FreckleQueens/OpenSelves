@@ -7,8 +7,10 @@ import {
 	ValidationPipe,
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { APP_GUARD } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import cookieParser from "cookie-parser";
 import type { Server } from "node:http";
 import { API_VERSION } from "openselves-common";
@@ -36,9 +38,23 @@ import { VersionMiddleware } from "./version.middleware.js";
 		DbModule,
 		ScheduleModule.forRoot(),
 		SyncModule,
+		// Default rates are configured for an average of 3 requests per second
+		ThrottlerModule.forRoot([
+			{
+				name: "default",
+				limit: 2700,
+				ttl: 15 * 60 * 1000, // 15min
+			},
+		]),
 	],
 	controllers: [StatusController],
-	providers: [VersionMiddleware],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: ThrottlerGuard,
+		},
+		VersionMiddleware,
+	],
 })
 export class AppModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {

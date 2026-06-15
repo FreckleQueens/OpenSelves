@@ -174,14 +174,12 @@ deadline or ETA
 </details>
 
 ## 🚧 0.6.0 - Basic account features
-- [ ] public registrations with captcha
+- [x] public registrations with captcha
   - [x] simple implementation
   - [x] protect against replay attacks by caching solved challenges in memory for their TTL
-  - [ ] increase work requirement by n when criteria met n times before 600s release period (memory cache):
+  - [x] increase work requirement by n when criteria met n times before 600s release period (memory cache):
     - [x] same ip (beware of reverse proxy with x-forwarded-for header)
     - [x] same email (for actions that send emails)
-    - [ ] same user (for heavy authenticated actions)
-    - [ ] configurable total (any user) /captcha/challenge call number threshold
 - [x] email verification
   - [x] basic verification link
   - [x] send the link via email directly (basic text email) -> use sendmail (system provided program and config)
@@ -196,6 +194,7 @@ deadline or ETA
   - [x] add a warning popup
   - [x] add an option to logout and wipe IDB
 - [ ] display list of unauthenticated users with locally stored data in auth settings
+- [ ] allow wiping data by-user while unauthenticated
 - [ ] add warning popup when user is logged out without wiping data
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one

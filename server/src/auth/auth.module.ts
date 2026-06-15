@@ -2,7 +2,7 @@ import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from 
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import { CaptchaMiddleware } from "../captcha/captcha.middleware.js";
@@ -12,6 +12,7 @@ import { QueueModule } from "../queue/queue.module.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
 import { MailService } from "./mail/mail.service.js";
+import { ParseJwtMiddleware } from "./parse-jwt.middleware.js";
 import { SessionService } from "./session/session.service.js";
 import { UserController } from "./user/user.controller.js";
 import { UserService } from "./user/user.service.js";
@@ -37,11 +38,6 @@ import { UserService } from "./user/user.service.js";
 		QueueModule,
 		// Default rates are configured for an average of 3 requests per second
 		ThrottlerModule.forRoot([
-			{
-				name: "default",
-				limit: 2700,
-				ttl: 15 * 60 * 1000, // 15min
-			},
 			{
 				name: "user",
 				limit: 900,
@@ -82,10 +78,6 @@ import { UserService } from "./user/user.service.js";
 			useClass: AuthGuard,
 		},
 		MailService,
-		{
-			provide: APP_GUARD,
-			useClass: ThrottlerGuard,
-		},
 		UserService,
 		SessionService,
 	],
@@ -93,6 +85,7 @@ import { UserService } from "./user/user.service.js";
 })
 export class AuthModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(ParseJwtMiddleware).forRoutes("*");
 		consumer.apply(CaptchaMiddleware).forRoutes(
 			"/auth/login",
 			{

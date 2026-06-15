@@ -18,7 +18,7 @@ export class AuthGuard implements CanActivate {
 		private readonly reflector: Reflector,
 	) {}
 
-	async canActivate(context: ExecutionContext): Promise<boolean> {
+	public canActivate(context: ExecutionContext): boolean {
 		const publicAccessSettings = this.reflector.getAllAndOverride(Public, [
 			context.getHandler(),
 			context.getClass(),
@@ -26,35 +26,26 @@ export class AuthGuard implements CanActivate {
 		const isPublic = !!publicAccessSettings;
 
 		const request = context.switchToHttp().getRequest<Request>();
-		const authToken = this.extractTokenFromCookies(request);
+		const { accessTokenPayload, accessTokenParseError } = request;
+
+		if (accessTokenParseError) {
+			throw new UnauthorizedException(accessTokenParseError);
+		}
 
 		if (isPublic) {
-			if (!publicAccessSettings.allowAuthenticatedUsers && authToken !== undefined) {
+			if (!publicAccessSettings.allowAuthenticatedUsers && accessTokenPayload !== undefined) {
 				throw new UnauthorizedException();
 			} else {
 				return true;
 			}
 		}
 
-		if (authToken === undefined) {
+		if (accessTokenPayload === undefined) {
 			throw new UnauthorizedException({
 				name: TOKEN_EXPIRED_ERROR,
 			});
 		}
 
-		try {
-			request.accessTokenPayload = await this.jwtService.verifyAsync(authToken);
-		} catch (error) {
-			throw new UnauthorizedException(error);
-		}
 		return true;
-	}
-
-	private extractTokenFromCookies(request: Request): string | undefined {
-		const refreshToken = request.cookies["accessToken"] as unknown;
-		if (typeof refreshToken !== "string") {
-			return undefined;
-		}
-		return refreshToken;
 	}
 }
