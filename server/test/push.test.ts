@@ -1,104 +1,38 @@
 import * as fs from "node:fs";
 import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
-import { createReadStream } from "node:fs";
 import test, { describe } from "node:test";
 import type { FrontCreate, Log, Member, MemberCreate, User } from "openselves-common/db";
 
-import { type TestEnv, type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
-
-const pushEndpoint = "/sync/push";
-const pullEndpoint = "/sync/pull";
-
-type ClientAttachment = {
-	path: string;
-};
-
-type ClientLogWithPushedAt = Omit<Log, "userId" | "deletedId" | "memberId" | "frontId"> & {
-	memberId?: string;
-	frontId?: string;
-};
-type ClientLog = Omit<ClientLogWithPushedAt, "pushedAt"> & {
-	attachments?: (FileToUpload & {
-		fieldName: "attachments[]";
-	})[];
-};
-
-type FileToUpload = {
-	fieldName: string;
-	name: string;
-	path: string;
-	contentType?: string;
-};
-
-const TEST_IMAGE_DATA_URL =
-	"data:image/png;base64," + fs.readFileSync("test/test_image_32x32.png").toString("base64");
-const LARGE_IMAGE_FILE_PATH = "test/test_image_512x512.png";
-const LARGE_IMAGE_CONTENT = fs.readFileSync(LARGE_IMAGE_FILE_PATH);
-const TEST_IMAGE_LONG_DATA_URL = "data:image/png;base64," + LARGE_IMAGE_CONTENT.toString("base64");
-
-function getLogAttachmentUrl(env: TestEnv, userId: string, log: ClientLog, dataKey: string) {
-	const publicUrl = env.configService.getOrThrow("PUBLIC_URL", { infer: true });
-	return {
-		absolute: `${publicUrl}/attachment/${userId}/${log.id}/${dataKey}`,
-		relative: `/attachment/${userId}/${log.id}/${dataKey}`,
-	};
-}
+import {
+	type ClientAttachment,
+	type ClientLog,
+	type ClientLogWithPushedAt,
+	LARGE_IMAGE_FILE_PATH,
+	TEST_IMAGE_DATA_URL,
+	TEST_IMAGE_LONG_DATA_URL,
+	attachFileToLog,
+	getLogAttachmentUrl,
+	makeMemberWithLog,
+	putLog as originalPutLog,
+	putLogs as originalPutLogs,
+	pullEndpoint,
+	pushEndpoint,
+} from "./sync-utils.js";
+import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 describe(pushEndpoint, () => {
 	let env: TestEnvWithUsers;
-
-	function attachFileToLog(attachment: ClientAttachment, log: ClientLog, dataKey: string) {
-		if (!log.data || typeof log.data !== "object" || !(dataKey in log.data)) {
-			throw new Error("Wrong log.data for key " + dataKey, { cause: log.data });
-		}
-
-		const attachmentId = createId();
-		log.data[dataKey] = "attachment:" + attachmentId;
-		if (!log.attachments) {
-			log.attachments = [];
-		}
-		log.attachments.push({
-			fieldName: "attachments[]",
-			name: attachmentId,
-			path: attachment.path,
-		});
-	}
-
-	function makeMemberWithLog(
-		date: Date = new Date(),
-		image: string | ClientAttachment | null = null,
-		minimal: boolean = false,
-	) {
-		const member: Omit<MemberCreate, "userId" | "id"> = {
-			name: "Alice",
-			pronouns: "she/her",
-			description: "a member of our& system",
-			createdAt: date,
-			updatedAt: date,
-		};
-		if (!minimal) {
-			member.color = "#123abc";
-			member.image = typeof image === "string" ? image : null;
-			member.isArchived = false;
-			member.archivedReason = null;
-		}
-		const createLog: ClientLog & {
-			memberId: string;
-		} = {
-			id: createId(),
-			memberId: createId(),
-			operationType: "create",
-			data: member,
-			executedAt: date,
-		};
-
-		if (image && typeof image !== "string") {
-			attachFileToLog(image, createLog, "image");
-		}
-
-		return { member, createLog, date };
-	}
+	const putLog = (
+		log: ClientLog,
+		expectCode: number = 200,
+		cookies: string = env.users.cookies,
+	) => originalPutLog(env, log, expectCode, cookies);
+	const putLogs = (
+		logs: ClientLog[],
+		expectCode: number = 200,
+		cookies: string = env.users.cookies,
+	) => originalPutLogs(env, logs, expectCode, cookies);
 
 	function makeFrontWithLog(date: Date, memberCreateLog: ClientLog) {
 		if (!memberCreateLog.memberId) {
@@ -122,43 +56,6 @@ describe(pushEndpoint, () => {
 			executedAt: date,
 		};
 		return { front, createLog, memberCreateLog, date };
-	}
-
-	async function putLog(
-		log: ClientLog,
-		expectCode: number = 200,
-		cookies: string = env.users.cookies,
-	) {
-		return putLogs([log], expectCode, cookies);
-	}
-
-	async function putLogs(
-		logs: ClientLog[],
-		expectCode: number = 200,
-		cookies: string = env.users.cookies,
-	) {
-		const files: FileToUpload[] = logs.map((log) => log.attachments || []).flat();
-
-		let request = env.request.put(pushEndpoint).set("Cookie", cookies);
-		if (files.length > 0) {
-			request = request.field("logs", JSON.stringify(logs));
-			for (const file of files) {
-				request = request.attach(file.fieldName, createReadStream(file.path), {
-					filename: file.name,
-					contentType: file.contentType,
-				});
-			}
-		} else {
-			request = request.send({
-				logs: logs,
-			});
-		}
-		const response = await request.expect("Content-Type", /json/);
-		if (response.statusCode !== expectCode) {
-			console.error(response.body);
-		}
-		assert.strictEqual(response.statusCode, expectCode);
-		return response;
 	}
 
 	async function createMember(date?: Date, image?: string | ClientAttachment | null) {

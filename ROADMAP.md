@@ -199,7 +199,7 @@ deadline or ETA
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
-- [ ] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
+- [x] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)

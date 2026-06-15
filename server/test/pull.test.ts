@@ -3,6 +3,7 @@ import assert from "node:assert";
 import test, { before, describe } from "node:test";
 import { type Log, type LogCreate, type Member, members, models } from "openselves-common/db";
 
+import { LARGE_IMAGE_FILE_PATH, makeMemberWithLog, putLog } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pullEndpoint = "/sync/pull";
@@ -283,6 +284,31 @@ describe("/sync/pull", () => {
 			);
 			assert.strictEqual(response.body.timestamp, undefined);
 			assert.strictEqual(response.body.logs, undefined);
+		});
+
+		test("initial sync serves the right member image link 200", async () => {
+			const date = new Date();
+
+			const { createLog } = makeMemberWithLog(date, {
+				path: LARGE_IMAGE_FILE_PATH,
+			});
+			await putLog(env, createLog);
+
+			const initialLogs = await callPullAndGetLogs("init", 200, env.users.cookies);
+			const syncLogs = await callPullAndGetLogs(0, 200, env.users.cookies);
+
+			const initialCreateLog = initialLogs.find((log) => {
+				return log && typeof log === "object" && log["memberId"] === createLog.memberId;
+			}) as object;
+			const syncCreateLog = syncLogs.find((log) => {
+				return log && typeof log === "object" && log["memberId"] === createLog.memberId;
+			}) as object;
+
+			const initialImage = initialCreateLog["data"]["image"];
+			const syncImage = syncCreateLog["data"]["image"];
+			assert(initialImage);
+			assert(syncImage);
+			assert.strictEqual(initialImage, syncImage);
 		});
 	});
 });

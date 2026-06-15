@@ -658,7 +658,7 @@ export class SyncService {
 
 		logs.push(...user.logs.filter((log) => log.operationType === "delete"));
 
-		this.mapLogDataAttachmentsUrls(logs);
+		this.mapLogDataAttachmentsUrls(logs, true);
 
 		return {
 			timestamp: returnedTimestamp.getTime(),
@@ -752,16 +752,17 @@ export class SyncService {
 		});
 	}
 
-	private mapLogDataAttachmentsUrls(logs: Log[]) {
+	private mapLogDataAttachmentsUrls(logs: Log[], inferLogIdFromValue: boolean = false) {
 		const publicUrl = this.configService.getOrThrow("PUBLIC_URL", { infer: true });
 		for (const log of logs) {
 			if (log.data) {
 				for (const [key, value] of Object.entries(log.data)) {
 					if (typeof value === "string" && value.startsWith("attachment:")) {
+						const logId = inferLogIdFromValue ? value.split(":", 2)[1] : log.id;
 						log.data[key] =
 							publicUrl +
 							"/attachment/" +
-							this.getLogAttachmentKey(log.userId, log.id, key);
+							this.getLogAttachmentKey(log.userId, logId, key);
 					}
 				}
 			}
