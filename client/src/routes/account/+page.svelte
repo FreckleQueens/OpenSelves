@@ -28,6 +28,7 @@
 	let showLogoutDialog: boolean = $state(false);
 	let showWipeConfirmDialog: boolean = $state(false);
 	let showTechnicalData: boolean = $state(false);
+	let userDataReady: boolean = $state(false);
 
 	requireAuth();
 	onMount(() => {
@@ -36,7 +37,10 @@
 
 	$effect(() => {
 		if (appState.syncWorkerOnline) {
-			refreshUserData();
+			userDataReady = false;
+			refreshUserData().then(() => (userDataReady = true));
+		} else {
+			userDataReady = true;
 		}
 	});
 
@@ -64,7 +68,8 @@
 
 	<AccountCard
 		id="online-status"
-		class={appState.isApiReachable && appState.userData ? "online" : "offline"}
+		class={(appState.isApiReachable && appState.userData ? "online" : "offline") +
+			(userDataReady ? " ready" : "")}
 		title="Online account status"
 	>
 		{#snippet status()}
@@ -119,9 +124,9 @@
 	{#if appState.userData}
 		<AccountCard
 			id="email-status"
-			class={appState.userData.isEmailVerified && !appState.userData.newEmailRequest
+			class={(appState.userData.isEmailVerified && !appState.userData.newEmailRequest
 				? "verified"
-				: "unverified"}
+				: "unverified") + (userDataReady ? " ready" : "")}
 			title="Email"
 		>
 			{#snippet status()}

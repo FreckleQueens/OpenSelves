@@ -107,7 +107,7 @@ export async function verifyEmail(page: Page) {
 		await page.goto("/account");
 	}
 
-	await page.waitForSelector("#email-status");
+	await page.waitForSelector("#email-status.ready");
 	assert(await page.isVisible("#email-status.unverified"));
 	assert(!(await page.isVisible("#email-status.verified")));
 
@@ -116,7 +116,7 @@ export async function verifyEmail(page: Page) {
 	await page.waitForURL("/front");
 
 	await page.goto("/account");
-	await page.waitForSelector("#email-status");
+	await page.waitForSelector("#email-status.ready");
 	assert(!(await page.isVisible("#email-status.unverified")));
 	assert(await page.isVisible("#email-status.verified"));
 }
