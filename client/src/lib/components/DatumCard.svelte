@@ -34,7 +34,9 @@
 		</div>
 	{/snippet}
 
-	<div class="flex flex-wrap justify-center items-center gap-4">
+	<div
+		class={"flex flex-wrap justify-center items-center" + (indentContent ? " gap-4" : " -m-4")}
+	>
 		{#if children}
 			<div class={"flex-1" + (indentContent ? " ps-safe-4" : "")}>
 				{@render children()}
