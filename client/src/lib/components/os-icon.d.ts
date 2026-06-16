@@ -10,6 +10,7 @@ export type OSIconProps = {
 	button?: boolean;
 	fab?: boolean;
 	input?: boolean;
+	listItemMedia?: boolean;
 	before?: boolean;
 	after?: boolean;
 	class?: string;

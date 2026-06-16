@@ -2,7 +2,6 @@ import { IDBAttachment } from "$lib/idb/IDBAttachment";
 import { IDBFront } from "$lib/idb/IDBFront";
 import { IDBLog } from "$lib/idb/IDBLog";
 import { IDBMember } from "$lib/idb/IDBMember";
-import type { IDBModel } from "$lib/idb/IDBModel";
 import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
 
 const IDB_NAME = "openselves";
@@ -40,8 +39,6 @@ export class IDB {
 	public readonly attachment: IDBAttachment = new IDBAttachment(this);
 	public readonly member: IDBMember = new IDBMember(this);
 	public readonly front: IDBFront = new IDBFront(this);
-	private readonly userDataModels: IDBModel<{ userId: string; id: string } & ModelBase, "id">[] =
-		[this.log, this.attachment, this.front, this.member];
 	private db?: IDBDatabase;
 
 	private async init() {
@@ -246,30 +243,6 @@ export class IDB {
 
 	public async delete(storeName: string, query: IDBValidKey | IDBKeyRange): Promise<undefined> {
 		return this.transaction(storeName, (transaction) => transaction.delete(storeName, query));
-	}
-
-	public async wipeUserData(userId: string): Promise<void> {
-		const storeNames = [
-			...this.userDataModels.map((model) => model.storeName),
-			this.storageEntry.storeName,
-		];
-		await this.transaction(storeNames, async (tx) => {
-			for (const model of this.userDataModels) {
-				const userRecords = model.parseModels(
-					await tx.getByIndex(model.storeName, "userId", IDBKeyRange.only(userId)),
-				);
-				for (const id of userRecords.map((record) => record.id)) {
-					await tx.delete(model.storeName, id);
-				}
-			}
-			const records = this.storageEntry.parseModels(
-				await tx.getAll(this.storageEntry.storeName),
-			);
-			const userRecords = records.filter((record) => record.key.startsWith(userId + "."));
-			for (const key of userRecords.map((record) => record.key)) {
-				await tx.delete(this.storageEntry.storeName, key);
-			}
-		});
 	}
 }
 

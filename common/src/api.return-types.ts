@@ -17,11 +17,12 @@ export const GetStatus = {
 	maxUploadSize: Number,
 	areRegistrationsOpen: Boolean,
 	unverifiedAccountCullingDelay: Number,
-};
+} satisfies ApiResultFields;
 export type GetStatusResult = ApiResult<typeof GetStatus>;
 
 export const GetUser = {
 	id: String,
+	domain: String,
 	email: String,
 	createdAt: Date,
 	isEmailVerified: Boolean,
@@ -32,7 +33,22 @@ export type GetUserResult = ApiResult<typeof GetUser>;
 export function parseApiResult<Fields extends ApiResultFields>(
 	fields: Fields,
 	value: unknown,
-): ApiResult<Fields> {
+): ApiResult<Fields>;
+export function parseApiResult<Fields extends ApiResultFields>(
+	fields: Fields,
+	value: unknown,
+	allowPartial: true,
+): Partial<ApiResult<Fields>>;
+export function parseApiResult<Fields extends ApiResultFields>(
+	fields: Fields,
+	value: unknown,
+	allowPartial: false,
+): ApiResult<Fields>;
+export function parseApiResult<Fields extends ApiResultFields>(
+	fields: Fields,
+	value: unknown,
+	allowPartial: boolean = false,
+): Partial<ApiResult<Fields>> | ApiResult<Fields> {
 	if (!value) {
 		throw new Error("Missing value", { cause: value });
 	}
@@ -43,7 +59,11 @@ export function parseApiResult<Fields extends ApiResultFields>(
 	const output: Record<string, ApiResultValue> = {};
 	for (const [key, type] of Object.entries(fields)) {
 		if (!(key in value)) {
-			throw new Error("Missing field " + key, { cause: value });
+			if (allowPartial) {
+				continue;
+			} else {
+				throw new Error("Missing field " + key, { cause: value });
+			}
 		}
 
 		if (type === String || type === Boolean || type === Number) {

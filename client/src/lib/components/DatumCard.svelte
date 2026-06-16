@@ -9,13 +9,15 @@
 		status,
 		children,
 		actions,
+		indentContent = true,
 	}: {
-		id: string;
+		id?: string;
 		class?: string;
 		title: string;
 		status?: Snippet;
 		children?: Snippet;
-		actions: Snippet;
+		actions?: Snippet;
+		indentContent?: boolean;
 	} = $props();
 </script>
 
@@ -34,13 +36,15 @@
 
 	<div class="flex flex-wrap justify-center items-center gap-4">
 		{#if children}
-			<div class="ps-safe-4 flex-1">
+			<div class={"flex-1" + (indentContent ? " ps-safe-4" : "")}>
 				{@render children()}
 			</div>
 		{/if}
 
-		<List nested>
-			{@render actions()}
-		</List>
+		{#if actions}
+			<List nested>
+				{@render actions()}
+			</List>
+		{/if}
 	</div>
 </Card>

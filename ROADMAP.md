@@ -193,7 +193,7 @@ deadline or ETA
 - [x] add a warning about data being accessible even after a logout
   - [x] add a warning popup
   - [x] add an option to logout and wipe IDB
-- [ ] display list of unauthenticated users with locally stored data in auth settings
+- [x] display list of unauthenticated users with locally stored data in auth settings
 - [ ] allow wiping data by-user while unauthenticated
 - [ ] add warning popup when user is logged out without wiping data
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to

@@ -386,6 +386,7 @@ describe("Auth (e2e)", () => {
 				.expect("Content-Type", /json/);
 			assert.deepStrictEqual(Object.keys(response.body), [
 				"id",
+				"domain",
 				"email",
 				"createdAt",
 				"isEmailVerified",
@@ -498,8 +499,12 @@ describe("Auth (e2e)", () => {
 				.set("Cookie", env.users.cookies)
 				.expect(200)
 				.expect("Content-Type", /json/);
+			const expectedDomain = env.configService
+				.getOrThrow("PUBLIC_URL", { infer: true })
+				.split("//", 2)[1];
 			assert.deepStrictEqual(response.body, {
 				id: env.users.user.id,
+				domain: expectedDomain,
 				email: env.users.user.email,
 				createdAt: env.users.user.createdAt,
 				isEmailVerified: false,

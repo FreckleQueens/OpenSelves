@@ -1,7 +1,7 @@
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte";
-import { type IDBSyncedModel, IDBSyncedModelEvent } from "$lib/idb/IDBSyncedModel";
-import { type SyncedModelBase } from "$lib/idb/idb";
+import { type IDBSyncedModel, IDBSyncedModelEvent } from "$lib/idb";
+import { type SyncedModelBase } from "$lib/idb";
 import { onDestroy, onMount } from "svelte";
 
 export function subscribeToModel<T extends SyncedModelBase>(

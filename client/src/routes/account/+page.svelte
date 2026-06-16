@@ -6,6 +6,7 @@
 	import { apiState, refreshUserData, tryLogout } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import DatumCard from "$lib/components/DatumCard.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
@@ -20,7 +21,6 @@
 	import { BlockTitle, Button, Dialog, DialogButton, ListItem, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
-	import AccountCard from "./AccountCard.svelte";
 	import ResendVerificationEmail from "./ResendVerificationEmail.svelte";
 
 	let storage: PersistentStorage | undefined = $state();
@@ -66,7 +66,7 @@
 <AppPage title="" activeMenuItem={MenuItem.ACCOUNT}>
 	<BlockTitle large>Account settings</BlockTitle>
 
-	<AccountCard
+	<DatumCard
 		id="online-status"
 		class={(appState.isApiReachable && appState.userData ? "online" : "offline") +
 			(userDataReady ? " ready" : "")}
@@ -119,10 +119,10 @@
 		{:else}
 			<Preloader />
 		{/if}
-	</AccountCard>
+	</DatumCard>
 
 	{#if appState.userData}
-		<AccountCard
+		<DatumCard
 			id="email-status"
 			class={(appState.userData.isEmailVerified && !appState.userData.newEmailRequest
 				? "verified"
@@ -152,10 +152,10 @@
 			{/snippet}
 
 			{appState.userData.newEmailRequest || appState.userData.email}
-		</AccountCard>
+		</DatumCard>
 	{/if}
 
-	<AccountCard id="security" title="Security">
+	<DatumCard id="security" title="Security">
 		{#snippet actions()}
 			<ListItem>
 				{#snippet text()}
@@ -166,7 +166,7 @@
 				{/snippet}
 			</ListItem>
 		{/snippet}
-	</AccountCard>
+	</DatumCard>
 </AppPage>
 
 <Dialog opened={showLogoutDialog} onBackdropClick={() => (showLogoutDialog = false)}>

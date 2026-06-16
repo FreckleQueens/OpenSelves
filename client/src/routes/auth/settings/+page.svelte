@@ -7,6 +7,8 @@
 	import { requireGuest } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
 
+	import LocalProfiles from "./LocalProfiles.svelte";
+
 	requireGuest();
 </script>
 
@@ -22,6 +24,11 @@
 	<BlockTitle>Change server</BlockTitle>
 	<Block>
 		<ServerSwitcher />
+	</Block>
+
+	<BlockTitle>Local profiles</BlockTitle>
+	<Block>
+		<LocalProfiles />
 	</Block>
 
 	<AppInfo />

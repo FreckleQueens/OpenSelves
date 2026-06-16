@@ -11,6 +11,7 @@
 		button = false,
 		fab = false,
 		input = false,
+		listItemMedia = false,
 		before = false,
 		after = false,
 		class: classNames,
@@ -19,7 +20,7 @@
 
 	const classes: string = $derived.by(() => {
 		const vals: string[] = ["icon"];
-		if (button || fab || input) {
+		if (button || fab || input || listItemMedia) {
 			vals.push("text-xl");
 		}
 		if (before) {

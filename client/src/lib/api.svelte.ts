@@ -8,9 +8,9 @@ import {
 } from "$env/static/public";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
-import { IDB } from "$lib/idb";
 import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
+import { LocalProfileManager } from "$lib/idb/local-profiles";
 import {
 	API_VERSION,
 	GetStatus,
@@ -319,7 +319,7 @@ export async function tryLogout(
 			scheduleOnlineCheck();
 			return false;
 		} else {
-			await IDB.getInstance().wipeUserData(userId);
+			await LocalProfileManager.getInstance().wipeUserData(userId);
 		}
 	}
 

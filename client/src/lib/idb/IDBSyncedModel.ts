@@ -3,14 +3,7 @@ import { IDBModel } from "$lib/idb/IDBModel";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { IDB, IDBTransactionWrapper, type ModelBase, type SyncedModelBase } from "$lib/idb/idb";
 import { createId } from "@paralleldrive/cuid2";
-import { type ColumnType } from "drizzle-orm/column-builder";
 import type { Log } from "openselves-common/db";
-
-export type DBColumn = {
-	dataType: ColumnType;
-	notNull: boolean;
-	enumValues: string[] | undefined;
-};
 
 export type CascadeDelete<T extends SyncedModelBase> = {
 	get model(): IDBSyncedModel<T>;

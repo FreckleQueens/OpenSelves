@@ -268,8 +268,11 @@ export class UserController {
 			"passwordHash"
 		>,
 	): GetUserResult {
+		const publicUrl = this.configService.getOrThrow("PUBLIC_URL", { infer: true });
+		const domain = publicUrl.split("//", 2)[1]; // strip protocol part
 		return {
 			id: user.id,
+			domain,
 			email: user.email,
 			createdAt: user.createdAt,
 			isEmailVerified: user.isEmailVerified,
