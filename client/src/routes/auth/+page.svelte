@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
+	import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { scheduleOnlineCheck } from "$lib/api.svelte";
 	import ApiReachableGate from "$lib/components/ApiReachableGate.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import SubmitButton from "$lib/components/forms/SubmitButton.svelte";
+	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
+	import DismissIcon from "$lib/components/icons/DismissIcon.svelte";
 	import LoginIcon from "$lib/components/icons/LoginIcon.svelte";
 	import RegisterIcon from "$lib/components/icons/RegisterIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
@@ -15,6 +18,7 @@
 	import {
 		Block,
 		BlockTitle,
+		Button,
 		Dialog,
 		DialogButton,
 		Link,
@@ -43,6 +47,7 @@
 				}
 				await storage.setUserId(`${result.userId}`);
 				SyncWorker.getInstance().resume();
+				await dismissWarnForRemainingLocalData();
 				await goto(resolve("/"));
 			},
 		},
@@ -58,6 +63,7 @@
 	});
 	let activeForm = $state(forms.login.name);
 	let registerSuccessDialogOpen = $state(false);
+	let warnForRemainingLocalData: boolean = $state(false);
 
 	const load = requireGuest();
 	let loaded = $state(false);
@@ -66,6 +72,11 @@
 		loaded = true;
 
 		scheduleOnlineCheck(0);
+
+		warnForRemainingLocalData = !!(await storage.get(
+			WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY,
+			true,
+		));
 	});
 
 	const onSubmit = async (e: SubmitEvent) => {
@@ -84,6 +95,11 @@
 		await tick();
 		await submitActiveForm();
 	}
+
+	async function dismissWarnForRemainingLocalData() {
+		await storage.delete(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, true);
+		warnForRemainingLocalData = false;
+	}
 </script>
 
 <AppPage title="" showMenu={false} loading={!loaded} transparentNavbar>
@@ -92,6 +108,29 @@
 			<SettingsIcon button />
 		</Link>
 	{/snippet}
+
+	{#if warnForRemainingLocalData}
+		<Block strong inset class="k-color-brand-yellow flex items-center">
+			<DangerIcon before />
+			<span class="flex-1">
+				Your data is still on this device. Anyone with access to the app or the device's
+				filesystem can read and modify it.
+				<br />
+				To delete your data, go to settings by clicking the cogwheel icon in the top right corner
+				of this page.
+			</span>
+			<Button
+				clear
+				rounded
+				small
+				inline
+				class="p-2"
+				onclick={() => dismissWarnForRemainingLocalData()}
+			>
+				<DismissIcon />
+			</Button>
+		</Block>
+	{/if}
 
 	<BlockTitle class="app-welcome-title flex justify-start text-4xl mb-8!">
 		<img

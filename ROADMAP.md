@@ -195,7 +195,7 @@ deadline or ETA
   - [x] add an option to logout and wipe IDB
 - [x] display list of unauthenticated users with locally stored data in auth settings
 - [x] allow wiping data by-user while unauthenticated
-- [ ] add warning popup when user is logged out without wiping data
+- [x] add warning popup when user is logged out without wiping data
 - [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag

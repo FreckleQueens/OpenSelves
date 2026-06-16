@@ -1,3 +1,5 @@
+import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
+import { PersistentStorage } from "$lib/PersistentStorage";
 import { USER_DATA_STORAGE_KEY } from "$lib/api.svelte";
 import type { IDBModel, ModelBase } from "$lib/idb";
 import { IDB } from "$lib/idb";
@@ -48,6 +50,11 @@ export class LocalProfileManager {
 				await tx.delete(this.idb.storageEntry.storeName, key);
 			}
 		});
+
+		const storage = PersistentStorage.getInstance();
+		if ((await storage.get(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, true)) === userId) {
+			await storage.delete(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, true);
+		}
 	}
 
 	public async loadProfilesData() {
