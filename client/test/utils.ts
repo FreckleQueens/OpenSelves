@@ -12,6 +12,7 @@ export async function expectNoAppError(page: Page) {
 
 export async function registerAndLoginUser(
 	page: Page,
+	persistSession: boolean = false,
 ): Promise<{ email: string; password: string }> {
 	const email = createId() + "@example.com";
 	const password = "12345678";
@@ -25,7 +26,12 @@ export async function registerAndLoginUser(
 	await form.locator("input[name=password]").fill(password);
 	await form.locator('input[name="registrationPassword"]').fill("12345678");
 	await form.getByRole("button", { name: "Register" }).click();
-	await page.locator("#auto-login-button").click();
+	await page.locator("#autofill-login-button").click();
+
+	if (persistSession) {
+		await page.locator("#persist-session-checkbox").click();
+	}
+	await page.locator("#login-button").click();
 
 	await page.waitForURL("/front");
 

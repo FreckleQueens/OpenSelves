@@ -22,7 +22,9 @@ test("register", async ({ page }) => {
 	await form.locator("input[name=password]").fill("12345678");
 	await form.locator('input[name="registrationPassword"]').fill("12345678");
 	await form.getByRole("button", { name: "Register" }).click();
-	await page.locator("#auto-login-button").click();
+	await page.locator("#autofill-login-button").click();
+
+	await page.locator("#login-button").click();
 
 	await page.waitForURL("/front");
 	await page.goto("/account");
@@ -43,6 +45,25 @@ test("login", async ({ page }) => {
 	await page.waitForURL("/front");
 	await page.goto("/account");
 	await expect(page.locator("body")).toContainText(user.email);
+});
+
+test("short lived session logs out", async ({ page }) => {
+	await registerAndLoginUser(page);
+	await page.goto("about:blank");
+	// Wait 2 more second than the configured REFRESH_TOKEN_SHORT_DURATION (see playwright.config.ts)
+	await page.waitForTimeout(12000);
+	await page.goto("/account");
+	await page.waitForURL("/land");
+});
+
+test("long lived session doesn't log out", async ({ page }) => {
+	await registerAndLoginUser(page, true);
+	await page.goto("about:blank");
+	// Wait 2 more second than the configured REFRESH_TOKEN_SHORT_DURATION (see playwright.config.ts)
+	await page.waitForTimeout(12000);
+	await page.goto("/account");
+	await page.waitForTimeout(5000);
+	assert(page.url().endsWith("/account"));
 });
 
 test("verify email", async ({ page }) => {

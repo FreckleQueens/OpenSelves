@@ -12,11 +12,9 @@ export interface ConfigData {
 	ALLOWED_ORIGINS: string[];
 
 	JWT_SECRET: string;
-
 	ACCESS_TOKEN_DURATION: number;
-
 	REFRESH_TOKEN_DURATION: number;
-
+	REFRESH_TOKEN_SHORT_DURATION: number;
 	REFRESH_TOKEN_SIZE: number;
 
 	REGISTRATION_PASSWORD: string | undefined;
@@ -86,14 +84,16 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set JWT_SECRET environment variable to secure random string",
 		"any.required": "Please set JWT_SECRET environment variable to secure random string",
 	}),
-
 	ACCESS_TOKEN_DURATION: Joi.number()
 		.positive()
 		.less(Joi.ref("REFRESH_TOKEN_DURATION"))
+		.less(Joi.ref("REFRESH_TOKEN_SHORT_DURATION"))
 		.required(),
-
 	REFRESH_TOKEN_DURATION: Joi.number().positive().required(),
-
+	REFRESH_TOKEN_SHORT_DURATION: Joi.number()
+		.positive()
+		.less(Joi.ref("REFRESH_TOKEN_DURATION"))
+		.required(),
 	REFRESH_TOKEN_SIZE: Joi.number().min(16).required(),
 
 	REGISTRATION_PASSWORD: Joi.string().min(8),

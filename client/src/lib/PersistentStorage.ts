@@ -30,7 +30,7 @@ export abstract class PersistentStorage {
 	public getUserId(): string {
 		const userId = this.getUserIdOptional();
 		if (!userId) {
-			throw new Error("SessionStorage userId not set.");
+			throw new Error("PersistentStorage userId not set.");
 		}
 		return userId;
 	}

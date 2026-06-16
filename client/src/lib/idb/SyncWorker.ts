@@ -17,6 +17,10 @@ export class SyncWorker {
 		this.instance = new SyncWorker(startOnline);
 	}
 
+	public static isInitialized(): boolean {
+		return !!this.instance;
+	}
+
 	public static getInstance(): SyncWorker {
 		if (!this.instance) {
 			throw new Error("SyncWorker not initialized");

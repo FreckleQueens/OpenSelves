@@ -88,12 +88,11 @@
 		return submitOSForm(forms[activeForm]);
 	}
 
-	async function loginFromRegistration() {
+	async function autofillLoginFromRegistration() {
 		forms.login.data = { ...forms.register.data };
 		activeForm = forms.login.name;
 		registerSuccessDialogOpen = false;
 		await tick();
-		await submitActiveForm();
 	}
 
 	async function dismissWarnForRemainingLocalData() {
@@ -200,9 +199,9 @@
 		</p>
 
 		{#snippet buttons()}
-			<DialogButton id="auto-login-button" strong onclick={loginFromRegistration}>
+			<DialogButton id="autofill-login-button" strong onclick={autofillLoginFromRegistration}>
 				<LoginIcon button before />
-				Login
+				Go to login
 			</DialogButton>
 		{/snippet}
 	</Dialog>

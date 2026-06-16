@@ -6,6 +6,7 @@ import {
 	PUBLIC_DEFAULT_API_URL_DEV,
 	PUBLIC_TEST_ENVIRONMENT,
 } from "$env/static/public";
+import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
 import type { Attachment } from "$lib/idb/IDBAttachment";
@@ -16,6 +17,7 @@ import {
 	GetStatus,
 	type GetStatusResult,
 	GetUser,
+	MISSING_REFRESH_TOKEN_COOKIE,
 	SESSION_EXPIRED_ERROR,
 	TOKEN_EXPIRED_ERROR,
 	parseApiResult,
@@ -52,7 +54,7 @@ export async function setApiStatus(status: GetStatusResult) {
 	);
 }
 
-export async function refreshUserData() {
+async function refreshUserData() {
 	if (!appState.isAuthenticated) {
 		throw new Error("Cannot use while not authenticated.");
 	}
@@ -62,6 +64,32 @@ export async function refreshUserData() {
 	const response = await call(`/user/${userId}`);
 	appState.userData = parseApiResult(GetUser, response);
 	await storage.set(USER_DATA_STORAGE_KEY, JSON.stringify(appState.userData));
+}
+
+let refreshUserDataTimeout: number | undefined = undefined;
+export function scheduleRefreshUserData(delay: number = 5000) {
+	if (!appState.isAuthenticated) {
+		if (delay === 0 && !appState.isAuthenticated) {
+			throw new Error("Cannot use while not authenticated.");
+		}
+		return;
+	}
+
+	clearTimeout(refreshUserDataTimeout);
+
+	refreshUserDataTimeout = window.setTimeout(async () => {
+		if (!appState.isAuthenticated) {
+			return;
+		}
+
+		try {
+			await refreshUserData();
+		} catch (e) {
+			console.debug("refreshUserData failed", e);
+			scheduleRefreshUserData();
+			return;
+		}
+	}, delay);
 }
 
 export type CallOptions<RawResponse extends true | false> = {
@@ -74,6 +102,7 @@ export type CallOptions<RawResponse extends true | false> = {
 export enum CallResult {
 	API_UNREACHABLE,
 	SESSION_EXPIRED,
+	MISSING_REFRESH_TOKEN_COOKIE,
 	WRONG_VERSION,
 }
 
@@ -132,6 +161,10 @@ export async function callRaw(
 	let responseBody: Record<string, unknown> | undefined = undefined;
 
 	for (let attempt = 0; attempt < 3; attempt++) {
+		if (attempt !== 0) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		}
+
 		try {
 			response = await tryFetch();
 			if (!options?.returnRawResponse) {
@@ -179,8 +212,11 @@ export async function callRaw(
 		if (response.status === 401 && responseBody.name === TOKEN_EXPIRED_ERROR) {
 			const result = await refreshAuth();
 			console.debug("refreshAuth", result);
-			if (result === CallResult.SESSION_EXPIRED) {
-				return result;
+			if (
+				result === CallResult.SESSION_EXPIRED ||
+				(attempt === 2 && result === CallResult.MISSING_REFRESH_TOKEN_COOKIE)
+			) {
+				return CallResult.SESSION_EXPIRED;
 			}
 
 			continue;
@@ -229,6 +265,7 @@ export async function call(
 			await goto(resolve("/"));
 			return undefined;
 		case CallResult.API_UNREACHABLE:
+		case CallResult.MISSING_REFRESH_TOKEN_COOKIE:
 		case CallResult.WRONG_VERSION:
 			handleApiUnreachable();
 			return undefined;
@@ -237,11 +274,15 @@ export async function call(
 	}
 }
 
-let refreshingAuthPromise: Promise<boolean | CallResult.SESSION_EXPIRED> | null = null;
-async function refreshAuth(): Promise<boolean | CallResult.SESSION_EXPIRED> {
-	while (refreshingAuthPromise) {
+let refreshingAuthPromise: Promise<
+	boolean | CallResult.SESSION_EXPIRED | CallResult.MISSING_REFRESH_TOKEN_COOKIE
+> | null = null;
+async function refreshAuth(): Promise<
+	boolean | CallResult.SESSION_EXPIRED | CallResult.MISSING_REFRESH_TOKEN_COOKIE
+> {
+	if (refreshingAuthPromise) {
 		try {
-			await refreshingAuthPromise;
+			return await refreshingAuthPromise;
 		} catch {
 			return false;
 		}
@@ -256,13 +297,14 @@ async function refreshAuth(): Promise<boolean | CallResult.SESSION_EXPIRED> {
 			});
 
 			const authResponseBody = await authResponse.json();
-			if (
-				!authResponse.ok &&
-				authResponse.status === 401 &&
-				authResponseBody.name === SESSION_EXPIRED_ERROR
-			) {
-				console.warn("Session expired with response", authResponseBody);
-				return CallResult.SESSION_EXPIRED;
+			if (!authResponse.ok && authResponse.status === 401) {
+				if (authResponseBody.name === SESSION_EXPIRED_ERROR) {
+					console.warn("Session expired with response", authResponseBody);
+					return CallResult.SESSION_EXPIRED;
+				} else if (authResponseBody.name === MISSING_REFRESH_TOKEN_COOKIE) {
+					console.warn("Refresh token cookie missing with response", authResponseBody);
+					return CallResult.MISSING_REFRESH_TOKEN_COOKIE;
+				}
 			}
 
 			return authResponse.ok;
@@ -303,6 +345,15 @@ export async function tryLogout(
 	forceWipe: boolean = false,
 	apiLogoutNeeded: boolean = false,
 ): Promise<boolean> {
+	if (!SyncWorker.isInitialized()) {
+		throw new Error("SyncWorker is not initialized");
+	}
+
+	if (!appState.isAuthenticated) {
+		// We're already logged out
+		return true;
+	}
+
 	if (onlineCheckTimeout !== undefined) {
 		clearTimeout(onlineCheckTimeout);
 		onlineCheckTimeout = undefined;
@@ -321,6 +372,8 @@ export async function tryLogout(
 		} else {
 			await LocalProfileManager.getInstance().wipeUserData(userId);
 		}
+	} else {
+		await storage.set(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, userId, true);
 	}
 
 	await storage.setOffline();

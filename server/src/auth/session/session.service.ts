@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { createId } from "@paralleldrive/cuid2";
 import { randomBytes } from "crypto";
-import { type RelationsFilterColumns, and, eq, gte } from "drizzle-orm";
+import { type RelationsFilterColumns, and, eq, gte, or } from "drizzle-orm";
 import { type PartialBy } from "openselves-common";
 import { type Session, type User, sessions } from "openselves-common/db";
 
@@ -44,27 +44,39 @@ export class SessionService {
 		});
 	}
 
-	public async createSession(userId: User["id"]): Promise<Session> {
+	public async createSession(userId: User["id"], persistSession: boolean): Promise<Session> {
 		const token = this.generateNewSessionToken();
 		return (
-			await this.db.insert(sessions).values({ token: token, userId: userId }).returning()
+			await this.db
+				.insert(sessions)
+				.values({ token, userId, persist: persistSession })
+				.returning()
 		)[0];
 	}
 
 	public hasSessionExpired(session: Session): boolean {
-		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
-			infer: true,
-		});
+		const refreshTokenDuration = this.configService.getOrThrow(
+			session.persist ? "REFRESH_TOKEN_DURATION" : "REFRESH_TOKEN_SHORT_DURATION",
+			{
+				infer: true,
+			},
+		);
 		const ttl = refreshTokenDuration * 1000;
 
 		const timeSinceLastUpdate = Date.now() - session.updatedAt.getTime();
 		return timeSinceLastUpdate >= ttl;
 	}
 
-	public async refreshSession(token: string): Promise<Session | undefined> {
-		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
-			infer: true,
-		});
+	public async refreshSession(
+		token: string,
+		persistSession: boolean,
+	): Promise<Session | undefined> {
+		const refreshTokenDuration = this.configService.getOrThrow(
+			persistSession ? "REFRESH_TOKEN_DURATION" : "REFRESH_TOKEN_SHORT_DURATION",
+			{
+				infer: true,
+			},
+		);
 		const ttl = refreshTokenDuration * 1000;
 
 		const newToken = this.generateNewSessionToken();
@@ -76,6 +88,7 @@ export class SessionService {
 					and(
 						eq(sessions.token, token),
 						gte(sessions.updatedAt, new Date(Date.now() - ttl)),
+						eq(sessions.persist, persistSession),
 					),
 				)
 				.returning()
@@ -86,13 +99,34 @@ export class SessionService {
 		const refreshTokenDuration = this.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
 			infer: true,
 		});
+		const shortRefreshTokenDuration = this.configService.getOrThrow(
+			"REFRESH_TOKEN_SHORT_DURATION",
+			{
+				infer: true,
+			},
+		);
 		return (
 			await this.db
 				.delete(sessions)
 				.where(
 					and(
 						eq(sessions.token, token),
-						gte(sessions.updatedAt, new Date(Date.now() - refreshTokenDuration * 1000)),
+						or(
+							and(
+								eq(sessions.persist, true),
+								gte(
+									sessions.updatedAt,
+									new Date(Date.now() - refreshTokenDuration * 1000),
+								),
+							),
+							and(
+								eq(sessions.persist, false),
+								gte(
+									sessions.updatedAt,
+									new Date(Date.now() - shortRefreshTokenDuration * 1000),
+								),
+							),
+						),
 					),
 				)
 				.returning()

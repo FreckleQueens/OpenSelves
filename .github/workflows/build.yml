@@ -85,6 +85,7 @@ jobs:
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
+          REFRESH_TOKEN_SHORT_DURATION: 86400
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: 12345678
           CAPTCHA_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod2
@@ -155,6 +156,7 @@ jobs:
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
+          REFRESH_TOKEN_SHORT_DURATION: 86400
           REFRESH_TOKEN_SIZE: 32
           REGISTRATION_PASSWORD: notarealpassword
           CAPTCHA_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod2

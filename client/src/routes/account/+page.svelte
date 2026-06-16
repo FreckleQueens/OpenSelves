@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { MenuItem, WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
+	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { apiState, refreshUserData, tryLogout } from "$lib/api.svelte";
+	import { apiState, scheduleRefreshUserData, tryLogout } from "$lib/api.svelte";
 	import { appState } from "$lib/appState.svelte.js";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import DatumCard from "$lib/components/DatumCard.svelte";
@@ -36,18 +36,21 @@
 	});
 
 	$effect(() => {
-		if (appState.syncWorkerOnline) {
+		if (appState.isAuthenticated && appState.syncWorkerOnline) {
 			userDataReady = false;
-			refreshUserData().then(() => (userDataReady = true));
+			scheduleRefreshUserData(0);
 		} else {
 			userDataReady = true;
 		}
 	});
 
-	async function doLogout(wipeData: boolean, forceWipe: boolean = false) {
-		const storage = PersistentStorage.getInstance();
-		const userId = storage.getUserId();
+	$effect(() => {
+		if (appState.userData) {
+			userDataReady = true;
+		}
+	});
 
+	async function doLogout(wipeData: boolean, forceWipe: boolean = false) {
 		showWipeConfirmDialog = false;
 		showLogoutDialog = false;
 
@@ -60,10 +63,6 @@
 		if (!loggedOut) {
 			showWipeConfirmDialog = true;
 			return;
-		}
-
-		if (!wipeData) {
-			await storage.set(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, userId, true);
 		}
 
 		await goto(resolve("/"));

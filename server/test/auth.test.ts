@@ -40,10 +40,18 @@ describe("Auth (e2e)", () => {
 		return expiredAccessToken;
 	}
 
-	async function makeRefreshTokenExpired() {
-		const refreshTokenDuration = env.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
-			infer: true,
-		});
+	async function makeRefreshTokenExpired(
+		persistSession: boolean = false,
+		forceShortTtl: boolean = false,
+	) {
+		const refreshTokenDuration = env.configService.getOrThrow(
+			persistSession && !forceShortTtl
+				? "REFRESH_TOKEN_DURATION"
+				: "REFRESH_TOKEN_SHORT_DURATION",
+			{
+				infer: true,
+			},
+		);
 
 		const refreshToken = extractCookie("refreshToken", env.users.cookies);
 
@@ -51,7 +59,7 @@ describe("Auth (e2e)", () => {
 		const time = new Date(Date.now() - refreshTokenDuration * 1000 - 1000);
 		await env.db
 			.update(sessions)
-			.set({ createdAt: time, updatedAt: time })
+			.set({ persist: persistSession, createdAt: time, updatedAt: time })
 			.where(eq(sessions.token, refreshToken));
 	}
 
@@ -63,6 +71,7 @@ describe("Auth (e2e)", () => {
 					.send({
 						email: env.users.user.email,
 						password: env.users.userPassword,
+						persistSession: true,
 						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
@@ -70,7 +79,8 @@ describe("Auth (e2e)", () => {
 					.expect(
 						// TODO@supertest: the case is wrong because of a bug in supertest, fix all TODOs in tag when this eventually fails
 						expectCookies
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "accesstoken",
 								options: {
 									httponly: true,
@@ -82,7 +92,8 @@ describe("Auth (e2e)", () => {
 									),
 								},
 							})
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "refreshtoken",
 								options: {
 									httponly: true,
@@ -108,6 +119,35 @@ describe("Auth (e2e)", () => {
 					infer: true,
 				});
 				assert.strictEqual(tokenPayload.exp - tokenPayload.iat, accessTokenDuration);
+			});
+
+			test("POST short-lived session 200", async () => {
+				await env.request
+					.post("/auth/login")
+					.send({
+						email: env.users.user.email,
+						password: env.users.userPassword,
+						persistSession: false,
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.expect("Content-Type", /json/)
+					.expect(
+						// TODO@supertest: the case is wrong because of a bug in supertest, fix all TODOs in tag when this eventually fails
+						// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+						expectCookies.contain({
+							name: "refreshtoken",
+							options: {
+								httponly: true,
+								"max-age": env.configService.getOrThrow(
+									"REFRESH_TOKEN_SHORT_DURATION",
+									{
+										infer: true,
+									},
+								),
+							},
+						}),
+					);
 			});
 
 			for (const { test: testName, data, status } of [
@@ -206,7 +246,8 @@ describe("Auth (e2e)", () => {
 					.expect(
 						// TODO@supertest
 						expectCookies
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "accesstoken",
 								options: {
 									httponly: true,
@@ -218,12 +259,13 @@ describe("Auth (e2e)", () => {
 									),
 								},
 							})
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "refreshtoken",
 								options: {
 									httponly: true,
 									"max-age": env.configService.getOrThrow(
-										"REFRESH_TOKEN_DURATION",
+										"REFRESH_TOKEN_SHORT_DURATION",
 										{
 											infer: true,
 										},
@@ -267,6 +309,39 @@ describe("Auth (e2e)", () => {
 					.expect("Content-Type", /json/);
 			});
 
+			test("POST long-lived session 200", async () => {
+				const response = await env.request
+					.post("/auth/login")
+					.send({
+						email: env.users.user.email,
+						password: env.users.userPassword,
+						persistSession: true,
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.expect("Content-Type", /json/);
+
+				const cookies = convertResponseCookiesToRequestCookies(response);
+				await env.request
+					.post("/auth/refresh")
+					.set("Cookie", cookies)
+					.expect(200)
+					.expect("Content-Type", /json/)
+					.expect(
+						// TODO@supertest
+						// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+						expectCookies.contain({
+							name: "refreshtoken",
+							options: {
+								httponly: true,
+								"max-age": env.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+									infer: true,
+								}),
+							},
+						}),
+					);
+			});
+
 			test("POST 401 invalid refresh token", async () => {
 				await testAuthRefreshFails("refreshToken=notavalidtoken", 401);
 			});
@@ -299,11 +374,13 @@ describe("Auth (e2e)", () => {
 					.expect("Content-Type", /json/)
 					.expect(
 						expectCookies
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "accesstoken",
 								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
 							})
-							.set({
+							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
+							.contain({
 								name: "refreshtoken",
 								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
 							}),
@@ -351,6 +428,26 @@ describe("Auth (e2e)", () => {
 					.post("/auth/logout")
 					.set("Cookie", env.users.cookies)
 					.expect(401)
+					.expect("Content-Type", /json/);
+			});
+
+			test("POST 401 expired token long-lived session", async () => {
+				await makeRefreshTokenExpired(true);
+
+				await env.request
+					.post("/auth/logout")
+					.set("Cookie", env.users.cookies)
+					.expect(401)
+					.expect("Content-Type", /json/);
+			});
+
+			test("POST 200 session lived past short-lived ttl but not long-lived", async () => {
+				await makeRefreshTokenExpired(true, true);
+
+				await env.request
+					.post("/auth/logout")
+					.set("Cookie", env.users.cookies)
+					.expect(200)
 					.expect("Content-Type", /json/);
 			});
 		});

@@ -12,7 +12,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
-import { SESSION_EXPIRED_ERROR } from "openselves-common";
+import { MISSING_REFRESH_TOKEN_COOKIE, SESSION_EXPIRED_ERROR } from "openselves-common";
 
 import { type ConfigData } from "../config.data.js";
 import { LoginDto } from "./data/login.dto.js";
@@ -34,9 +34,12 @@ export class AuthController {
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
 		const user = await this.userService.getUserWithPassword({ email: loginDto.email });
 		if (user && (await this.userService.verifyPassword(user, loginDto.password))) {
-			const session = await this.sessionService.createSession(user.id);
+			const session = await this.sessionService.createSession(
+				user.id,
+				!!loginDto.persistSession,
+			);
 			const accessToken = await this.sessionService.makeAccessToken(user);
-			this.setAuthCookies(accessToken, session.token, response);
+			this.setAuthCookies(accessToken, session.token, session.persist, response);
 			return {
 				userId: user.id,
 			};
@@ -74,13 +77,13 @@ export class AuthController {
 			throw new InternalServerErrorException("User was not loaded with old session");
 		}
 
-		const newSession = await this.sessionService.refreshSession(session.token);
+		const newSession = await this.sessionService.refreshSession(session.token, session.persist);
 		if (!newSession) {
 			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
 		}
 
 		const accessToken = await this.sessionService.makeAccessToken(user);
-		this.setAuthCookies(accessToken, newSession.token, response);
+		this.setAuthCookies(accessToken, newSession.token, session.persist, response);
 		return {};
 	}
 
@@ -105,19 +108,31 @@ export class AuthController {
 	private getRefreshTokenFromRequest(request: Request) {
 		const refreshToken = request.cookies["refreshToken"] as unknown;
 		if (typeof refreshToken !== "string") {
-			throw new UnauthorizedException("Missing refreshToken cookie");
+			throw new UnauthorizedException({
+				name: MISSING_REFRESH_TOKEN_COOKIE,
+				description: "Missing refreshToken cookie",
+			});
 		}
 		return refreshToken;
 	}
 
-	private setAuthCookies(accessToken: string, refreshToken: string, response: Response) {
+	private setAuthCookies(
+		accessToken: string,
+		refreshToken: string,
+		persistSession: boolean,
+		response: Response,
+	) {
 		response.cookie("accessToken", accessToken, {
 			httpOnly: true,
 			maxAge: this.configService.getOrThrow("ACCESS_TOKEN_DURATION", { infer: true }) * 1000,
 		});
 		response.cookie("refreshToken", refreshToken, {
 			httpOnly: true,
-			maxAge: this.configService.getOrThrow("REFRESH_TOKEN_DURATION", { infer: true }) * 1000,
+			maxAge:
+				this.configService.getOrThrow(
+					persistSession ? "REFRESH_TOKEN_DURATION" : "REFRESH_TOKEN_SHORT_DURATION",
+					{ infer: true },
+				) * 1000,
 		});
 	}
 }

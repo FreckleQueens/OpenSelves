@@ -5,8 +5,8 @@ import {
 	USER_DATA_STORAGE_KEY,
 	apiState,
 	needsApiLogout,
-	refreshUserData,
 	scheduleOnlineCheck,
+	scheduleRefreshUserData,
 	tryApiLogout,
 } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
@@ -69,11 +69,11 @@ export async function initApp() {
 			!appState.userData.isEmailVerified ||
 			appState.userData.newEmailRequest
 		) {
-			await refreshUserData();
+			scheduleRefreshUserData(0);
 		}
-	}
-
-	if (await needsApiLogout()) {
-		await tryApiLogout(5000, false);
+	} else {
+		if (await needsApiLogout()) {
+			await tryApiLogout(5000, false);
+		}
 	}
 }

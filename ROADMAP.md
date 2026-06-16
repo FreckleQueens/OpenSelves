@@ -196,10 +196,12 @@ deadline or ETA
 - [x] display list of unauthenticated users with locally stored data in auth settings
 - [x] allow wiping data by-user while unauthenticated
 - [x] add warning popup when user is logged out without wiping data
-- [ ] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
+- [x] add "This is a safe, personal device - remember me" checkbox to opt in for a persistent refreshToken and default to
 a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
 - [x] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
+- [ ] fix: email not verified warning stays when logging out
+- [ ] find an alternative to playwright
 
 ## 0.7.0 - Import data from Simply Plural
 - [ ] simply plural data importer (save all simply plural ids!)

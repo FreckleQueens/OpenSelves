@@ -4,7 +4,7 @@
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import type { OSFormData } from "$lib/forms";
-	import { BlockTitle, Link, List, ListInput, ListItem } from "konsta/svelte";
+	import { BlockTitle, Link, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 
 	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
@@ -42,15 +42,28 @@
 			{#snippet media()}
 				<PasswordIcon input />
 			{/snippet}
-		</ListInput>
-		<ListItem>
-			{#snippet after()}
+			<div class="flex justify-end p-4">
 				<Link
 					href={resolve("/auth/recover-password") +
 						(formState.data["email"] ? "?email=" + formState.data["email"] : "")}
 				>
 					Forgot password?
 				</Link>
+			</div>
+		</ListInput>
+	</List>
+
+	<List inset>
+		<ListItem label title={t("This is a safe, personal device - remember me")}>
+			{#snippet media()}
+				<Toggle
+					id="persist-session-checkbox"
+					checked={!!formState.data["persistSession"]}
+					onChange={() => {
+						const currentValue = formState.data["persistSession"] === "true";
+						formState.data["persistSession"] = currentValue ? "false" : "true";
+					}}
+				/>
 			{/snippet}
 		</ListItem>
 	</List>

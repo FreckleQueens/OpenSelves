@@ -130,6 +130,7 @@
 	"The server was updated to a more recent version. Do you want to try to update the app?": "Le serveur a été mis à jour vers une version plus récente. Voulez-vous essayer de mettre à jour l'application ?",
 	"This action is <strong>irreversible</strong>.": "Cette action est <strong>irréversible</strong>.",
 	"This file is too big! (max {file.size})": "Ce fichier est trop volumineux ! (max {file.size})",
+	"This is a safe, personal device - remember me": "Ceci est un appareil personnel et sécurisé - rester connecté.es",
 	"This is provided by the website's administrator. It may be required to be allowed to create a new account.": "Cette valeur est fournie par l'administrateur.ice du site. Elle est peut-être nécessaire pour pouvoir créer un compte.",
 	"This will delete the profile for {email} and all associated data.": "Le profil dont l'adresse mail est {email} ainsi que toutes les données associées seront supprimés.",
 	"This will mark all front entries as ended.": "Cela marquera toutes les présences comme terminées.",

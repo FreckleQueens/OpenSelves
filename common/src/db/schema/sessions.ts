@@ -1,4 +1,4 @@
-import { camelCase, text } from "drizzle-orm/pg-core";
+import { boolean, camelCase, text } from "drizzle-orm/pg-core";
 import { timestamps } from "./utils.js";
 import { users } from "./users.js";
 
@@ -9,6 +9,7 @@ export const sessions = camelCase.table("sessions", {
 		.references(() => users.id, {
 			onDelete: "cascade",
 		}),
+	persist: boolean().notNull().default(false),
 	...timestamps(),
 });
 export type Session = typeof sessions.$inferSelect;

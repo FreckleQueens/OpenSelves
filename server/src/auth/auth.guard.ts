@@ -5,7 +5,6 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { JwtService } from "@nestjs/jwt";
 import { type Request } from "express";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
 
@@ -13,10 +12,7 @@ import { Public } from "./decorators/public.decorator.js";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-	constructor(
-		private readonly jwtService: JwtService,
-		private readonly reflector: Reflector,
-	) {}
+	constructor(private readonly reflector: Reflector) {}
 
 	public canActivate(context: ExecutionContext): boolean {
 		const publicAccessSettings = this.reflector.getAllAndOverride(Public, [
@@ -28,10 +24,6 @@ export class AuthGuard implements CanActivate {
 		const request = context.switchToHttp().getRequest<Request>();
 		const { accessTokenPayload, accessTokenParseError } = request;
 
-		if (accessTokenParseError) {
-			throw new UnauthorizedException(accessTokenParseError);
-		}
-
 		if (isPublic) {
 			if (!publicAccessSettings.allowAuthenticatedUsers && accessTokenPayload !== undefined) {
 				throw new UnauthorizedException();
@@ -41,9 +33,14 @@ export class AuthGuard implements CanActivate {
 		}
 
 		if (accessTokenPayload === undefined) {
-			throw new UnauthorizedException({
-				name: TOKEN_EXPIRED_ERROR,
-			});
+			throw new UnauthorizedException(
+				{
+					name: TOKEN_EXPIRED_ERROR,
+				},
+				{
+					cause: accessTokenParseError,
+				},
+			);
 		}
 
 		return true;
