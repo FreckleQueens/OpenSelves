@@ -107,16 +107,12 @@ export async function verifyEmail(page: Page) {
 		await page.goto("/account");
 	}
 
-	await page.waitForSelector("#email-status.ready");
-	assert(await page.isVisible("#email-status.unverified"));
-	assert(!(await page.isVisible("#email-status.verified")));
+	await page.waitForSelector("#email-status.ready.unverified");
 
 	await gotoLastEmailLink(page);
 	await page.locator("#success-continue-button").click();
 	await page.waitForURL("/front");
 
 	await page.goto("/account");
-	await page.waitForSelector("#email-status.ready");
-	assert(!(await page.isVisible("#email-status.unverified")));
-	assert(await page.isVisible("#email-status.verified"));
+	await page.waitForSelector("#email-status.ready.verified");
 }
