@@ -39,6 +39,7 @@
 			errors: {},
 			generalError: "",
 			endpoint: "/auth/login",
+			isUnauthenticated: true,
 			data: {},
 			submitWorkingStatus: t("Authenticating..."),
 			onSuccess: async (result: object) => {
@@ -56,6 +57,7 @@
 			errors: {},
 			generalError: "",
 			endpoint: "/user",
+			isUnauthenticated: true,
 			data: {},
 			submitWorkingStatus: t("Creating account..."),
 			onSuccess: () => (registerSuccessDialogOpen = true),

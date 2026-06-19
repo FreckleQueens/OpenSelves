@@ -21,6 +21,7 @@
 		try {
 			await call("/user/" + params.userId + "/verify-email/" + params.token, {
 				method: "POST",
+				isUnauthenticated: true,
 			});
 		} catch (e) {
 			verified = false;

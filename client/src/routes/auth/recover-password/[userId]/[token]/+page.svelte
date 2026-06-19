@@ -28,6 +28,7 @@
 	formName="recover-password"
 	formData={{ token: params["token"] }}
 	endpoint={"/user/" + params["userId"] + "/recover-password"}
+	unauthenticated
 	title={t("Change password")}
 	submitButtonText={t("Change password")}
 	submitWorkingStatus={t("Changing password...")}

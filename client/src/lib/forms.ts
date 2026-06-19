@@ -17,6 +17,7 @@ export type OSFormData = FormValidationState & {
 	endpoint: string;
 	method?: "GET" | "POST" | "PUT" | "PATCH";
 	data: Record<string, string>;
+	isUnauthenticated?: boolean;
 	onSuccess: (result: object) => Promise<unknown> | unknown;
 	beforeSubmit?: () => Promise<boolean> | boolean;
 	isWorking?: boolean;
@@ -30,6 +31,7 @@ export type OSFormProps = {
 	formData?: OSFormData["data"];
 	endpoint: string;
 	method?: OSFormData["method"];
+	unauthenticated?: boolean;
 	submitWorkingStatus: string;
 	captcha?: boolean;
 	captchaAction?: CaptchaAction;
@@ -71,15 +73,16 @@ export async function submitOSForm(form: OSFormData) {
 
 		form.workingStatus = form.submitWorkingStatus;
 
-		let response: Response;
+		let result: { response: Response; responseBody: Record<string, unknown> } | undefined;
 		try {
-			response = await call(form.endpoint, {
+			result = await call(form.endpoint, {
 				method: form.method || "POST",
 				data: form.data,
-				returnRawResponse: true,
+				returnUnhandledResponses: true,
+				isUnauthenticated: form.isUnauthenticated,
 			});
 
-			if (!response) {
+			if (!result) {
 				appState.isApiReachable = false;
 				scheduleOnlineCheck();
 				return;
@@ -96,13 +99,16 @@ export async function submitOSForm(form: OSFormData) {
 			}
 			return;
 		}
-		const result = await response.json();
 
-		if (!response.ok) {
-			form.generalError = result.message;
+		if (!result.response.ok) {
+			if (typeof result.responseBody.message === "string") {
+				form.generalError = result.responseBody.message;
+			} else {
+				throw new Error("Unhandled form response", { cause: result });
+			}
 			return;
 		}
-		await form.onSuccess(result);
+		await form.onSuccess(result.responseBody);
 	} finally {
 		form.isWorking = false;
 	}

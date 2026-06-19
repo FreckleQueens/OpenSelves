@@ -187,7 +187,7 @@ export class SyncWorker {
 		console.debug("Attachments to push:", pendingAttachments);
 
 		if (formattedLogs.length > 0) {
-			const response = await call("/sync/push", {
+			const result = await call("/sync/push", {
 				method: "PUT",
 				data: {
 					logs: formattedLogs,
@@ -195,8 +195,8 @@ export class SyncWorker {
 				attachments: pendingAttachments,
 			});
 
-			if (!response || typeof response !== "object") {
-				console.debug("push failed with response", response);
+			if (!result) {
+				console.debug("push failed with response", result);
 				return false;
 			}
 
@@ -232,19 +232,19 @@ export class SyncWorker {
 		const reqTimestamp =
 			currentTimestamp && Number.isFinite(currentTimestamp) ? currentTimestamp : "init";
 		console.debug("timestamp:", currentTimestamp, reqTimestamp);
-		const response = await call("/sync/pull", {
+		const result = await call("/sync/pull", {
 			method: "POST",
 			data: {
 				timestamp: reqTimestamp,
 			},
 		});
 
-		if (!response || typeof response !== "object") {
-			console.debug("pull failed with response", response);
+		if (!result) {
+			console.debug("pull failed with response", result);
 			return;
 		}
 
-		const logs = response["logs"];
+		const logs = result.responseBody["logs"];
 		console.debug("Logs to apply:", logs);
 		if (Array.isArray(logs)) {
 			for (const log of logs) {
@@ -284,7 +284,7 @@ export class SyncWorker {
 			}
 		}
 
-		const timestamp = response["timestamp"];
+		const timestamp = result.responseBody["timestamp"];
 		if (typeof timestamp === "number") {
 			await storage.setForUser(userId, "timestamp", timestamp.toString());
 		}

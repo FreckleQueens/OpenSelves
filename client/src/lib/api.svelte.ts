@@ -61,8 +61,11 @@ async function refreshUserData() {
 
 	const storage = PersistentStorage.getInstance();
 	const userId = storage.getUserId();
-	const response = await call(`/user/${userId}`);
-	appState.userData = parseApiResult(GetUser, response);
+	const result = await call(`/user/${userId}`);
+	if (!result) {
+		throw new Error("Couldn't fetch user data");
+	}
+	appState.userData = parseApiResult(GetUser, result.responseBody);
 	await storage.set(USER_DATA_STORAGE_KEY, JSON.stringify(appState.userData));
 }
 
@@ -92,11 +95,12 @@ export function scheduleRefreshUserData(delay: number = 5000) {
 	}, delay);
 }
 
-export type CallOptions<RawResponse extends true | false> = {
+export type CallOptions = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	data?: Record<string, unknown>;
 	attachments?: Attachment[];
-	returnRawResponse?: RawResponse;
+	returnUnhandledResponses?: boolean;
+	isUnauthenticated?: boolean;
 };
 
 export enum CallResult {
@@ -113,20 +117,8 @@ const baseApiRequestHeaders = {
 
 export async function callRaw(
 	path: string,
-	options: CallOptions<true>,
-): Promise<CallResult | Response>;
-export async function callRaw(
-	path: string,
-	options?: CallOptions<false>,
-): Promise<CallResult | Record<string, unknown>>;
-export async function callRaw(
-	path: string,
-	options?: CallOptions<true | false>,
-): Promise<CallResult | Response | Record<string, unknown>>;
-export async function callRaw(
-	path: string,
-	options?: CallOptions<true | false>,
-): Promise<CallResult | Response | Record<string, unknown>> {
+	options?: CallOptions,
+): Promise<CallResult | { response: Response; responseBody: Record<string, unknown> }> {
 	const isFileUpload = (options?.attachments?.length || 0) > 0;
 
 	const headers: Record<string, string> = { ...baseApiRequestHeaders };
@@ -167,9 +159,7 @@ export async function callRaw(
 
 		try {
 			response = await tryFetch();
-			if (!options?.returnRawResponse) {
-				responseBody = await response.json();
-			}
+			responseBody = await response.json();
 		} catch (error) {
 			console.debug(
 				"attempt",
@@ -191,13 +181,6 @@ export async function callRaw(
 			return CallResult.WRONG_VERSION;
 		}
 
-		if (options?.returnRawResponse) {
-			if (!response) {
-				continue;
-			}
-			return response;
-		}
-
 		if (!response || !(response instanceof Response) || !responseBody) {
 			if (!(await isApiReachable())) {
 				return CallResult.API_UNREACHABLE;
@@ -209,9 +192,16 @@ export async function callRaw(
 			break;
 		}
 
-		if (response.status === 401 && responseBody.name === TOKEN_EXPIRED_ERROR) {
+		if (
+			!options?.isUnauthenticated &&
+			response.status === 401 &&
+			responseBody.name === TOKEN_EXPIRED_ERROR
+		) {
 			const result = await refreshAuth();
-			console.debug("refreshAuth", result);
+			console.debug(
+				"refreshAuth",
+				typeof result === "boolean" ? result : CallResult[result].toString(),
+			);
 			if (
 				result === CallResult.SESSION_EXPIRED ||
 				(attempt === 2 && result === CallResult.MISSING_REFRESH_TOKEN_COOKIE)
@@ -226,37 +216,34 @@ export async function callRaw(
 			return CallResult.WRONG_VERSION;
 		}
 
+		if (options?.returnUnhandledResponses) {
+			if (!response) {
+				continue;
+			}
+			return { response, responseBody };
+		}
+
 		throw new Error(
 			`Unhandled call response for status ${response.status} ${response.statusText}`,
 			{ cause: responseBody },
 		);
 	}
 
-	if (!responseBody) {
+	if (!response || !responseBody) {
 		return CallResult.API_UNREACHABLE;
 	}
 
-	return responseBody;
+	return {
+		response,
+		responseBody,
+	};
 }
 
-export async function call(path: string, options: CallOptions<true>): Promise<Response>;
 export async function call(
 	path: string,
-	options?: CallOptions<false>,
-): Promise<Record<string, unknown> | undefined>;
-export async function call(
-	path: string,
-	options?: CallOptions<true | false>,
-): Promise<Record<string, unknown> | Response | undefined>;
-export async function call(
-	path: string,
-	options?: CallOptions<true | false>,
-): Promise<Record<string, unknown> | Response | undefined> {
+	options?: CallOptions,
+): Promise<{ response: Response; responseBody: Record<string, unknown> } | undefined> {
 	const result = await callRaw(path, options);
-
-	if (options?.returnRawResponse && result instanceof Response) {
-		return result;
-	}
 
 	switch (result) {
 		case CallResult.SESSION_EXPIRED:
@@ -402,7 +389,7 @@ export async function tryApiLogout(delay: number = 0, firstCall: boolean = true)
 			const result = await call("/auth/logout", {
 				method: "POST",
 			});
-			if (result && typeof result === "object") {
+			if (result) {
 				console.debug("Api logout success!");
 				await storage.delete(NEEDS_API_LOGOUT_STORAGE_KEY, true);
 				return;
