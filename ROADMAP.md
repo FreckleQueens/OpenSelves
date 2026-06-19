@@ -200,7 +200,11 @@ deadline or ETA
 a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
 - [x] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
+- [x] fix: create/update front and delete its member in the same request 500
 - [ ] fix: email not verified warning stays when logging out
+- [ ] fix: member images hosted in object storage are not cached by the client (should be cached forever)
+
+## 0.6.1
 - [ ] find an alternative to playwright
 
 ## 0.7.0 - Import data from Simply Plural
@@ -209,24 +213,28 @@ a short-lived one
 
 ## 0.8.0 - Optimizations
 - [ ] client
-    - [ ] drop prior unsynced create and update operations when deleting a record
-    - [ ] leverage @capacitor/background-runner
-    - [ ] leverage Background Sync API when available
-    - [ ] detect unused translations and fail build
+  - [ ] drop prior unsynced create and update operations when deleting a record
+  - [ ] leverage @capacitor/background-runner
+  - [ ] leverage Background Sync API when available
+  - [ ] detect unused translations and fail build
 - [ ] server
-    - [ ] purge logs that don't have an effect anymore
-    - [ ] use @nestjs/cache-manager to cache s3 get responses
-    - [ ] throttle requests using @nestjs/throttler
-    - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
-    - [ ] turn on Secure flag on cookies (except in dev and test mode)
-    - [ ] lock rows in sync engine operations transaction
+  - [ ] preload all records used by sub-functions of computeOperations (solveHistory, filterCascadeDeletedRecordsOperations...) in computeOperations 
+  - [ ] purge logs that don't have an effect anymore
+  - [ ] use @nestjs/cache-manager to cache s3 get responses
+  - [ ] throttle requests using @nestjs/throttler
+  - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
+  - [ ] turn on Secure flag on cookies (except in dev and test mode)
+  - [ ] lock rows in sync engine operations transaction
 
 ## 0.9.0 - Exclusive-offline mode
-- [ ] add data export to json
-- [ ] add data import from json
-- [ ] add an option to use the app without an account
+- [ ] add data export to zip file (json files + image files)
+- [ ] add data import from zip file
+- [ ] add data export to a consolidated json
+- [ ] add an option to create a local profile without registering an account
+- [ ] add an option to switch to a local profile without authentication
 - [ ] warn the user that using the app in this mode has potential data loss risks and that they should backup their data regularly
 - [ ] add data backup reminder
+- [ ] add a way to copy data to the active local profile from any other local profile
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
 
 ## 0.10.0 - UI tweaks

@@ -744,6 +744,41 @@ describe(pushEndpoint, () => {
 			);
 		});
 
+		test("PUT create front and delete its member in the same request 200", async () => {
+			const { createLog: memberCreateLog } = await createMember();
+			const { createLog: frontCreateLog } = makeFrontWithLog(new Date(), memberCreateLog);
+
+			const deleteLog = {
+				...memberCreateLog,
+				id: createId(),
+				operationType: "delete",
+				executedAt: new Date(),
+			} satisfies ClientLog;
+			delete deleteLog.data;
+
+			await putLogs([frontCreateLog, deleteLog], 200);
+		});
+
+		test("PUT update front and delete its member in the same request 200", async () => {
+			const { createLog, memberCreateLog } = await createFrontEntry();
+
+			const updateLog = {
+				...createLog,
+				id: createId(),
+				operationType: "update",
+				executedAt: new Date(),
+			} satisfies ClientLog;
+			const deleteLog = {
+				...memberCreateLog,
+				id: createId(),
+				operationType: "delete",
+				executedAt: new Date(),
+			} satisfies ClientLog;
+			delete deleteLog.data;
+
+			await putLogs([updateLog, deleteLog], 200);
+		});
+
 		async function setupLogMatrix() {
 			const member = await createMember(new Date(0));
 			const client1Logs: ClientLog[] = [

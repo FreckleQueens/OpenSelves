@@ -7,21 +7,21 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createId } from "@paralleldrive/cuid2";
-import { DrizzleQueryError, SQL, and, eq, inArray, sql } from "drizzle-orm";
-import { PgAsyncTransaction } from "drizzle-orm/pg-core";
-import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
+import { DrizzleQueryError, SQL, and, eq, inArray, or, sql } from "drizzle-orm";
+import type { KeysMatching } from "openselves-common";
 import {
 	type Front,
-	type FrontCreate,
 	type Log,
 	type Member,
-	type MemberCreate,
+	type Model,
+	type ModelCreate,
+	type ModelUpdate,
+	type Transaction,
 	type User,
 	fronts,
 	logs,
 	members,
 	models,
-	type relations,
 } from "openselves-common/db";
 
 import type { ConfigData } from "../config.data.js";
@@ -36,32 +36,51 @@ import {
 } from "./data/push.dto.js";
 import { S3Service } from "./s3.service.js";
 
-type SyncedModelParams<T extends TableMap = TableMap> = {
-	name: T["table"];
-	table: (typeof models)[T["table"]];
-	modelIdLogKey: keyof (typeof models)["logs"] & T["modelIdLogKey"];
+export type SyncedModelCreate<K extends keyof typeof models> = Omit<ModelCreate<K>, "userId"> & {
+	id: string;
 };
-type SyncedModels<T extends TableMap = TableMap> = Record<T["table"], SyncedModelParams<T>>;
+export type SyncedModelUpdate<K extends keyof typeof models> = Omit<
+	ModelUpdate<K>,
+	"userId" | "id" | "createdAt" | "updatedAt"
+>;
 
 /**
  * !!ORDER MATTERS!!
  * Must be ordered by cascade delete dependency so that deleting from next model won't cascade
  * delete from previous model.
  */
-export const syncedModels: SyncedModels = {
+export const syncedModels = {
 	members: {
 		name: "members",
 		table: members,
 		modelIdLogKey: "memberId",
+		cascadeDeletes: {
+			fronts: "memberId",
+		},
 	},
 	fronts: {
 		name: "fronts",
 		table: fronts,
 		modelIdLogKey: "frontId",
+		cascadeDeletes: undefined,
 	},
+} satisfies {
+	[M in keyof typeof models]?: {
+		name: M;
+		table: (typeof models)[M];
+		modelIdLogKey: KeysMatching<Model<"logs">, string | null>;
+		cascadeDeletes:
+			| {
+					[CM in Exclude<keyof typeof models, M>]?: KeysMatching<
+						SyncedModelCreate<CM>,
+						string
+					>;
+			  }
+			| undefined;
+	};
 };
 
-type LogToSave<Op extends OperationType = OperationType> = Omit<
+type LogOperation<Op extends OperationType = OperationType> = Omit<
 	PushLogDto<Op>,
 	"memberId" | "frontId" | "deletedId" | "pushedAt"
 > & {
@@ -69,40 +88,29 @@ type LogToSave<Op extends OperationType = OperationType> = Omit<
 	frontId: Op["recordId"];
 	deletedId: Op["deletedId"];
 };
-type Transaction = PgAsyncTransaction<PostgresJsQueryResultHKT, typeof relations>;
 
-type TableMap =
-	| {
-			table: "members";
-			selectData: Member;
-			createData: Omit<MemberCreate, "userId">;
-			deleteId: Member["id"];
-			modelIdLogKey: "memberId";
-	  }
-	| {
-			table: "fronts";
-			selectData: Front;
-			createData: Omit<FrontCreate, "userId">;
-			deleteId: Front["id"];
-			modelIdLogKey: "frontId";
-	  };
-type UpdateData<Type> = Partial<Omit<Type, "userId" | "id" | "createdAt" | "updatedAt">>;
-
-type RecordsToCreate<T extends TableMap = TableMap> = {
-	[P in T["table"]]?: T["createData"][];
+type RecordsToCreate = {
+	[K in keyof typeof syncedModels]?: SyncedModelCreate<K>[];
 };
-type RecordsToUpdate<T extends TableMap = TableMap> = {
-	[P in T["table"]]?: {
-		id: Member["id"];
-		data: UpdateData<T["createData"]>;
+type RecordsToUpdate = {
+	[K in keyof typeof syncedModels]?: {
+		id: Model<K>["id"];
+		data: SyncedModelUpdate<K>;
 	}[];
 };
-type RecordsToDelete<T extends TableMap = TableMap> = {
-	[P in T["table"]]?: T["deleteId"][];
+type RecordsToDelete = {
+	[K in keyof typeof syncedModels]?: Model<K>["id"][];
 };
 type UserAttachment = {
 	logId: string;
 	dataKey: string;
+};
+
+type CascadeDeletesFromRecordIds = {
+	[ForeignModel in keyof typeof syncedModels]?: {
+		foreignKey: KeysMatching<SyncedModelCreate<ForeignModel>, string>;
+		localIds: string[];
+	};
 };
 
 @Injectable()
@@ -194,12 +202,12 @@ export class SyncService {
 		logDtos: PushLogDto[],
 		alreadyPushedLogs: Log[],
 	) {
-		let logsToSave: LogToSave[] = logDtos
+		const logs: LogOperation[] = logDtos
 			.filter((log) => !alreadyPushedLogs.find((existingLog) => log.id === existingLog.id))
 			.map((log) => {
 				if (log.operationType === "create") {
 					const logDto = log as PushLogDto<CreateOperation>;
-					const logToSave: LogToSave<CreateOperation> = {
+					const logToSave: LogOperation<CreateOperation> = {
 						memberId: null,
 						frontId: null,
 						...logDto,
@@ -209,7 +217,7 @@ export class SyncService {
 				}
 				if (log.operationType === "update") {
 					const logDto = log as PushLogDto<UpdateOperation>;
-					const logToSave: LogToSave<UpdateOperation> = {
+					const logToSave: LogOperation<UpdateOperation> = {
 						memberId: null,
 						frontId: null,
 						...logDto,
@@ -220,19 +228,15 @@ export class SyncService {
 				if (log.operationType === "delete") {
 					const logDto = log as PushLogDto<DeleteOperation>;
 
-					let model: SyncedModelParams | undefined;
-					if (logDto.memberId) {
-						model = syncedModels.members;
-					}
-					if (logDto.frontId) {
-						model = syncedModels.fronts;
-					}
+					const model = Object.values(syncedModels).find(
+						(model) => logDto[model.modelIdLogKey],
+					);
 					if (!model) {
 						throw new InternalServerErrorException("logDto has no recordId");
 					}
 
 					const deletedId = model.name + "." + logDto[model.modelIdLogKey];
-					const logToSave: LogToSave<DeleteOperation> = {
+					const logToSave: LogOperation<DeleteOperation> = {
 						...logDto,
 						memberId: null,
 						frontId: null,
@@ -244,17 +248,18 @@ export class SyncService {
 			});
 		const recordsToUpdateIds = [
 			...new Set(
-				logsToSave
+				logs
 					.filter((log) => log.operationType === "update")
 					.map((log) => {
-						const inferredLog = log as LogToSave<UpdateOperation>;
-						if (inferredLog.memberId) {
-							return inferredLog.memberId;
+						const inferredLog = log as LogOperation<UpdateOperation>;
+						const model = Object.values(syncedModels).find(
+							(model) => inferredLog[model.modelIdLogKey],
+						);
+						const recordId = model ? inferredLog[model.modelIdLogKey] : null;
+						if (!recordId) {
+							throw new InternalServerErrorException("Missing record id");
 						}
-						if (inferredLog.frontId) {
-							return inferredLog.frontId;
-						}
-						throw new InternalServerErrorException("Missing record id");
+						return recordId;
 					}),
 			),
 		];
@@ -279,11 +284,69 @@ export class SyncService {
 			},
 		});
 
+		const { solvedLogs, attachmentsToDelete } = await this.solveHistory(
+			tx,
+			userId,
+			logs,
+			existingDataLogs,
+		);
+
+		// Remove empty update logs
+		const filteredLogs = solvedLogs.filter(
+			(log) =>
+				log.operationType !== "update" ||
+				Object.keys((log as LogOperation<UpdateOperation>).data).length > 0,
+		);
+
+		// Set attachments to log id
+		const attachmentsProcessedLogs: LogOperation[] = filteredLogs.map((log) => {
+			const outputLog = { ...log };
+			if (outputLog.data) {
+				outputLog.data = { ...outputLog.data };
+				for (const [key, value] of Object.entries(outputLog.data)) {
+					if (typeof value === "string" && value.startsWith("attachment:")) {
+						outputLog.data[key] = "attachment:" + outputLog.id;
+					}
+				}
+			}
+			return outputLog;
+		});
+
+		const recordsToCreate = this.computeCreateOperations(attachmentsProcessedLogs);
+		const recordsToUpdate = this.computeUpdateOperations(attachmentsProcessedLogs);
+		const { cascadeDeletesFromRecordIds, recordsToDelete } =
+			this.computeDeleteOperations(attachmentsProcessedLogs);
+
+		const { filteredRecordsToCreate, filteredRecordsToUpdate, logsToSave } =
+			await this.filterCascadeDeletedRecordsOperations(
+				tx,
+				cascadeDeletesFromRecordIds,
+				recordsToCreate,
+				recordsToUpdate,
+				filteredLogs,
+			);
+
+		return {
+			logsToSave,
+			recordsToCreate: filteredRecordsToCreate,
+			recordsToUpdate: filteredRecordsToUpdate,
+			recordsToDelete,
+			attachmentsToDelete,
+		};
+	}
+
+	private async solveHistory(
+		tx: Transaction,
+		userId: string,
+		logs: LogOperation[],
+		existingDataLogs: Log[],
+	) {
 		const attachmentsToDelete: UserAttachment[] = [];
+		let solvedLogs = logs;
 
 		for (const model of Object.values(syncedModels)) {
 			// Skip update and delete logs for already deleted records
-			const recordIdsToUpdateOrDelete = logsToSave
+			const recordIdsToUpdateOrDelete = solvedLogs
 				.filter(
 					(log) =>
 						["update", "delete"].includes(log.operationType) &&
@@ -310,7 +373,7 @@ export class SyncService {
 						? `${model.name}.${log[model.modelIdLogKey]}`
 						: log.deletedId,
 				);
-				logsToSave = logsToSave.filter((log) => {
+				solvedLogs = solvedLogs.filter((log) => {
 					const id = log[model.modelIdLogKey]
 						? `${model.name}.${log[model.modelIdLogKey]}`
 						: log.deletedId;
@@ -320,16 +383,16 @@ export class SyncService {
 
 			// Resolve update logs conflicts
 			const mergedHistory: {
-				logToSave?: LogToSave<UpdateOperation>;
+				logToSave?: LogOperation<UpdateOperation>;
 				dbLog?: Log;
 				recordId: string;
 				data: Record<string, unknown>;
 				executedAt: Date;
 			}[] = [
-				...logsToSave
+				...solvedLogs
 					.filter((log) => log.operationType === "update" && log[model.modelIdLogKey])
 					.map((log) => {
-						const inferredLog = log as LogToSave<UpdateOperation>;
+						const inferredLog = log as LogOperation<UpdateOperation>;
 						const recordId = inferredLog[model.modelIdLogKey];
 						if (!recordId) {
 							throw new InternalServerErrorException("recordId is null");
@@ -341,12 +404,20 @@ export class SyncService {
 							executedAt: log.executedAt,
 						};
 					}),
-				...existingDataLogs.map((log) => ({
-					dbLog: log,
-					recordId: log[model.modelIdLogKey] as string,
-					data: log.data as Record<string, unknown>,
-					executedAt: log.executedAt,
-				})),
+				...existingDataLogs
+					.filter((log) => log[model.modelIdLogKey])
+					.map((log) => {
+						const recordId = log[model.modelIdLogKey];
+						if (!recordId) {
+							throw new InternalServerErrorException("recordId is null");
+						}
+						return {
+							dbLog: log,
+							recordId,
+							data: log.data as Record<string, unknown>,
+							executedAt: log.executedAt,
+						};
+					}),
 			].sort((step1, step2) => step2.executedAt.getTime() - step1.executedAt.getTime());
 			const dataTrackers: Record<
 				string,
@@ -389,64 +460,54 @@ export class SyncService {
 				dataTracker.data = Object.assign({ ...step.data }, dataTracker.data);
 			}
 		}
+		return { solvedLogs, attachmentsToDelete };
+	}
 
-		// Remove empty update logs
-		logsToSave = logsToSave.filter(
-			(log) =>
-				log.operationType !== "update" ||
-				Object.keys((log as LogToSave<UpdateOperation>).data).length > 0,
-		);
-
-		// Set attachments to log id
-		const logsDataForRecords = logsToSave.map((log) => {
-			const outputLog = { ...log };
-			if (outputLog.data && typeof outputLog.data === "object") {
-				outputLog.data = { ...outputLog.data };
-				for (const [key, value] of Object.entries(outputLog.data)) {
-					if (typeof value === "string" && value.startsWith("attachment:")) {
-						outputLog.data[key] = "attachment:" + outputLog.id;
-					}
-				}
-			}
-			return outputLog;
-		});
-
+	private computeCreateOperations(attachmentsProcessedLogs: LogOperation[]) {
 		const recordsToCreate: RecordsToCreate = {};
-		for (const log of logsDataForRecords.filter((log) => log.operationType === "create")) {
-			const inferredLog = log as LogToSave<CreateOperation>;
-
-			const model: SyncedModelParams | undefined = Object.values(syncedModels).find(
-				(model) => inferredLog[model.modelIdLogKey],
-			);
+		const createLogs = attachmentsProcessedLogs.filter(
+			(log) => log.operationType === "create",
+		) as LogOperation<CreateOperation>[];
+		for (const log of createLogs) {
+			const model = Object.values(syncedModels).find((model) => log[model.modelIdLogKey]);
 			if (!model) {
 				throw new InternalServerErrorException("Tried to create non-synced record");
 			}
 
-			let recordsToCreateArray = recordsToCreate[model.name];
-			if (!recordsToCreateArray) {
-				recordsToCreate[model.name] = recordsToCreateArray = [];
-			}
-
-			const recordId = inferredLog[model.modelIdLogKey];
+			const recordId = log[model.modelIdLogKey];
 			if (!recordId) {
 				throw new InternalServerErrorException("recordId is null for member creation");
 			}
 
-			recordsToCreateArray.push({
-				...inferredLog.data,
+			let modelRecordsToCreate = recordsToCreate[model.name] as SyncedModelCreate<
+				keyof typeof syncedModels
+			>[];
+			if (!modelRecordsToCreate) {
+				recordsToCreate[model.name] = modelRecordsToCreate = [];
+			}
+
+			modelRecordsToCreate.push({
+				...log.data,
 				id: recordId,
 			});
 		}
+		return recordsToCreate;
+	}
 
+	private computeUpdateOperations(attachmentsProcessedLogs: LogOperation[]) {
 		const recordsToUpdate: RecordsToUpdate = {};
-		for (const log of logsDataForRecords.filter((log) => log.operationType === "update")) {
-			const inferredLog = log as LogToSave<UpdateOperation>;
-
-			const model: SyncedModelParams | undefined = Object.values(syncedModels).find(
-				(model) => inferredLog[model.modelIdLogKey],
-			);
+		const updateLogs = attachmentsProcessedLogs.filter(
+			(log) => log.operationType === "update",
+		) as LogOperation<UpdateOperation>[];
+		for (const log of updateLogs) {
+			const model = Object.values(syncedModels).find((model) => log[model.modelIdLogKey]);
 			if (!model) {
 				throw new InternalServerErrorException("Tried to update non-synced record");
+			}
+
+			const recordId = log[model.modelIdLogKey];
+			if (!recordId) {
+				throw new InternalServerErrorException("recordId is null for member creation");
 			}
 
 			let recordsToUpdateArray = recordsToUpdate[model.name];
@@ -454,38 +515,144 @@ export class SyncService {
 				recordsToUpdate[model.name] = recordsToUpdateArray = [];
 			}
 
-			const recordId = inferredLog[model.modelIdLogKey];
-			if (!recordId) {
-				throw new InternalServerErrorException("recordId is null for member creation");
-			}
-
 			recordsToUpdateArray.push({
 				id: recordId,
-				data: { ...inferredLog.data },
+				data: { ...log.data },
 			});
 		}
+		return recordsToUpdate;
+	}
+
+	private computeDeleteOperations(attachmentsProcessedLogs: LogOperation[]) {
+		const cascadeDeletesFromRecordIds: CascadeDeletesFromRecordIds = {};
 
 		const recordsToDelete: RecordsToDelete = {};
-		for (const log of logsDataForRecords.filter((log) => log.operationType === "delete")) {
-			const inferredLog = log as LogToSave<DeleteOperation>;
-			const [tableName, id] = inferredLog.deletedId.split(".");
+		const deleteLogs = attachmentsProcessedLogs.filter(
+			(log) => log.operationType === "delete",
+		) as LogOperation<DeleteOperation>[];
+		for (const log of deleteLogs) {
+			const [tableName, id] = log.deletedId.split(".");
 			const model = Object.values(syncedModels).find((model) => model.name === tableName);
 			if (!model) {
 				throw new InternalServerErrorException("Tried to delete non-synced record");
 			}
+
 			let data = recordsToDelete[model.name];
 			if (!data) {
 				data = recordsToDelete[model.name] = [];
 			}
 			data.push(id);
+
+			if (model.cascadeDeletes) {
+				let foreignModelName: keyof typeof model.cascadeDeletes;
+				for (foreignModelName in model.cascadeDeletes) {
+					let cascadeDelete = cascadeDeletesFromRecordIds[foreignModelName];
+					if (!cascadeDelete) {
+						cascadeDelete = cascadeDeletesFromRecordIds[foreignModelName] = {
+							foreignKey: model.cascadeDeletes[foreignModelName],
+							localIds: [],
+						};
+					}
+
+					cascadeDelete.localIds.push(id);
+				}
+			}
+		}
+		return { cascadeDeletesFromRecordIds, recordsToDelete };
+	}
+
+	private async filterCascadeDeletedRecordsOperations(
+		tx: Transaction,
+		cascadeDeletesFromRecordIds: CascadeDeletesFromRecordIds,
+		recordsToCreate: RecordsToCreate,
+		recordsToUpdate: RecordsToUpdate,
+		logs: LogOperation[],
+	) {
+		let logsToSave = logs;
+		const filteredRecordsToCreate = { ...recordsToCreate };
+		const filteredRecordsToUpdate = { ...recordsToUpdate };
+
+		let foreignModelName: keyof typeof cascadeDeletesFromRecordIds;
+		for (foreignModelName in cascadeDeletesFromRecordIds) {
+			const cascadeDelete = cascadeDeletesFromRecordIds[foreignModelName];
+			if (!cascadeDelete) {
+				continue;
+			}
+
+			const { foreignKey, localIds } = cascadeDelete;
+			const foreignModel = syncedModels[foreignModelName];
+
+			const modelRecordsToCreate = filteredRecordsToCreate[foreignModelName];
+			if (modelRecordsToCreate) {
+				const filteredRecordIds = modelRecordsToCreate
+					.filter((record) => localIds.find((id) => id === record[foreignKey]))
+					.map((record) => record.id);
+
+				(
+					filteredRecordsToCreate as Record<
+						string,
+						SyncedModelCreate<keyof typeof syncedModels>[]
+					>
+				)[foreignModelName] = modelRecordsToCreate.filter(
+					(record) => !filteredRecordIds.includes(record.id),
+				);
+				logsToSave = logsToSave.filter((log) => {
+					const logRecordId = log[foreignModel.modelIdLogKey];
+					return !(
+						log.operationType === "create" &&
+						logRecordId &&
+						filteredRecordIds.includes(logRecordId)
+					);
+				});
+			}
+
+			const modelRecordsToUpdate = recordsToUpdate[foreignModel.name] as Array<{
+				id: string;
+				data: SyncedModelUpdate<keyof typeof syncedModels>;
+			}>;
+			if (modelRecordsToUpdate) {
+				const filteredRecordIds = (
+					await tx
+						.select()
+						.from(foreignModel.table)
+						.where(
+							or(
+								...localIds.map((id) =>
+									and(
+										eq(foreignModel.table[foreignKey], id),
+										inArray(
+											foreignModel.table.id,
+											modelRecordsToUpdate.map((data) => data.id),
+										),
+									),
+								),
+							),
+						)
+				).map((record) => record.id);
+
+				(
+					filteredRecordsToUpdate as Record<
+						string,
+						{ id: string; data: SyncedModelUpdate<keyof typeof syncedModels> }[]
+					>
+				)[foreignModelName] = modelRecordsToUpdate.filter(
+					(record) => !filteredRecordIds.includes(record.id),
+				);
+				logsToSave = logsToSave.filter((log) => {
+					const logRecordId = log[foreignModel.modelIdLogKey];
+					return !(
+						log.operationType === "update" &&
+						logRecordId &&
+						filteredRecordIds.includes(logRecordId)
+					);
+				});
+			}
 		}
 
 		return {
+			filteredRecordsToCreate,
+			filteredRecordsToUpdate,
 			logsToSave,
-			recordsToCreate,
-			recordsToUpdate,
-			recordsToDelete,
-			attachmentsToDelete,
 		};
 	}
 
@@ -497,9 +664,12 @@ export class SyncService {
 		for (const model of Object.values(syncedModels)) {
 			const valuesToInsert = recordsToCreate[model.name];
 			if (valuesToInsert && valuesToInsert.length > 0) {
-				await tx
-					.insert(model.table)
-					.values(valuesToInsert.map((val) => ({ ...val, userId })));
+				await tx.insert(model.table).values(
+					valuesToInsert.map((val: SyncedModelCreate<keyof typeof syncedModels>) => ({
+						...val,
+						userId,
+					})),
+				);
 			}
 		}
 	}
@@ -528,7 +698,9 @@ export class SyncService {
 					}
 				}
 
-				const recordToUpdateIds = [...new Set(updateData.map((data) => data.id))];
+				const recordToUpdateIds = [
+					...new Set(updateData.map(({ id }: { id: string }) => id)),
+				];
 				const updatedRecords = await tx
 					.update(model.table)
 					.set(
@@ -566,7 +738,7 @@ export class SyncService {
 		userId: string,
 		recordsToDelete: RecordsToDelete,
 	) {
-		const allDeletedRecords: TableMap["selectData"][] = [];
+		const allDeletedRecords: Model<keyof typeof syncedModels>[] = [];
 		for (const model of Object.values(syncedModels).reverse()) {
 			const recordsToDeleteIds = recordsToDelete[model.name];
 			if (recordsToDeleteIds && recordsToDeleteIds.length > 0) {
@@ -716,7 +888,7 @@ export class SyncService {
 
 	private async handleLogAttachments(
 		userId: string,
-		logsToSave: LogToSave[],
+		logsToSave: LogOperation[],
 		attachments: Express.Multer.File[],
 		attachmentsToDelete: UserAttachment[],
 	) {

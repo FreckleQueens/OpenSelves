@@ -25,8 +25,10 @@ import type {
 	Log,
 	MemberCreate,
 	MemberUpdate,
+	models,
 } from "openselves-common/db";
 
+import { syncedModels } from "../sync.service.js";
 import { IsCuid2 } from "./is-cuid2.decorator.js";
 
 type OmitBaseFields<K> = Omit<K, "id" | "userId">;
@@ -199,15 +201,29 @@ export class PushCreateFrontDto extends PushUpdateFrontDto implements OmitBaseFi
 	declare public readonly updatedAt: Date;
 }
 
-export type CreateOperation = {
+export const syncedModelsDataDtoTypes = {
+	members: { create: PushCreateMemberDto, update: PushUpdateMemberDto },
+	fronts: { create: PushCreateFrontDto, update: PushUpdateFrontDto },
+} satisfies {
+	[K in keyof typeof syncedModels]: {
+		create: {
+			new (): PushRecordDto & OmitBaseFields<(typeof models)[K]["$inferInsert"]>;
+		};
+		update: {
+			new (): PushRecordDto & OmitBaseFields<Partial<(typeof models)[K]["$inferInsert"]>>;
+		};
+	};
+};
+
+export type CreateOperation<K extends keyof typeof syncedModels = keyof typeof syncedModels> = {
 	type: "create";
-	data: PushCreateMemberDto | PushCreateFrontDto;
+	data: (typeof syncedModelsDataDtoTypes)[K]["create"]["prototype"];
 	recordId: string | null;
 	deletedId: null;
 };
-export type UpdateOperation = {
+export type UpdateOperation<K extends keyof typeof syncedModels = keyof typeof syncedModels> = {
 	type: "update";
-	data: PushUpdateMemberDto | PushUpdateFrontDto;
+	data: (typeof syncedModelsDataDtoTypes)[K]["update"]["prototype"];
 	recordId: string | null;
 	deletedId: null;
 };
@@ -217,7 +233,10 @@ export type DeleteOperation = {
 	recordId: null;
 	deletedId: string;
 };
-export type OperationType = CreateOperation | UpdateOperation | DeleteOperation;
+export type OperationType<K extends keyof typeof syncedModels = keyof typeof syncedModels> =
+	| CreateOperation<K>
+	| UpdateOperation<K>
+	| DeleteOperation;
 
 type ClientPushLog = Omit<
 	Log,
@@ -267,25 +286,18 @@ export class PushLogDto<Op extends OperationType = OperationType> implements Cli
 	})
 	@ValidateNested()
 	@Type((helper) => {
-		const types = {
-			member: [PushCreateMemberDto, PushUpdateMemberDto],
-			front: [PushCreateFrontDto, PushUpdateFrontDto],
-		};
-		let model: keyof typeof types | null = null;
-		if (helper?.object.memberId) {
-			model = "member";
-		}
-		if (helper?.object.frontId) {
-			model = "front";
-		}
-		if (model === null) {
+		const model = Object.values(syncedModels).find(
+			(model) => helper?.object[model.modelIdLogKey],
+		);
+		if (!model) {
 			return Object;
 		}
+		const dtoType = syncedModelsDataDtoTypes[model.name];
 		switch (helper?.object.operationType) {
 			case "create":
-				return types[model][0];
+				return dtoType.create;
 			case "update":
-				return types[model][1];
+				return dtoType.update;
 			case "delete":
 			default:
 				return Object;
