@@ -202,7 +202,7 @@ a short-lived one
 - [x] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
 - [x] fix: create/update front and delete its member in the same request 500
 - [x] fix: email not verified warning stays when logging out
-- [ ] fix: member images hosted in object storage are not cached by the client (should be cached forever)
+- [x] fix: member images hosted in object storage are not cached by the client (should be cached forever)
 
 ## 0.6.1
 - [ ] find an alternative to playwright

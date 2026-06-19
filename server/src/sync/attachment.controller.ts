@@ -1,5 +1,5 @@
 import { type GetObjectCommandOutput, S3ServiceException } from "@aws-sdk/client-s3";
-import { Controller, Get, NotFoundException, Param, Req, Res } from "@nestjs/common";
+import { Controller, Get, Header, NotFoundException, Param, Req, Res } from "@nestjs/common";
 import { type Request, type Response } from "express";
 import { ReadStream } from "node:fs";
 
@@ -14,6 +14,7 @@ export class AttachmentController {
 	) {}
 
 	@Get(":userId/:logId/:fieldName")
+	@Header("Cache-Control", "max-age=31536000, private")
 	public async getAttachment(
 		@Req() request: Request,
 		@Res() response: Response,
