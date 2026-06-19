@@ -53,7 +53,8 @@ test("short lived session logs out", async ({ page }) => {
 	// Wait 2 more second than the configured REFRESH_TOKEN_SHORT_DURATION (see playwright.config.ts)
 	await page.waitForTimeout(12000);
 	await page.goto("/account");
-	await page.waitForURL("/land");
+	await page.waitForTimeout(5000);
+	assert(page.url().endsWith("/land"));
 });
 
 test("long lived session doesn't log out", async ({ page }) => {
