@@ -201,7 +201,7 @@ a short-lived one
 - [x] PWA manifest: change display back to standalone and override theme_color with theme-color meta tag
 - [x] fix: initial sync doesn't set correct attachment url (wrong logId) for member image
 - [x] fix: create/update front and delete its member in the same request 500
-- [ ] fix: email not verified warning stays when logging out
+- [x] fix: email not verified warning stays when logging out
 - [ ] fix: member images hosted in object storage are not cached by the client (should be cached forever)
 
 ## 0.6.1

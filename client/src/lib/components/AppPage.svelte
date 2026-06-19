@@ -183,7 +183,7 @@
 		</div>
 	{/if}
 
-	{#if apiState.status && appState.userData}
+	{#if appState.isAuthenticated && apiState.status && appState.userData}
 		{#if !appState.userData.isEmailVerified}
 			{@const willBeDeletedAt =
 				appState.userData.createdAt.getTime() +
