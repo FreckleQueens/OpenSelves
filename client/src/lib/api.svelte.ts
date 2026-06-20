@@ -1,6 +1,4 @@
 import { dev } from "$app/environment";
-import { goto } from "$app/navigation";
-import { resolve } from "$app/paths";
 import {
 	PUBLIC_DEFAULT_API_URL,
 	PUBLIC_DEFAULT_API_URL_DEV,
@@ -12,6 +10,7 @@ import { appState } from "$lib/appState.svelte.js";
 import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { LocalProfileManager } from "$lib/idb/local-profiles";
+import { gotoHomeRoute } from "$lib/routing-utils";
 import {
 	API_VERSION,
 	GetStatus,
@@ -249,7 +248,10 @@ export async function call(
 		case CallResult.SESSION_EXPIRED:
 			console.debug("Got result", result, "from callRaw");
 			await tryLogout(false);
-			await goto(resolve("/"));
+			await gotoHomeRoute({
+				session_expired: "1",
+				call_path: path,
+			});
 			return undefined;
 		case CallResult.API_UNREACHABLE:
 		case CallResult.MISSING_REFRESH_TOKEN_COOKIE:

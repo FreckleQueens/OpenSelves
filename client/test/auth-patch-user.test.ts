@@ -1,14 +1,16 @@
 import { createId } from "@paralleldrive/cuid2";
 import { test } from "@playwright/test";
 import assert from "node:assert";
+import type { Response } from "playwright";
 
 import {
-	debugSelector,
+	debugPromise,
 	expectNoAppError,
 	getEmailLink,
 	logout,
 	registerAndLoginUser,
 	verifyEmail,
+	waitForRequest,
 } from "./utils";
 
 test("verify email", async ({ page }) => {
@@ -59,8 +61,9 @@ test("change email", async ({ page }) => {
 	await page.locator("input[name=email]").fill(newEmail);
 	await page.locator("#change-email-button").click();
 
-	await debugSelector(page, "#success-dialog-continue-button", 5000);
-	await page.locator("#success-dialog-continue-button").click();
+	await page.locator("#success-dialog-continue-button").click({
+		timeout: 5000,
+	});
 	await page.waitForURL("/account");
 
 	await verifyEmail(page, newEmail);
@@ -103,5 +106,35 @@ test("recover password", async ({ page }) => {
 	await page.fill("input[name=email]", user.email);
 	await page.fill("input[name=password]", newPassword);
 	await page.locator("#login-button").click();
-	await page.waitForURL("/front");
+	await page.waitForURL("/front?user_logged_in=1");
+});
+
+test("send single form page with captcha and expired access token", async ({ page }) => {
+	await registerAndLoginUser(page);
+	await page.goto("/account");
+	await page.locator("[href='/account/change-email']").click();
+	await page.waitForURL("/account/change-email");
+
+	await page.locator("input[name=email]").fill(createId() + "@example.com");
+	let response: Response;
+	do {
+		response = await waitForRequest(page, "/sync/pull");
+	} while (!response.ok());
+	await page.evaluate(() => {
+		window.openselves.SyncWorker.getInstance().pause();
+	});
+	// Wait for access token to expire (see playwright.config.ts)
+	await page.waitForTimeout(4000);
+	await page.locator("#change-email-button").click();
+	await waitForRequest(page, "/user/", false);
+	await waitForRequest(page, "/user/");
+
+	await debugPromise(
+		page,
+		page.locator("#success-dialog-continue-button").click({
+			timeout: 5000,
+		}),
+	);
+	await page.waitForURL("/account");
+	await expectNoAppError(page);
 });

@@ -30,7 +30,7 @@ export async function registerAndLoginUser(page: Page, persistSession: boolean =
 	}
 	await page.locator("#login-button").click();
 
-	await page.waitForURL("/front");
+	await page.waitForURL("/front?user_logged_in=1");
 
 	return {
 		email,
@@ -133,7 +133,7 @@ export async function logout(page: Page) {
 
 	await page.locator("#logout-button").click();
 	await page.locator("#logout-wipe-data-button").click();
-	await page.waitForURL("/land");
+	await page.waitForURL("/land?user_logged_out=1");
 }
 
 export async function verifyEmail(
@@ -156,7 +156,7 @@ export async function verifyEmail(
 	assert(gotoResponse);
 	assert(gotoResponse.ok());
 	await page.locator("#success-continue-button").click();
-	await page.waitForURL("/front");
+	await page.waitForURL("/front?verified_email=1");
 
 	await page.goto("/account");
 	await page.waitForSelector("#email-status.ready.verified", {
@@ -164,11 +164,19 @@ export async function verifyEmail(
 	});
 }
 
-export async function debugSelector(page: Page, selector: string, timeout: number) {
+export async function waitForRequest(page: Page, pathContains: string, expectOk?: boolean) {
+	const response = await page.waitForResponse((response) => {
+		return response.request().url().indexOf(pathContains) >= 0;
+	});
+	if (typeof expectOk === "boolean") {
+		assert.strictEqual(response.ok(), expectOk);
+	}
+	return response;
+}
+
+export async function debugPromise(page: Page, promise: Promise<unknown>) {
 	try {
-		await page.waitForSelector(selector, {
-			timeout,
-		});
+		await promise;
 	} catch (e) {
 		console.error(e);
 		console.error(await page.consoleMessages({ filter: "since-navigation" }));

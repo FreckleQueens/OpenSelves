@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
@@ -14,7 +13,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import { type OSFormData, submitOSForm } from "$lib/forms";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
-	import { requireGuest } from "$lib/routing-utils";
+	import { gotoHomeRoute, requireGuest } from "$lib/routing-utils";
 	import {
 		Block,
 		BlockTitle,
@@ -49,7 +48,9 @@
 				await storage.setUserId(`${result.userId}`);
 				SyncWorker.getInstance().resume();
 				await dismissWarnForRemainingLocalData();
-				await goto(resolve("/"));
+				await gotoHomeRoute({
+					user_logged_in: "1",
+				});
 			},
 		},
 		register: {

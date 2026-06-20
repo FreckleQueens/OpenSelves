@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
-	import { resolve } from "$app/paths";
 	import { transformErrorToReadable } from "$lib";
 	import { call } from "$lib/api.svelte.js";
 	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
@@ -8,6 +6,7 @@
 	import ErrorIcon from "$lib/components/icons/ErrorIcon.svelte";
 	import ReloadIcon from "$lib/components/icons/ReloadIcon.svelte";
 	import VerifiedIcon from "$lib/components/icons/VerifiedIcon.svelte";
+	import { gotoHomeRoute } from "$lib/routing-utils";
 	import { Dialog, DialogButton, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
@@ -44,8 +43,10 @@
 		window.location.reload();
 	}
 
-	function goToAppButtonOnclick() {
-		goto(resolve("/"));
+	async function goToAppButtonOnclick() {
+		await gotoHomeRoute({
+			verified_email: "1",
+		});
 	}
 </script>
 

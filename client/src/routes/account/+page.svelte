@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
@@ -17,7 +16,7 @@
 	import SyncIcon from "$lib/components/icons/SyncIcon.svelte";
 	import SyncOffIcon from "$lib/components/icons/SyncOffIcon.svelte";
 	import VerifiedIcon from "$lib/components/icons/VerifiedIcon.svelte";
-	import { requireAuth } from "$lib/routing-utils";
+	import { gotoHomeRoute, requireAuth } from "$lib/routing-utils";
 	import { BlockTitle, Button, Dialog, DialogButton, ListItem, Preloader } from "konsta/svelte";
 	import { onMount } from "svelte";
 
@@ -65,7 +64,9 @@
 			return;
 		}
 
-		await goto(resolve("/"));
+		await gotoHomeRoute({
+			user_logged_out: "1",
+		});
 	}
 </script>
 
