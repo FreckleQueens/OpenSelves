@@ -212,7 +212,7 @@ a short-lived one
 
 ## 🚧 0.6.1
 - [x] fix: cannot perform captcha-protected api called when using ipv6 
-- [ ] Add beta warning on registration page
+- [x] Add beta warning on registration page
 
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright

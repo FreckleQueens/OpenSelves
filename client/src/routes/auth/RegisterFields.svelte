@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { apiState } from "$lib/api.svelte.js";
 	import FormFields from "$lib/components/forms/FormFields.svelte";
+	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import PassphraseIcon from "$lib/components/icons/PassphraseIcon.svelte";
 	import PasswordIcon from "$lib/components/icons/PasswordIcon.svelte";
 	import type { OSFormData } from "$lib/forms";
-	import { BlockTitle, List, ListInput } from "konsta/svelte";
+	import { Block, BlockTitle, List, ListInput } from "konsta/svelte";
 
 	let { formState = $bindable() }: { formState: OSFormData } = $props();
 </script>
@@ -74,4 +75,16 @@
 			</ListInput>
 		</List>
 	{/if}
+
+	<Block strong inset class="k-color-brand-yellow flex items-center">
+		<DangerIcon before />
+		<span class="flex-1">
+			By creating an OpenSelves account, you acknowledge that during the testing period (Early
+			access), the account may only be used for testing purposes only and that we DO NOT
+			guarantee that your data is safe, NOR protected from software or hardware failure, NOR
+			protected from being released publicly in case of a data breach.
+			<br /><br />
+			The service is provided for free and without any guarantee. Use it at your own risk.
+		</span>
+	</Block>
 </FormFields>

@@ -142,7 +142,10 @@
 			)}
 			class="h-20 m-2"
 		/>
-		OpenSelves
+		<div class="flex flex-col gap-2">
+			<span>OpenSelves</span>
+			<sup class="uppercase font-thin text-xs">Early access</sup>
+		</div>
 	</BlockTitle>
 
 	<ApiReachableGate>
