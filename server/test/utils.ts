@@ -279,16 +279,16 @@ export function testCaptcha(
 			captcha: "",
 		},
 		{
-			test: "POST 401 invalid captcha",
-			status: 401,
+			test: "POST 400 invalid captcha",
+			status: 400,
 			captcha: {
 				challenge: {},
 				solution: {},
 			},
 		},
 		{
-			test: "POST 401 no solution captcha",
-			status: 401,
+			test: "POST 400 no solution captcha",
+			status: 400,
 			captcha: async (actionValue?: string) => {
 				const captcha = await solveCaptcha(getEnv(), action, actionValue);
 				return { ...captcha, solution: {} };

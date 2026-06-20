@@ -110,6 +110,17 @@ export class CaptchaService {
 
 	public async verifySolution(challenge: Challenge, solution: Solution): Promise<boolean> {
 		try {
+			const expiresAt = challenge.parameters.expiresAt;
+			if (!expiresAt) {
+				return false;
+			}
+
+			const challengeCacheKey = CAPTCHA_CACHE_PREFIX + JSON.stringify(challenge);
+
+			if ((await this.cache.get(challengeCacheKey)) === true) {
+				return false;
+			}
+
 			const result = await verifySolution({
 				challenge,
 				solution,
@@ -123,17 +134,6 @@ export class CaptchaService {
 			});
 
 			if (result.verified) {
-				const challengeCacheKey = CAPTCHA_CACHE_PREFIX + JSON.stringify(challenge);
-
-				if ((await this.cache.get(challengeCacheKey)) === true) {
-					return false;
-				}
-
-				const expiresAt = challenge.parameters.expiresAt;
-				if (!expiresAt) {
-					return false;
-				}
-
 				await this.cache.set(challengeCacheKey, true, expiresAt * 1000 - Date.now());
 			}
 

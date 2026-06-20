@@ -1,12 +1,12 @@
-import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from "@nestjs/common";
+import { type MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerModule } from "@nestjs/throttler";
 import type { Request } from "express";
 
-import { CaptchaMiddleware } from "../captcha/captcha.middleware.js";
 import { CaptchaModule } from "../captcha/captcha.module.js";
+import { ParseCaptchaMiddleware } from "../captcha/parse-captcha.middleware.js";
 import { type ConfigData } from "../config.data.js";
 import { QueueModule } from "../queue/queue.module.js";
 import { AuthController } from "./auth.controller.js";
@@ -86,21 +86,6 @@ import { UserService } from "./user/user.service.js";
 export class AuthModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
 		consumer.apply(ParseJwtMiddleware).forRoutes("*");
-		consumer.apply(CaptchaMiddleware).forRoutes(
-			"/auth/login",
-			{
-				path: "/user",
-				method: RequestMethod.POST,
-			},
-			{
-				path: "/user/:id",
-				method: RequestMethod.PATCH,
-			},
-			{
-				path: "/user/:id/resend-verification-email",
-				method: RequestMethod.POST,
-			},
-			"/user/recover-password",
-		);
+		consumer.apply(ParseCaptchaMiddleware).forRoutes("*");
 	}
 }

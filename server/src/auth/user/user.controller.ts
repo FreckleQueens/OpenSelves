@@ -22,6 +22,7 @@ import type { Request } from "express";
 import type { GetUserResult, PartialBy } from "openselves-common";
 import type { ServerUserEmailChangeRequest, User } from "openselves-common/db";
 
+import { Captcha } from "../../captcha/decorators/captcha.decorator.js";
 import type { ConfigData } from "../../config.data.js";
 import { Public } from "../decorators/public.decorator.js";
 import { CreateUserDto } from "./data/create-user.dto.js";
@@ -59,6 +60,7 @@ export class UserController {
 
 	@Public({ allowAuthenticatedUsers: false })
 	@Post("")
+	@Captcha()
 	public async createUser(@Req() request: Request, @Body() createUserDto: CreateUserDto) {
 		this.requireCaptchaSendEmailAction(request, createUserDto.email);
 
@@ -98,6 +100,7 @@ export class UserController {
 	}
 
 	@Patch(":id")
+	@Captcha()
 	public async updateUser(
 		@Req() request: Request,
 		@Param() params: FindOneParams,
@@ -191,6 +194,7 @@ export class UserController {
 			limit: 1,
 		},
 	})
+	@Captcha()
 	public async resendVerificationEmail(@Param() params: FindOneParams, @Req() request: Request) {
 		const authenticatedUserId = request.accessTokenPayload?.user.id;
 		if (params.id !== authenticatedUserId) {
@@ -246,6 +250,7 @@ export class UserController {
 			limit: 1,
 		},
 	})
+	@Captcha()
 	public async sendPasswordRecoveryEmail(
 		@Req() request: Request,
 		@Body() sendPasswordRecoveryEmailDto: SendPasswordRecoveryEmailDto,

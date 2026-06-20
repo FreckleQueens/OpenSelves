@@ -14,6 +14,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
 import { MISSING_REFRESH_TOKEN_COOKIE, SESSION_EXPIRED_ERROR } from "openselves-common";
 
+import { Captcha } from "../captcha/decorators/captcha.decorator.js";
 import { type ConfigData } from "../config.data.js";
 import { LoginDto } from "./data/login.dto.js";
 import { Public } from "./decorators/public.decorator.js";
@@ -31,6 +32,7 @@ export class AuthController {
 	@Public()
 	@Post("login")
 	@HttpCode(HttpStatus.OK)
+	@Captcha()
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
 		const user = await this.userService.getUserWithPassword({ email: loginDto.email });
 		if (user && (await this.userService.verifyPassword(user, loginDto.password))) {
