@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
-import { type Locator, expect } from "@playwright/test";
+import { type Locator, expect, test } from "@playwright/test";
 import assert from "node:assert";
 import type { Page } from "playwright";
 
@@ -10,10 +10,7 @@ export async function expectNoAppError(page: Page) {
 	return expect(page.locator("#application-error-dialog")).not.toHaveClass("has-errors");
 }
 
-export async function registerAndLoginUser(
-	page: Page,
-	persistSession: boolean = false,
-): Promise<{ email: string; password: string }> {
+export async function registerAndLoginUser(page: Page, persistSession: boolean = false) {
 	const email = createId() + "@example.com";
 	const password = "12345678";
 
@@ -70,32 +67,63 @@ export async function getLogsCount(page: Page) {
 	});
 }
 
-export async function gotoLastEmailLink(page: Page): Promise<void> {
-	const fetchUrl = "http://localhost:8025/view/latest.txt";
-	const response = await fetch(fetchUrl);
+async function fetchUrl(url: string, parseJson: boolean): Promise<object | string> {
+	const response = await fetch(url);
 
 	if (!response) {
-		throw new Error("No response from fetch " + fetchUrl);
+		throw new Error(`No response from mailpit api for url ${url}`);
 	}
 
 	if (!response.ok) {
-		throw new Error("Fetch returned non ok status " + response.status, { cause: response });
+		throw new Error(`Fetch returned non ok status ${response.status} for url ${url}`, {
+			cause: response,
+		});
 	}
 
-	let body: string;
-	try {
+	let body: unknown;
+	if (parseJson) {
+		try {
+			body = await response.json();
+		} catch {
+			throw new Error(`Couldn't parse response body as json for url ${url}`, {
+				cause: response,
+			});
+		}
+	} else {
 		body = await response.text();
-	} catch {
-		throw new Error("Couldn't parse response body as text", { cause: response });
 	}
+	assert(body);
+	return body;
+}
+
+export async function getEmailLink(
+	emailAddress: string,
+	expectEmailCount: number = 1,
+	useEmailIndex: number = 0,
+) {
+	const query = new URLSearchParams({
+		query: `to:"${emailAddress}"`,
+	});
+	const searchUrl = `http://localhost:8025/api/v1/search?${query.toString()}`;
+
+	const search = await fetchUrl(searchUrl, true);
+	let messages = search["messages"];
+	assert(messages);
+	assert(Array.isArray(messages));
+	assert.strictEqual(messages.length, expectEmailCount);
+	messages = messages.sort((a, b) =>
+		a["Created"] < b["Created"] ? -1 : a["Created"] > b["Created"] ? 1 : 0,
+	);
+
+	const messageId = messages[useEmailIndex]["ID"];
+	const viewUrl = `http://localhost:8025/view/${messageId}.txt`;
+	const body = await fetchUrl(viewUrl, false);
+	assert(typeof body === "string");
 
 	const lines = body.split("\n");
 	const verificationLink = lines.find((line) => line.startsWith("http"));
 	assert(verificationLink);
-
-	const gotoResponse = await page.goto(verificationLink);
-	assert(gotoResponse);
-	assert(gotoResponse.ok());
+	return verificationLink;
 }
 
 export async function logout(page: Page) {
@@ -108,17 +136,47 @@ export async function logout(page: Page) {
 	await page.waitForURL("/land");
 }
 
-export async function verifyEmail(page: Page) {
+export async function verifyEmail(
+	page: Page,
+	email: string,
+	expectEmailCount?: number,
+	useEmailIndex?: number,
+) {
 	if (!page.url().endsWith("/account")) {
 		await page.goto("/account");
 	}
 
-	await page.waitForSelector("#email-status.ready.unverified");
+	await page.waitForSelector("#email-status.ready.unverified", {
+		timeout: 3000,
+	});
 
-	await gotoLastEmailLink(page);
+	const link = await getEmailLink(email, expectEmailCount, useEmailIndex);
+	assert(link.indexOf("/verify-email/") >= 0);
+	const gotoResponse = await page.goto(link);
+	assert(gotoResponse);
+	assert(gotoResponse.ok());
 	await page.locator("#success-continue-button").click();
 	await page.waitForURL("/front");
 
 	await page.goto("/account");
-	await page.waitForSelector("#email-status.ready.verified");
+	await page.waitForSelector("#email-status.ready.verified", {
+		timeout: 3000,
+	});
+}
+
+export async function debugSelector(page: Page, selector: string, timeout: number) {
+	try {
+		await page.waitForSelector(selector, {
+			timeout,
+		});
+	} catch (e) {
+		console.error(e);
+		console.error(await page.consoleMessages({ filter: "since-navigation" }));
+		console.error(await page.pageErrors({ filter: "since-navigation" }));
+		await page.screenshot({
+			path: `test-results/failure-screenshot_${test.info().title.replaceAll(" ", "-")}.png`,
+			fullPage: true,
+		});
+		throw e;
+	}
 }
