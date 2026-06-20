@@ -210,9 +210,15 @@ a short-lived one
 
 </details>
 
-## 🚧 0.6.1
+## ✅ 0.6.1
+
+<details>
+  <summary>todolist</summary>
+
 - [x] fix: cannot perform captcha-protected api called when using ipv6 
 - [x] Add beta warning on registration page
+
+</details>
 
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright
