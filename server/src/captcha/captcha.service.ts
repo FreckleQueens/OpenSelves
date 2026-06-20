@@ -233,7 +233,7 @@ export class CaptchaService {
 
 function anonymiseIpAddr(rawIp: string) {
 	let parsedIp = ipaddr.parse(rawIp);
-	if (parsedIp instanceof ipaddr.IPv6) {
+	if (parsedIp instanceof ipaddr.IPv6 && parsedIp.isIPv4MappedAddress()) {
 		parsedIp = parsedIp.toIPv4Address();
 	}
 
