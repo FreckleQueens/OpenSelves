@@ -5,7 +5,7 @@ deadline or ETA
 
 ## ✅ 0.1.0
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] DB orm (prisma?)
 - [x] Single command dev env build and start (client and server)
@@ -64,7 +64,7 @@ deadline or ETA
 ## ✅ 0.2.0
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] linting (git hooks)
 - [x] client: add a check to prevent an update log from saving with no data (empty object)
@@ -80,7 +80,7 @@ deadline or ETA
 ## ✅ 0.3.0
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] set favicon to logo
 - [x] set android app icon to logo
@@ -93,7 +93,7 @@ deadline or ETA
 ## ✅ 0.4.0
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] client: offline icons
 - [x] client: improve service worker's ability to start from offline
@@ -124,7 +124,7 @@ deadline or ETA
 ## ✅ 0.4.1
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] bug: members/records are saved with userId "offline"
 - [x] bug: some pages (i.e. /front) don't redirect when userId is lost
@@ -135,7 +135,7 @@ deadline or ETA
 ## ✅ 0.4.2
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] partial IndexedDB upgrades hang indefinitely
 - [x] server: serve all delete logs on initial sync to account for lost timestamp edgecase
@@ -145,7 +145,7 @@ deadline or ETA
 ## ✅ 0.5.0 - Member profile picture
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [ ] ~~client: switch to a better md3 library~~ (canceled)
 - [x] add version checks on /push and /pull endpoints
@@ -163,7 +163,7 @@ deadline or ETA
 ## ✅ 0.5.1
 
 <details>
-  <summary>dev todo</summary>
+  <summary>todolist</summary>
 
 - [x] fix desktop frame background color regression
 - [x] fix server warning for route pattern "/attachment/*"
@@ -173,7 +173,11 @@ deadline or ETA
 
 </details>
 
-## 🚧 0.6.0 - Basic account features
+## ✅ 0.6.0 - Basic account features
+
+<details>
+  <summary>todolist</summary>
+
 - [x] public registrations with captcha
   - [x] simple implementation
   - [x] protect against replay attacks by caching solved challenges in memory for their TTL
@@ -204,10 +208,10 @@ a short-lived one
 - [x] fix: email not verified warning stays when logging out
 - [x] fix: member images hosted in object storage are not cached by the client (should be cached forever)
 
-## 0.6.1
-- [ ] find an alternative to playwright
+</details>
 
-## 0.7.0 - Import data from Simply Plural
+## 🚧 0.7.0 - Import data from Simply Plural
+- [ ] find an alternative to playwright
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
