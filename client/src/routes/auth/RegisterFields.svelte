@@ -15,7 +15,7 @@
 	bind:formState
 	captcha
 	captchaAction="sendEmail"
-	bind:captchaActionValue={formState.data["email"]}
+	captchaActionValue={formState.data["email"]}
 >
 	<BlockTitle class="mt-0">Credentials</BlockTitle>
 	<List>

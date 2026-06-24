@@ -147,7 +147,7 @@
 			{/snippet}
 
 			{#snippet actions()}
-				<ResendVerificationEmail bind:user={appState.userData} />
+				<ResendVerificationEmail user={appState.userData} />
 				<ListItem>
 					{#snippet text()}
 						<Button tonal href={resolve("/account/change-email")}>

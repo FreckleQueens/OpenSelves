@@ -6,8 +6,7 @@
 	import type { Snippet } from "svelte";
 
 	let {
-		children = $bindable(),
-		formState = $bindable(),
+		children,
 		formData = {},
 		endpoint,
 		method,
@@ -18,12 +17,17 @@
 		submitButtonText,
 		onSuccess,
 		inline = false,
+		formState = $bindable(),
 		...rest
 	}: OSFormProps & {
 		children?: Snippet;
 		onSuccess: OSFormData["onSuccess"];
 		inline?: boolean;
 	} = $props();
+
+	if (formState) {
+		throw new Error("formState can only be provided by OSForm");
+	}
 
 	// svelte-ignore state_referenced_locally
 	let _formState: OSFormData = $state({
@@ -60,7 +64,7 @@
 	</FormFields>
 
 	<Block class={inline ? "m-0 p-0!" : ""}>
-		<SubmitButton bind:formState={_formState}>
+		<SubmitButton formState={_formState}>
 			{#if submitButtonIcon}
 				{@const Icon = submitButtonIcon}
 				<Icon button before />

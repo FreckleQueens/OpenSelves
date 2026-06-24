@@ -97,7 +97,7 @@
 					},
 				},
 			]}
-			bind:pageContent
+			{pageContent}
 		/>
 	{/snippet}
 </AppPage>

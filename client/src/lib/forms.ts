@@ -23,6 +23,7 @@ export type OSFormData = FormValidationState & {
 	isWorking?: boolean;
 	workingStatus?: string;
 	submitWorkingStatus: string;
+	disabled?: boolean;
 };
 
 export type OSFormProps = {

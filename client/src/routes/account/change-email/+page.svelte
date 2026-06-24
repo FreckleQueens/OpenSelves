@@ -20,7 +20,7 @@
 </script>
 
 <SingleFormPage
-	bind:loaded
+	{loaded}
 	bind:formState
 	formName="change-email"
 	endpoint={"/user/" + PersistentStorage.getInstance().getUserId()}

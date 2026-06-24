@@ -25,14 +25,26 @@ test("resend verification email", async ({ page }) => {
 		timeout: 3000,
 	});
 	await page.locator("#resend-verification-email-button").click();
-	await page.waitForSelector("#resend-verification-email-button", {
-		state: "hidden",
-	});
+	await page
+		.locator("span", {
+			hasText: "Verification email sent.",
+		})
+		.waitFor({
+			timeout: 5000,
+		});
+	assert(await page.locator("#resend-verification-email-button[disabled]").isVisible());
 	assert(await page.isVisible(".resend-verification-email-comp"));
 	await expectNoAppError(page);
 
 	await verifyEmail(page, email, 2, 1);
 	assert(await page.isHidden("#resend-verification-email-button"));
+	assert(
+		await page
+			.locator("span", {
+				hasText: "Verification email sent.",
+			})
+			.isHidden(),
+	);
 	assert(await page.isHidden(".resend-verification-email-comp"));
 	await expectNoAppError(page);
 });

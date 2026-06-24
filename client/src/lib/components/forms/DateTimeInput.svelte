@@ -19,12 +19,12 @@
 	let {
 		hidden,
 		name,
+		onInput,
+		min,
+		max,
 		value = $bindable(),
-		onInput = $bindable(),
 		// eslint-disable-next-line no-useless-assignment
 		open = $bindable(),
-		min = $bindable(),
-		max = $bindable(),
 		...rest
 	}: Props & Omit<CompProps, keyof Props> = $props();
 

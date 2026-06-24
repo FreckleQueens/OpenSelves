@@ -7,7 +7,7 @@
 
 	let {
 		menuItems,
-		pageContent = $bindable(),
+		pageContent,
 	}: {
 		menuItems: {
 			id: string;

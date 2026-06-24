@@ -179,13 +179,13 @@
 					<form class="login" onsubmit={onSubmit} transition:fly={{ x: -200 }}>
 						<LoginFields bind:formState={forms.login} />
 
-						<SubmitButton bind:formState={forms.login}>Login</SubmitButton>
+						<SubmitButton formState={forms.login}>Login</SubmitButton>
 					</form>
 				{:else if activeForm === "register"}
 					<form class="register" onsubmit={onSubmit} transition:fly={{ x: 200 }}>
 						<RegisterFields bind:formState={forms.register} />
 
-						<SubmitButton bind:formState={forms.register}>Register</SubmitButton>
+						<SubmitButton formState={forms.register}>Register</SubmitButton>
 					</form>
 				{/if}
 			</div>

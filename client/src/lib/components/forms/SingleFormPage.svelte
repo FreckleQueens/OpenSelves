@@ -12,7 +12,7 @@
 
 	let {
 		children,
-		loaded = $bindable(),
+		loaded,
 		formState = $bindable(),
 		title,
 		successDialogTitle,

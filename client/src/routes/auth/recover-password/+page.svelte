@@ -21,7 +21,7 @@
 </script>
 
 <SingleFormPage
-	bind:loaded
+	{loaded}
 	bind:formState
 	formName="recover-password"
 	formData={{

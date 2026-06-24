@@ -10,9 +10,9 @@
 	import { onMount } from "svelte";
 
 	let {
+		action,
+		actionValue,
 		value = $bindable(),
-		action = $bindable(),
-		actionValue = $bindable(),
 		// eslint-disable-next-line no-useless-assignment
 		captchaController = $bindable(),
 	}: {

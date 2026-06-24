@@ -147,12 +147,12 @@
 				/>
 				<DateTimeInput
 					name="endedAt"
-					bind:min={front.startedAt}
+					min={front.startedAt}
 					max={new Date()}
 					clearButton
 					inputClass="pr-8"
 					bind:value={front.endedAt}
-					onInput={(date) => {
+					onInput={(date: Date | null) => {
 						if (front) {
 							front.endedAt = date;
 						}

@@ -8,10 +8,7 @@
 		avatarSrc: string;
 		avatarAlt: string;
 	};
-	let {
-		children,
-		contributorsSrc = $bindable(),
-	}: { children?: Snippet; contributorsSrc: string } = $props();
+	let { children, contributorsSrc }: { children?: Snippet; contributorsSrc: string } = $props();
 	let contributors: Contributor[] = $state([]);
 	let contributorsSortedRandomly: Contributor[] = $derived.by(() => {
 		const array = [...contributors];

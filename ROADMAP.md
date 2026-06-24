@@ -222,7 +222,7 @@ a short-lived one
 
 ## 🚧 0.6.2
 - [x] add a word of thanks for contributors in the repo, the app and the website
-- [ ] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
+- [x] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
 - [ ] does the client actually use its `idb` dependency?
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
@@ -319,9 +319,12 @@ a short-lived one
 - [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
 - [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
 - [ ] normalize all dialog `buttons()` to `DialogButton` instead of `Button`
+- [ ] add <title> to all client pages
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check
+- [ ] add demo screenshots to https://openselves.org and the PWA's manifest
+- [ ] prepare for release on Android app stores (Google Play, F-Droid)
 - [ ] review [private launch items](./private%20launch%20items.md) (not accessible publicly)
 
 ## 1.1.0

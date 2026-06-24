@@ -12,10 +12,10 @@
 
 	let {
 		children,
-		formState = $bindable(),
 		captcha = false,
 		captchaAction,
-		captchaActionValue = $bindable(),
+		captchaActionValue,
+		formState = $bindable(),
 	}: {
 		children: Snippet;
 		formState: FormValidationState | OSFormData;
@@ -69,8 +69,8 @@
 {#if captcha && isFullFormState(formState)}
 	<Captcha
 		bind:value={formState.data["captcha"]}
-		bind:action={captchaAction}
-		bind:actionValue={captchaActionValue}
+		action={captchaAction}
+		actionValue={captchaActionValue}
 		bind:captchaController
 	/>
 {/if}

@@ -273,7 +273,7 @@
 					},
 				},
 			]}
-			bind:pageContent
+			{pageContent}
 		/>
 		<FrontTabbar activeTab={FrontTab.CURRENT} />
 	{/snippet}
