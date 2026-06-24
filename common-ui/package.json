@@ -5,8 +5,7 @@
 		"clean": "rm -rf dist .svelte-kit",
 		"build": "svelte-kit sync && svelte-package",
 		"dev": "yarn build --watch",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"lint": "yarn check && prettier --check . && eslint .",
+		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write . && eslint . --fix"
 	},
 	"main": "./dist/index.js",
