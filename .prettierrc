@@ -4,7 +4,13 @@
 	"trailingComma": "all",
 	"printWidth": 100,
 	"tabWidth": 4,
-	"plugins": ["prettier-plugin-svelte"],
+	"importOrder": ["<THIRD_PARTY_MODULES>", "^[./]"],
+	"importOrderSeparation": true,
+	"importOrderSortSpecifiers": true,
+	"importOrderGroupNamespaceSpecifiers": true,
+	"importOrderSideEffects": false,
+	"importOrderParserPlugins": ["typescript", "decorators"],
+	"plugins": ["prettier-plugin-svelte", "@trivago/prettier-plugin-sort-imports"],
 	"overrides": [
 		{
 			"files": "*.svelte",

@@ -1,4 +1,5 @@
 import { camelCase, integer, json, text, timestamp } from "drizzle-orm/pg-core";
+
 import { idPrimaryKey, timestamps } from "./utils.js";
 
 export const serverJobs = camelCase.table("server_jobs", {

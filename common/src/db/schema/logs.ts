@@ -1,19 +1,20 @@
+import { SQL, and, eq, inArray, isNotNull, isNull, not, or, sql } from "drizzle-orm";
 import {
+	camelCase,
 	check,
 	foreignKey,
 	json,
 	pgEnum,
 	primaryKey,
-	camelCase,
 	text,
 	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { id } from "./utils.js";
-import { members } from "./members.js";
-import { and, eq, inArray, isNotNull, isNull, not, or, sql, SQL } from "drizzle-orm";
-import { users } from "./users.js";
+
 import { fronts } from "./fronts.js";
+import { members } from "./members.js";
+import { users } from "./users.js";
+import { id } from "./utils.js";
 
 export const logOperationType = pgEnum("logOperationType", ["create", "update", "delete"]);
 export const logs = camelCase.table(

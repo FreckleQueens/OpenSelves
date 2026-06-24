@@ -1,0 +1,81 @@
+@import "openselves-common-ui";
+
+@theme {
+	--breakpoint-lg: initial;
+	--breakpoint-xl: initial;
+	--breakpoint-2xl: initial;
+}
+
+body {
+	background-color: lch(from var(--color-brand-primary) 95% 1% h);
+
+	@media (prefers-color-scheme: dark) {
+		background-color: lch(from var(--color-brand-primary) 5% 1% h) !important;
+		color: #fff;
+	}
+}
+
+hr {
+	opacity: 0.2;
+}
+
+.button,
+header nav ul li a {
+	padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+	border-radius: var(--spacing);
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--spacing) * 2);
+
+	&:hover {
+		background: #0002;
+
+		@media (prefers-color-scheme: dark) {
+			background: #fff2;
+		}
+	}
+
+	&.tonal {
+		background: lch(from var(--color-brand-primary) 85% calc(c * 0.5) h);
+
+		@media (prefers-color-scheme: dark) {
+			background: lch(from var(--color-brand-primary) 25% calc(c * 0.1) h);
+		}
+
+		&:hover {
+			background: lch(from var(--color-brand-primary) 75% calc(c * 0.5) h);
+
+			@media (prefers-color-scheme: dark) {
+				background: lch(from var(--color-brand-primary) 35% calc(c * 0.1) h);
+			}
+		}
+	}
+}
+
+header,
+main,
+section {
+	padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+
+	h2 {
+		font-size: var(--text-2xl);
+		font-weight: 300;
+		margin-bottom: calc(var(--spacing) * 4);
+	}
+}
+
+main,
+section {
+	margin: calc(var(--spacing) * 4) 0;
+}
+
+@media (max-width: 40rem) {
+	header .container {
+		flex-direction: column;
+
+		ul {
+			flex-direction: column;
+			align-items: center;
+		}
+	}
+}

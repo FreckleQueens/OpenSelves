@@ -1,11 +1,5 @@
-@import "tailwindcss";
 @import "konsta/svelte/theme.css";
-
-@custom-variant dark {
-	@media (prefers-color-scheme: dark) {
-		@slot;
-	}
-}
+@import "openselves-common-ui";
 
 @supports (left: env(safe-area-inset-left)) {
 	.safe-areas {
@@ -14,15 +8,6 @@
 		--k-safe-area-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
 		--k-safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
 	}
-}
-
-@theme {
-	--color-brand-primary: #df6800;
-	--color-brand-secondary: #cc407f;
-	--color-brand-link: #6184d8;
-	--color-brand-green: #28a460;
-	--color-brand-red: #d72638;
-	--color-brand-yellow: #ffcc00;
 }
 
 .k-material .material\:bg-md-light-surface-darker {

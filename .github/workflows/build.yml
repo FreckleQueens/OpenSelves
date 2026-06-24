@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: 25.x
+          node-version: 26.x
       - run: corepack enable
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -19,8 +19,7 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
-      - run: yarn ci:build
-      - run: yarn workspaces foreach --all run lint
+      - run: yarn lint
 
   test-client:
     runs-on: ubuntu-latest
@@ -46,7 +45,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: 25.x
+          node-version: 26.x
       - run: corepack enable
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -56,7 +55,7 @@ jobs:
       - run: sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
       - run: sudo ln -s /usr/local/bin/mailpit /usr/sbin/sendmail
       - run: yarn install --immutable
-      - run: yarn ci:build
+      - run: yarn build
       - run: yarn workspace openselves-server db:migrate
         env:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
@@ -129,7 +128,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: 25.x
+          node-version: 26.x
       - run: corepack enable
       - run: sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
       - run: sudo ln -s /usr/local/bin/mailpit /usr/sbin/sendmail
@@ -139,7 +138,7 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
-      - run: yarn ci:build
+      - run: yarn build
       - run: yarn workspace openselves-server db:migrate:test
         env:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"

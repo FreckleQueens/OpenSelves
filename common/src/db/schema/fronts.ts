@@ -1,7 +1,8 @@
-import { foreignKey, primaryKey, camelCase, text, timestamp } from "drizzle-orm/pg-core";
-import { id } from "./utils.js";
-import { users } from "./users.js";
+import { camelCase, foreignKey, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+
 import { members } from "./members.js";
+import { users } from "./users.js";
+import { id } from "./utils.js";
 
 export const fronts = camelCase.table(
 	"fronts",

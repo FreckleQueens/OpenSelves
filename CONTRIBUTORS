@@ -1,8 +1,10 @@
 # You can choose to add your name and optionally any link of your choosing (within reason)
 #
 # This will be used in the future to display thanks in the app and on the website.
-# We& may or may not integrate some avatar fetching, for instance displaying your github avatar if it's a link to your
-# github profile and so on.
+# If the link is a GitHub profile URL, the avatar is automatically set to `${link}.png?size=128`
 #
-# Format: name[, link]
+# The list is sorted by order of addition and does not reflect the level of contribution or carries any other meaning
+# whatsoever.
+#
+# Format: name[, link[, avatarUrl]]
 Freckles, https://github.com/FreckleQueens

@@ -1,0 +1,43 @@
+{
+	"name": "openselves-common-ui",
+	"packageManager": "yarn@4.13.0",
+	"scripts": {
+		"clean": "rm -rf dist .svelte-kit",
+		"build": "svelte-kit sync && svelte-package",
+		"dev": "yarn build --watch",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"lint": "yarn check && prettier --check . && eslint .",
+		"format": "prettier --write . && eslint . --fix"
+	},
+	"main": "./dist/index.js",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"style": "./dist/index.css"
+		},
+		"./config": "./dist/config/index.js"
+	},
+	"svelte": "./dist/index.js",
+	"devDependencies": {
+		"@eslint/eslintrc": "^3.3.5",
+		"@eslint/js": "^10.0.1",
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.66.0",
+		"@sveltejs/package": "^2.5.8",
+		"@sveltejs/vite-plugin-svelte": "^7.1.2",
+		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
+		"eslint": "^10.5.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-prettier": "^5.5.6",
+		"prettier": "^3.8.4",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.61.1"
+	},
+	"dependencies": {
+		"@tailwindcss/vite": "^4.3.1",
+		"openselves-common": "workspace:^",
+		"svelte": "^5.56.3",
+		"tailwindcss": "^4.3.1"
+	}
+}

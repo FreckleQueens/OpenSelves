@@ -24,10 +24,17 @@ when there is connectivity
 
 ---
 
+## Policies
+
+- Generative AI: We& take a firm stand **against** the use of generative AI in any part of the process whatsoever.
+  Please report (see "Contributing") any unintentional indirect use of generative AI to us& (i.e. dependencies...).
+
+---
+
 ## Contributing
 
 This is a big project, and we& want it to serve the plural community. For this reason, the opinion and feedback of our&
-fellow plurals is of critical importance to this project. Ideally, we& don't want to do this alone.
+fellow plurals is of critical importance.
 
 So, please reach out through any of these channels:
 - OpenSelves' discord server https://discord.gg/Bx6XFt5rFN
@@ -39,7 +46,10 @@ requests.
 
 ---
 
-## Policies
+## Contributors
 
-- Generative AI: We& take a firm stand **against** the use of generative AI in any part of the process whatsoever.
-Please report (see "Contributing") any unintentional indirect use of generative AI to us& (i.e. dependencies...).
+As a community project, OpenSelves is made possible by the work and time selflessly donated by volunteers from
+various backgrounds. We&, the initiators of the project known as Freckles, acknowledge their·& efforts and thank
+them·& for their·& precious contributions to the project.
+
+The list of contributors is kept in [CONTRIBUTORS](./CONTRIBUTORS) and can be viewed on https://openselves.org

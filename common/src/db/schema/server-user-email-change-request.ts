@@ -1,6 +1,7 @@
 import { camelCase, text } from "drizzle-orm/pg-core";
-import { createdAt, idPrimaryKey } from "./utils.js";
+
 import { users } from "./users.js";
+import { createdAt, idPrimaryKey } from "./utils.js";
 
 export const serverUserEmailChangeRequest = camelCase.table("server_user_email_change_request", {
 	userId: idPrimaryKey().id.references(() => users.id, {

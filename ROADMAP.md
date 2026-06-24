@@ -220,10 +220,65 @@ a short-lived one
 
 </details>
 
+## 🚧 0.6.2
+- [x] add a word of thanks for contributors in the repo, the app and the website
+- [ ] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
+- [ ] does the client actually use its `idb` dependency?
+- [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
+
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright
+- [ ] Willow data model, e2e encryption and moving to a zero-trust model
+  As per https://willowprotocol.org/specs/data-model/index.html#data_model
+  - [ ] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
+    - [ ] migrate the database to the new format
+        ```ts
+        // MAX_UPLOAD_SIZE=5242880 (5MiB), the maximum individual payload_length at the controller level
+        // MAX_STORAGE_PER_USER=5368709120 (5GiB), the maximum sum of payload_length per user at the service level
+        // hash_payload is 
+        interface Entry {
+            // Not a db field
+            readonly namespace_id: "org.openselves";
+            // foreignKey users.userId
+            readonly subspace_id: string;
+            readonly path: string;
+            // was logs.executedAt
+            timestamp: number;
+            // length of entries.payload in bytes
+            payload_length: U64;
+            // The result of applying hash_payload to the Payload.
+            payload_digest: PayloadDigest;
+    
+            // null means the payload was not transmitted yet
+            payload: string | null;
+		
+            // Server-only field
+            // null, 0 to 8192 bytes, payload contains the raw value
+            // "s3", 8193 to Infinity bytes, means payload contains the necessary reference to identify, fetch or delete the s3 object
+            payload_storage: null | "s3";
+    
+            // Server-only field
+            // was logs.pushedAt
+            // is set to now() when entry is created
+            // is updated to now() whenever any other non-readonly field changes
+            updated_at: number;
+        }
+        ```
+    - [ ] Drop uploaded entries for which there exists a newer entry in DB whose path prefixes the uploaded entry
+    - [ ] For each uploaded entry, delete all entries in the same namespace AND subspace AND whose path is prefixed by the uploaded entry
+    - [ ] insert remaining entries in DB
+    - [ ] initial sync is no longer a separate process. to retrieve all data, call /sync/pull with the timestamp set to 0
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
+- [ ] encryption (client side)
+  - [ ] make sure the password is never sent to the server (srp? opaque?)
+  - [ ] use PBKDF2 to derive the KEK from the password, store it securely (idb?)
+  - [ ] generate a CEK, encrypt it with the KEK and store the result as an entry
+  - [ ] check the
+  - [ ] generate a CEK, encrypt it with the KEK and store as entry /encryption/CEK/recovery
+  - [ ] put the public key in a "/public.key"
+  - [ ] encrypt path components
+  - [ ] encrypt payloads
 
 ## 0.8.0 - Optimizations
 - [ ] client
@@ -263,6 +318,7 @@ a short-lived one
 - [ ] bug: click on a member's card image captures click events, preventing from performing card click action
 - [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
 - [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
+- [ ] normalize all dialog `buttons()` to `DialogButton` instead of `Button`
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check

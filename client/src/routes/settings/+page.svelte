@@ -2,6 +2,7 @@
 	import { MenuItem } from "$lib";
 	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import Contributors from "$lib/components/Contributors.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
@@ -18,4 +19,6 @@
 	</Block>
 
 	<AppInfo />
+
+	<Contributors />
 </AppPage>

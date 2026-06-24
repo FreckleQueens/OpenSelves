@@ -2,8 +2,10 @@
 	"name": "openselves",
 	"version": "0.6.1",
 	"scripts": {
-		"dev": "concurrently --kill-others \"cd common && yarn dev\" \"cd client && yarn dev\" \"cd server && yarn dev\"",
-		"ci:build": "yarn workspaces foreach --all run prepare && cd common && yarn build && cd ../client && yarn build && cd ../server && yarn build",
+		"dev": "concurrently --kill-others \"cd common && yarn dev\" \"cd common-ui && yarn dev\" \"cd client && yarn dev\" \"cd server && yarn dev\" \"cd www && yarn dev\"",
+		"clean": "yarn workspaces foreach -Ap run clean",
+		"build": "yarn clean && yarn workspaces foreach -Rpt --from \"{client,server,www}\" run build",
+		"lint": "yarn build && yarn workspaces foreach -Ap run lint",
 		"prepare": "husky"
 	},
 	"packageManager": "yarn@4.13.0",
@@ -13,7 +15,9 @@
 	},
 	"workspaces": [
 		"common",
+		"common-ui",
 		"client",
-		"server"
+		"server",
+		"www"
 	]
 }

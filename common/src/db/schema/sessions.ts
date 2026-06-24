@@ -1,6 +1,7 @@
 import { boolean, camelCase, text } from "drizzle-orm/pg-core";
-import { timestamps } from "./utils.js";
+
 import { users } from "./users.js";
+import { timestamps } from "./utils.js";
 
 export const sessions = camelCase.table("sessions", {
 	token: text().notNull().unique().primaryKey(),

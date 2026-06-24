@@ -2,6 +2,7 @@
 	import AppInfo from "$lib/components/AppInfo.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
+	import Contributors from "$lib/components/Contributors.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
 	import ServerSwitcher from "$lib/components/forms/ServerSwitcher.svelte";
 	import { requireGuest } from "$lib/routing-utils";
@@ -32,4 +33,6 @@
 	</Block>
 
 	<AppInfo />
+
+	<Contributors />
 </AppPage>

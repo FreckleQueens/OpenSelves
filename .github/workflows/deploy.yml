@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: 25.x
+          node-version: 26.x
       - run: corepack enable
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -24,7 +24,7 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
-      - run: yarn ci:build
+      - run: yarn build
 
       - name: Install server dependencies
         run: cd server/dist && yarn install --no-immutable

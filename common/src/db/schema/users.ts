@@ -1,6 +1,7 @@
-import { boolean, camelCase, text } from "drizzle-orm/pg-core";
-import { idPrimaryKey, timestamps } from "./utils.js";
 import { sql } from "drizzle-orm";
+import { boolean, camelCase, text } from "drizzle-orm/pg-core";
+
+import { idPrimaryKey, timestamps } from "./utils.js";
 
 export const users = camelCase.table("users", {
 	...idPrimaryKey(),

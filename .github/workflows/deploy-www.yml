@@ -1,0 +1,39 @@
+name: Deploy www
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26.x
+      - run: corepack enable
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          key: yarn
+          path: ~/.yarn
+      - run: yarn install --immutable
+      - run: yarn build
+
+      - name: Copy files to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_KEY }}
+          VPS_IP: ${{ secrets.VPS_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $VPS_IP >> ~/.ssh/known_hosts
+          rsync -avz --delete ./www/build/ github@$VPS_IP:/var/openselves/www/
