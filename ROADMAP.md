@@ -224,6 +224,7 @@ a short-lived one
 - [x] add a word of thanks for contributors in the repo, the app and the website
 - [x] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
 - [x] does the client actually use its `idb` dependency? -> no, remove it
+- [x] remove dependency on @capacitor/assets
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
 ## 🚧 0.7.0 - Import data from Simply Plural
@@ -307,7 +308,6 @@ a short-lived one
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
 
 ## 0.10.0 - UI tweaks
-- [ ] remove dependency on @capacitor/assets
 - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
 - [ ] show proper language names in language switcher
 - [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)

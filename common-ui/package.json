@@ -19,8 +19,15 @@
 	},
 	"svelte": "./dist/index.js",
 	"devDependencies": {
-		"@eslint/eslintrc": "^3.3.5",
+		"@eslint/config-helpers": "^0.6.0",
 		"@eslint/js": "^10.0.1",
+		"@iconify-json/f7": "^1.2.2",
+		"@iconify-json/heroicons": "^1.2.3",
+		"@iconify-json/heroicons-outline": "^1.2.1",
+		"@iconify-json/ic": "^1.2.4",
+		"@iconify-json/material-symbols": "^1.2.79",
+		"@iconify-json/material-symbols-light": "^1.2.79",
+		"@iconify-json/mdi": "^1.2.3",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.66.0",
 		"@sveltejs/package": "^2.5.8",
@@ -28,7 +35,8 @@
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
 		"eslint": "^10.5.0",
 		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-prettier": "^5.5.6",
+		"eslint-plugin-svelte": "^3.19.0",
+		"globals": "^17.7.0",
 		"prettier": "^3.8.4",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.61.1"
@@ -37,6 +45,8 @@
 		"@tailwindcss/vite": "^4.3.1",
 		"openselves-common": "workspace:^",
 		"svelte": "^5.56.3",
-		"tailwindcss": "^4.3.1"
+		"tailwindcss": "^4.3.1",
+		"unplugin-auto-import": "^21.0.0",
+		"unplugin-icons": "^23.0.1"
 	}
 }
