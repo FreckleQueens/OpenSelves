@@ -4,12 +4,14 @@ import type { Page } from "playwright";
 import { createMember, expectNoAppError, getMemberEntry, registerAndLoginUser } from "./utils";
 
 async function createFront(page: Page, member: { name: string; pronouns: string }) {
-	await page.goto("/front");
-	await page.locator("#open-fab-menu-button").click();
-	await page.locator("#add-front-button").click();
-	await getMemberEntry(page, member).locator(".member-card").click();
-
+	await page.goto("/members");
+	await getMemberEntry(page, member).locator(".member-card .start-front-button").click();
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
+
+	await page.goto("/front");
+	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
+
+	await page.goto("/members");
 }
 
 test("create front", async ({ page }) => {
@@ -43,7 +45,9 @@ test("end front", async ({ page }) => {
 	const member = await createMember(page);
 	await createFront(page, member);
 
-	await getMemberEntry(page, member).locator(`.end-front-button`).click();
+	await getMemberEntry(page.locator("#current-fronting-members"), member)
+		.locator(`.end-front-button`)
+		.click();
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(0);
 	await expectNoAppError(page);
 });

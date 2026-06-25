@@ -10,7 +10,7 @@ test("create member", async ({ page }) => {
 
 	expect((await pushRequest).ok()).toBe(true);
 
-	await expect(getMemberEntry(page, member)).toHaveCount(1);
+	await expect(getMemberEntry(page.locator("#not-fronting-members"), member)).toHaveCount(1);
 });
 
 test("update member no change", async ({ page }) => {
@@ -18,7 +18,9 @@ test("update member no change", async ({ page }) => {
 	const member = await createMember(page);
 
 	const previousLogsCount = await getLogsCount(page);
-	await getMemberEntry(page, member).locator(".member-card").click();
+	await getMemberEntry(page.locator("#not-fronting-members"), member)
+		.locator(".member-card")
+		.click();
 	await page.locator("#save-record-button").click();
 
 	await page.waitForURL("/members");

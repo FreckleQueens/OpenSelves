@@ -91,6 +91,7 @@
 	"No data": "Aucune données",
 	"No front yet": "Pas de présence pour l'instant",
 	"No one is currently fronting.": "Personne n'est présent.e actuellement.",
+	"Not fronting": "Absent.es",
 	"Note": "Note",
 	"Offline - #{user.id}": "Hors ligne - #{user.id}",
 	"Online account status": "Statut de compte en ligne",

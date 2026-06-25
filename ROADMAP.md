@@ -227,13 +227,13 @@ a short-lived one
 - [x] remove dependency on @capacitor/assets
 - [ ] /members:
   - [x] sort fronting members at the top of the list
-  - [ ] allow adding and removing member from front
+  - [x] allow adding and removing member from front
   - [ ] rename item menu to "Members and Front"
   - [ ] allow searching/filtering members by name
 - [ ] /front:
   - [ ] move toolbar and history to /members
-  - [ ] remove all front edit actions
-  - [ ] click anywhere on current front goes to /members
+  - [x] remove all front edit actions
+  - [x] click anywhere on current front goes to /members
   - [ ] rename to /dashboard "Dashboard"
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
