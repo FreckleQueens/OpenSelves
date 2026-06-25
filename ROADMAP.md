@@ -236,6 +236,8 @@ a short-lived one
   - [x] click anywhere on current front goes to /members
   - [x] rename to /dashboard "Dashboard"
 - [x] Ignore case when sorting stuff by name
+- [x] fix: Fronter's fronting time wraps below secondary actions, which doesn't feel right
+- [ ] fix: captcha makes some devices crash
 
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright
@@ -330,6 +332,7 @@ a short-lived one
 - [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
 - [ ] normalize all dialog `buttons()` to `DialogButton` instead of `Button`
 - [ ] add <title> to all client pages
+- [ ] add app setting to choose landing page on app open
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check

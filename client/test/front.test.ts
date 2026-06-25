@@ -5,7 +5,9 @@ import { createMember, expectNoAppError, getMemberEntry, registerAndLoginUser } 
 
 async function createFront(page: Page, member: { name: string; pronouns: string }) {
 	await page.goto("/members");
-	await getMemberEntry(page, member).locator(".member-card .start-front-button").click();
+	await getMemberEntry(page.locator("#not-fronting-members"), member)
+		.locator(".start-front-button")
+		.click();
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
 
 	await page.goto("/dashboard");

@@ -6,34 +6,29 @@
 	import { appState } from "$lib/appState.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
+	import FrontNote from "$lib/components/FrontNote.svelte";
+	import FrontTimeFrontedFor from "$lib/components/FrontTimeFrontedFor.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
-	import DateTimeInput from "$lib/components/forms/DateTimeInput.svelte";
-	import SelectMemberSheet from "$lib/components/forms/SelectMemberSheet.svelte";
 	import AddNoteIcon from "$lib/components/icons/AddNoteIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
-	import DateTimeInputIcon from "$lib/components/icons/DateTimeInputIcon.svelte";
 	import DeleteSweepIcon from "$lib/components/icons/DeleteSweepIcon.svelte";
+	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import FilterIcon from "$lib/components/icons/FilterIcon.svelte";
 	import JoinFrontIcon from "$lib/components/icons/JoinFrontIcon.svelte";
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
-	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import SearchIcon from "$lib/components/icons/SearchIcon.svelte";
-	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
-	import humanizeDuration from "humanize-duration";
 	import {
 		Block,
 		BlockTitle,
 		Button,
-		Chip,
 		Dialog,
 		DialogButton,
 		Link,
 		List,
-		ListInput,
 		ListItem,
 		Searchbar,
 		Toggle,
@@ -71,8 +66,6 @@
 			.filter((front) => front.member.name.toLowerCase().includes(memberSearch.toLowerCase()))
 			.sort(sortBy((front) => front.member.name)),
 	);
-	let frontInputMap: Record<string, () => void> = $state({});
-	let showMemberSelectSheet = $state(false);
 	let showClearFrontDialog = $state(false);
 	let addNoteToFrontId: string | undefined = $state();
 
@@ -113,24 +106,6 @@
 		await storage.set("showArchivedMembers", showArchivedMembers ? "on" : "");
 	}
 
-	let selectMemberAction: "replaceFrontMember" | null = null;
-	let replaceMemberFrontId: string | undefined = undefined;
-	async function selectMember(member: Member) {
-		if (selectMemberAction === "replaceFrontMember") {
-			await idb.front.saveSynced(
-				storage.getUserId(),
-				{
-					id: replaceMemberFrontId || "",
-					memberId: member.id,
-				},
-				true,
-			);
-			showMemberSelectSheet = false;
-		} else {
-			throw new Error("No select member action selected");
-		}
-	}
-
 	async function startFront(memberId: string) {
 		const now = new Date();
 		const front: Omit<Front, "userId"> = {
@@ -143,7 +118,6 @@
 			updatedAt: now,
 		};
 		await idb.front.saveSynced(storage.getUserId(), front);
-		showMemberSelectSheet = false;
 	}
 
 	async function endFront(frontId: string) {
@@ -176,17 +150,6 @@
 		);
 	}
 
-	async function setFrontStartDate(frontId: string, value: Date) {
-		await idb.front.saveSynced(
-			storage.getUserId(),
-			{
-				id: frontId,
-				startedAt: value,
-			},
-			true,
-		);
-	}
-
 	onMount(() => {
 		const interval = window.setInterval(() => {
 			fronts.records = [...fronts.records]; // Re-calculate frontingFor
@@ -213,21 +176,24 @@
 >
 	<BlockTitle>Currently fronting</BlockTitle>
 	<Block id="current-fronting-members">
-		<div>
-			<Button
-				id="reset-front-button"
-				onclick={() => {
-					showClearFrontDialog = true;
-				}}
-				inline
-				rounded
-				clear
-				class="k-color-brand-red"
-			>
-				<DeleteSweepIcon button before /> Clear front
-			</Button>
-		</div>
-		{#each currentFronts as front (front.member.id)}
+		{#if currentFronts.length > 1}
+			<div>
+				<Button
+					id="reset-front-button"
+					onclick={() => {
+						showClearFrontDialog = true;
+					}}
+					inline
+					rounded
+					clear
+					class="k-color-brand-red"
+				>
+					<DeleteSweepIcon button before /> Clear front
+				</Button>
+			</div>
+		{/if}
+
+		{#each currentFronts as front (front.id)}
 			<MemberCard
 				member={front.member}
 				onClick={() => goto(resolve(`/members/edit/${front.member.id}`))}
@@ -240,72 +206,27 @@
 				]}
 				secondaryActions={[
 					{
-						id: "change-start-date",
-						icon: DateTimeInputIcon,
-						onClick: () => {
-							frontInputMap[front.id]?.();
-						},
-					},
-					{
-						id: "replace-member",
-						icon: ReplaceMemberIcon,
-						onClick: () => {
-							selectMemberAction = "replaceFrontMember";
-							replaceMemberFrontId = front.id;
-							showMemberSelectSheet = true;
-						},
-					},
-					{
 						id: "add-note",
 						icon: AddNoteIcon,
 						onClick: () => {
-							selectMemberAction = "replaceFrontMember";
 							addNoteToFrontId = front.id;
 						},
+					},
+					{
+						id: "edit",
+						icon: EditIcon,
+						onClick: () => goto(resolve(`/members/front/edit/${front.id}`)),
 					},
 				]}
 			>
 				{#snippet chips()}
-					<Chip>
-						<time datetime={front.startedAt.toISOString()}>
-							{humanizeDuration(front.frontingFor, {
-								language: localeState.locale || undefined,
-								round: true,
-								fallbacks: ["en"],
-								largest: 2,
-							})}
-						</time>
-					</Chip>
+					<FrontTimeFrontedFor {front} />
 				{/snippet}
 
 				{#snippet footer()}
 					{#if front.note || front.id === addNoteToFrontId}
-						<List class="m-0 mt-2">
-							{@const initialNote = front.note}
-							<ListInput
-								name="note"
-								placeholder={t("Note")}
-								floatingLabel
-								onclick={(ev) => ev.stopPropagation()}
-								onInput={(ev) => setFrontNote(front.id, ev.target?.value)}
-								value={initialNote}
-							/>
-						</List>
+						<FrontNote {front} {setFrontNote} />
 					{/if}
-
-					<DateTimeInput
-						hidden
-						name="startedAt"
-						onInput={(date) => {
-							if (date) {
-								return setFrontStartDate(front.id, date);
-							}
-						}}
-						max={new Date()}
-						value={front.startedAt}
-						bind:open={frontInputMap[front.id]}
-						onclick={(ev) => ev.stopPropagation()}
-					/>
 				{/snippet}
 			</MemberCard>
 		{:else}
@@ -359,16 +280,6 @@
 		<MembersTabbar activeTab={MembersTab.CURRENT} />
 	{/snippet}
 </AppPage>
-
-<SelectMemberSheet
-	title={t("Select fronter")}
-	opened={showMemberSelectSheet}
-	onCancel={() => {
-		showMemberSelectSheet = false;
-	}}
-	onSelect={selectMember}
-	excludedMembers={currentFronts.map((front) => front.member)}
-/>
 
 <Dialog opened={showFilterDialog} onBackdropClick={() => (showFilterDialog = false)}>
 	{#snippet title()}

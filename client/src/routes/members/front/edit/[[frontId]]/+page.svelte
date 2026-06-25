@@ -8,6 +8,7 @@
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NoteIcon from "$lib/components/icons/NoteIcon.svelte";
 	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
+	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
@@ -127,6 +128,18 @@
 						Select member
 					</Button>
 				{/if}
+
+				<Button
+					tonal
+					class="w-max m-auto"
+					onclick={(ev) => {
+						ev.preventDefault();
+						showSelectMemberSheet = true;
+					}}
+				>
+					<ReplaceMemberIcon button before />
+					Swap member
+				</Button>
 			</Block>
 
 			<List>

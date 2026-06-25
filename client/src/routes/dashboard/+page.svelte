@@ -2,13 +2,13 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import AppPage from "$lib/components/AppPage.svelte";
+	import FrontNote from "$lib/components/FrontNote.svelte";
+	import FrontTimeFrontedFor from "$lib/components/FrontTimeFrontedFor.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
-	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
-	import humanizeDuration from "humanize-duration";
-	import { Block, BlockTitle, Chip, Preloader } from "konsta/svelte";
+	import { Block, BlockTitle, Preloader } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
 
 	let members: SubscriptionState<Member> = $state({
@@ -51,16 +51,13 @@
 				{#if member}
 					<MemberCard {member}>
 						{#snippet chips()}
-							<Chip>
-								<time datetime={front.startedAt.toISOString()}>
-									{humanizeDuration(front.frontingFor, {
-										language: localeState.locale || undefined,
-										round: true,
-										fallbacks: ["en"],
-										largest: 2,
-									})}
-								</time>
-							</Chip>
+							<FrontTimeFrontedFor {front} />
+						{/snippet}
+
+						{#snippet footer()}
+							{#if front.note}
+								<FrontNote {front} />
+							{/if}
 						{/snippet}
 					</MemberCard>
 				{/if}
