@@ -225,6 +225,16 @@ a short-lived one
 - [x] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
 - [x] does the client actually use its `idb` dependency? -> no, remove it
 - [x] remove dependency on @capacitor/assets
+- [ ] /members:
+  - [x] sort fronting members at the top of the list
+  - [ ] allow adding and removing member from front
+  - [ ] rename item menu to "Members and Front"
+  - [ ] allow searching/filtering members by name
+- [ ] /front:
+  - [ ] move toolbar and history to /members
+  - [ ] remove all front edit actions
+  - [ ] click anywhere on current front goes to /members
+  - [ ] rename to /dashboard "Dashboard"
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
 ## 🚧 0.7.0 - Import data from Simply Plural

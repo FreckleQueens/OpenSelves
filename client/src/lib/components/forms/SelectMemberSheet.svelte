@@ -1,7 +1,7 @@
 <script lang="ts">
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import { IDB } from "$lib/idb";
-	import { subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
 	import { Block, Navbar, Searchbar, Sheet } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 
@@ -19,7 +19,7 @@
 		title?: string;
 	} = $props();
 
-	let members: { loaded?: boolean; records: Member[] } = $state({
+	let members: SubscriptionState<Member> = $state({
 		records: [],
 	});
 	let memberSearch: string = $state("");

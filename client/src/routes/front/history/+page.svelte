@@ -9,7 +9,7 @@
 	import SortDescIcon from "$lib/components/icons/SortDescIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
-	import { subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
@@ -27,10 +27,10 @@
 	import FrontTabbar from "../FrontTabbar.svelte";
 	import { FrontTab } from "../tabs.ts";
 
-	let members: { loaded?: boolean; records: Member[] } = $state({
+	let members: SubscriptionState<Member> = $state({
 		records: [],
 	});
-	let fronts: { loaded?: boolean; records: Front[] } = $state({
+	let fronts: SubscriptionState<Front> = $state({
 		records: [],
 	});
 	let sortedFronts = $derived(

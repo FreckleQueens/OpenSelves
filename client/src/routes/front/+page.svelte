@@ -16,7 +16,7 @@
 	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
-	import { subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
 	import humanizeDuration from "humanize-duration";
 	import {
@@ -35,10 +35,10 @@
 	import FrontTabbar from "./FrontTabbar.svelte";
 	import { FrontTab } from "./tabs";
 
-	let members: { loaded?: boolean; records: Member[] } = $state({
+	let members: SubscriptionState<Member> = $state({
 		records: [],
 	});
-	let fronts: { loaded?: boolean; records: Front[] } = $state({
+	let fronts: SubscriptionState<Front> = $state({
 		records: [],
 	});
 	let currentFronts = $derived(
@@ -55,15 +55,7 @@
 					frontingFor: Date.now() - front.startedAt.getTime(),
 				};
 			})
-			.sort((a, b) => {
-				if (a.member.name < b.member.name) {
-					return -1;
-				}
-				if (a.member.name > b.member.name) {
-					return 1;
-				}
-				return 0;
-			}),
+			.sort(sortBy((front) => front.member.name)),
 	);
 	let frontInputMap: Record<string, () => void> = $state({});
 	let pageContent: HTMLDivElement | undefined = $state();

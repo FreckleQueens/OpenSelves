@@ -4,16 +4,18 @@ import { type IDBSyncedModel, IDBSyncedModelEvent } from "$lib/idb";
 import { type SyncedModelBase } from "$lib/idb";
 import { onDestroy, onMount } from "svelte";
 
-export function subscribeToModel<T extends SyncedModelBase>(
-	model: IDBSyncedModel<T>,
-	state: {
-		loaded?: boolean;
-		records: T[];
-	},
+export type SubscriptionState<Model extends SyncedModelBase> = {
+	loaded?: boolean;
+	records: Model[];
+};
+
+export function subscribeToModel<Model extends SyncedModelBase>(
+	model: IDBSyncedModel<Model>,
+	state: SubscriptionState<Model>,
 ) {
 	state.loaded = false;
 
-	let subscription: (event: IDBSyncedModelEvent<T>) => void;
+	let subscription: (event: IDBSyncedModelEvent<Model>) => void;
 	onMount(async () => {
 		if (!appState.isAuthenticated) {
 			return;
@@ -48,4 +50,21 @@ export function subscribeToModel<T extends SyncedModelBase>(
 			model.unsubscribe(subscription);
 		}
 	});
+}
+
+export function sortBy<T>(...fieldGetters: ((obj: T) => string | boolean)[]) {
+	return (a: T, b: T) => {
+		for (let i = 0; i < fieldGetters.length; i++) {
+			const fieldGetter = fieldGetters[i];
+			const aField = fieldGetter(a),
+				bField = fieldGetter(b);
+			if (aField < bField) {
+				return -1;
+			}
+			if (aField > bField) {
+				return 1;
+			}
+		}
+		return 0;
+	};
 }

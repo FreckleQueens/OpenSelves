@@ -11,7 +11,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { IDB } from "$lib/idb";
-	import { subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
 	import type { Front, Member } from "openselves-common/db";
@@ -23,10 +23,7 @@
 
 	const { params }: PageProps = $props();
 
-	let members: {
-		loaded: boolean;
-		records: Member[];
-	} = $state({
+	let members: SubscriptionState<Member> = $state({
 		loaded: false,
 		records: [],
 	});
