@@ -52,17 +52,31 @@ export function subscribeToModel<Model extends SyncedModelBase>(
 	});
 }
 
-export function sortBy<T>(...fieldGetters: ((obj: T) => string | boolean)[]) {
+export function sortBy<T>(
+	direction: "asc" | "desc" | ((obj: T) => string | boolean | number),
+	...valueGetters: ((obj: T) => string | boolean | number)[]
+): (a: T, b: T) => number {
+	let directionMultiplier: number;
+	if (typeof direction === "string") {
+		directionMultiplier = direction === "asc" ? 1 : -1;
+	} else {
+		directionMultiplier = 1;
+		valueGetters = [direction, ...valueGetters];
+	}
 	return (a: T, b: T) => {
-		for (let i = 0; i < fieldGetters.length; i++) {
-			const fieldGetter = fieldGetters[i];
-			const aField = fieldGetter(a),
-				bField = fieldGetter(b);
-			if (aField < bField) {
-				return -1;
+		for (let i = 0; i < valueGetters.length; i++) {
+			const fieldGetter = valueGetters[i];
+			let aValue = fieldGetter(a),
+				bValue = fieldGetter(b);
+			if (typeof aValue === "string" && typeof bValue === "string") {
+				aValue = aValue.toLowerCase();
+				bValue = bValue.toLowerCase();
 			}
-			if (aField > bField) {
-				return 1;
+			if (aValue < bValue) {
+				return -1 * directionMultiplier;
+			}
+			if (aValue > bValue) {
+				return 1 * directionMultiplier;
 			}
 		}
 		return 0;

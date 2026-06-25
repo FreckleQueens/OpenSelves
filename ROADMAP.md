@@ -235,7 +235,7 @@ a short-lived one
   - [x] remove all front edit actions
   - [x] click anywhere on current front goes to /members
   - [x] rename to /dashboard "Dashboard"
-- [ ] Ignore case when sorting stuff by name
+- [x] Ignore case when sorting stuff by name
 
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright

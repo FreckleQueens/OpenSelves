@@ -9,7 +9,7 @@
 	import SortDescIcon from "$lib/components/icons/SortDescIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
@@ -33,47 +33,42 @@
 	let fronts: SubscriptionState<Front> = $state({
 		records: [],
 	});
+	let sortByField: keyof ArrayElement<typeof sortedFronts> = $state("startedAt");
+	let direction: "asc" | "desc" = $state("desc");
 	let sortedFronts = $derived(
 		fronts.records
 			.map((front) => ({
 				...front,
 				member: members.records.find((member) => member.id === front.memberId),
 			}))
-			.sort((a, b) => {
-				const aName = (a.member?.name || t("Unknown")).toLowerCase();
-				const bName = (b.member?.name || t("Unknown")).toLowerCase();
-				const aEndedAt = a.endedAt?.getTime() || Number.POSITIVE_INFINITY;
-				const bEndedAt = b.endedAt?.getTime() || Number.POSITIVE_INFINITY;
-				function compare(by: typeof sortBy, directionInt: number) {
-					switch (by) {
-						case "member":
-							return (aName > bName ? 1 : aName < bName ? -1 : 0) * directionInt;
-						case "startedAt":
-							return (a.startedAt.getTime() - b.startedAt.getTime()) * directionInt;
-						case "endedAt":
-							return (aEndedAt - bEndedAt) * directionInt;
-						default:
-							throw new Error("Unimplemented");
-					}
-				}
-				let compared = compare(sortBy, direction === "asc" ? 1 : -1);
-				if (compared === 0) {
-					compared = compare("startedAt", -1);
-				}
-				return compared;
-			}),
+			.sort(
+				sortBy(
+					direction,
+					(front) => {
+						switch (sortByField) {
+							case "member":
+								return front.member?.name || t("Unknown");
+							case "startedAt":
+								return front.startedAt.getTime();
+							case "endedAt":
+								return front.endedAt?.getTime() || Number.POSITIVE_INFINITY;
+							default:
+								throw new Error("Unimplemented");
+						}
+					},
+					(front) => front.startedAt.getTime(),
+				),
+			),
 	);
-	let sortBy: keyof ArrayElement<typeof sortedFronts> = $state("startedAt");
-	let direction: "asc" | "desc" = $state("desc");
 
 	requireAuth();
 	const idb = IDB.getInstance();
 	subscribeToModel(idb.member, members);
 	subscribeToModel(idb.front, fronts);
 
-	function setSortBy(value: typeof sortBy) {
-		direction = sortBy === value && direction === "asc" ? "desc" : "asc";
-		sortBy = value;
+	function setSortBy(value: typeof sortByField) {
+		direction = sortByField === value && direction === "asc" ? "desc" : "asc";
+		sortByField = value;
 	}
 </script>
 
@@ -86,7 +81,7 @@
 					<TableCell header class="cursor-pointer" onclick={() => setSortBy("member")}>
 						<div class="flex items-center">
 							Member
-							{#if sortBy === "member"}
+							{#if sortByField === "member"}
 								{#if direction === "asc"}
 									<SortAscIcon class="text-xl" after />
 								{:else}
@@ -98,7 +93,7 @@
 					<TableCell header class="cursor-pointer" onclick={() => setSortBy("startedAt")}>
 						<div class="flex items-center">
 							Start
-							{#if sortBy === "startedAt"}
+							{#if sortByField === "startedAt"}
 								{#if direction === "asc"}
 									<SortAscIcon class="text-xl" after />
 								{:else}
@@ -110,7 +105,7 @@
 					<TableCell header class="cursor-pointer" onclick={() => setSortBy("endedAt")}>
 						<div class="flex items-center">
 							End
-							{#if sortBy === "endedAt"}
+							{#if sortByField === "endedAt"}
 								{#if direction === "asc"}
 									<SortAscIcon class="text-xl" after />
 								{:else}
