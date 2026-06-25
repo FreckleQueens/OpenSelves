@@ -8,7 +8,7 @@ async function createFront(page: Page, member: { name: string; pronouns: string 
 	await getMemberEntry(page, member).locator(".member-card .start-front-button").click();
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
 
-	await page.goto("/front");
+	await page.goto("/dashboard");
 	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
 
 	await page.goto("/members");
@@ -34,7 +34,7 @@ test("create front then delete member", async ({ page }) => {
 
 	await expect(getMemberEntry(page, member)).toHaveCount(0);
 
-	await page.goto("/front");
+	await page.goto("/dashboard");
 	await expect(page.locator(".no-front")).toHaveCount(1);
 	await expect(getMemberEntry(page, member)).toHaveCount(0);
 	await expectNoAppError(page);
@@ -45,9 +45,11 @@ test("end front", async ({ page }) => {
 	const member = await createMember(page);
 	await createFront(page, member);
 
-	await getMemberEntry(page.locator("#current-fronting-members"), member)
-		.locator(`.end-front-button`)
-		.click();
-	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(0);
+	const memberEntry = getMemberEntry(page.locator("#current-fronting-members"), member);
+	await memberEntry.locator(`.end-front-button`).click();
+	await memberEntry.waitFor({
+		timeout: 5000,
+	});
+	await expect(memberEntry).toHaveCount(0);
 	await expectNoAppError(page);
 });

@@ -3,7 +3,7 @@ export const USER_LANDED_STORAGE_KEY = "userLanded";
 export const WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY = "warnForRemainingLocalData";
 
 export enum MenuItem {
-	FRONT,
+	DASHBOARD,
 	MEMBERS,
 	ACCOUNT,
 	SETTINGS,

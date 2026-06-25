@@ -24,8 +24,8 @@
 	import type { ArrayElement } from "openselves-common";
 	import type { Front, Member } from "openselves-common/db";
 
-	import FrontTabbar from "../FrontTabbar.svelte";
-	import { FrontTab } from "../tabs.ts";
+	import MembersTabbar from "../../MembersTabbar.svelte";
+	import { MembersTab } from "../../tabs.ts";
 
 	let members: SubscriptionState<Member> = $state({
 		records: [],
@@ -77,7 +77,7 @@
 	}
 </script>
 
-<AppPage title="" activeMenuItem={MenuItem.FRONT}>
+<AppPage title="" activeMenuItem={MenuItem.DASHBOARD}>
 	<BlockTitle>Front history</BlockTitle>
 	<Block class="overflow-x-auto pl-safe! pr-safe!">
 		<Table>
@@ -149,7 +149,7 @@
 								small
 								class="edit-front-button p-2"
 								inline
-								onClick={() => goto(resolve(`/front/edit/${front.id}`))}
+								onClick={() => goto(resolve(`/members/front/edit/${front.id}`))}
 							>
 								<EditIcon />
 							</Button>
@@ -165,6 +165,6 @@
 	</Block>
 
 	{#snippet bottomNav()}
-		<FrontTabbar activeTab={FrontTab.HISTORY} />
+		<MembersTabbar activeTab={MembersTab.HISTORY} />
 	{/snippet}
 </AppPage>

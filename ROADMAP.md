@@ -228,13 +228,13 @@ a short-lived one
 - [ ] /members:
   - [x] sort fronting members at the top of the list
   - [x] allow adding and removing member from front
-  - [ ] rename item menu to "Members and Front"
+  - [x] rename item menu to "Members and Front"
   - [ ] allow searching/filtering members by name
-- [ ] /front:
-  - [ ] move toolbar and history to /members
+- [x] /front:
+  - [x] move toolbar and history to /members
   - [x] remove all front edit actions
   - [x] click anywhere on current front goes to /members
-  - [ ] rename to /dashboard "Dashboard"
+  - [x] rename to /dashboard "Dashboard"
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
 ## 🚧 0.7.0 - Import data from Simply Plural

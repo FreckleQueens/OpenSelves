@@ -38,6 +38,9 @@
 	import { type Front, type Member } from "openselves-common/db";
 	import { onMount } from "svelte";
 
+	import MembersTabbar from "./MembersTabbar.svelte";
+	import { MembersTab } from "./tabs.ts";
+
 	let members: SubscriptionState<Member> = $state({
 		records: [],
 	});
@@ -322,6 +325,7 @@
 			]}
 			{pageContent}
 		/>
+		<MembersTabbar activeTab={MembersTab.CURRENT} />
 	{/snippet}
 </AppPage>
 

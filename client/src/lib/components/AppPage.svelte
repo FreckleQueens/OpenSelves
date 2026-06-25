@@ -8,7 +8,7 @@
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
 	import AccountIcon from "$lib/components/icons/AccountIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
-	import FrontIcon from "$lib/components/icons/FrontIcon.svelte";
+	import DashboardIcon from "$lib/components/icons/DashboardIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
@@ -68,13 +68,13 @@
 			iconComponent: Component<OSIconProps>;
 		};
 	} = {
-		[MenuItem.FRONT]: {
-			title: t("Front"),
-			href: resolve("/front"),
-			iconComponent: FrontIcon,
+		[MenuItem.DASHBOARD]: {
+			title: t("Dashboard"),
+			href: resolve("/dashboard"),
+			iconComponent: DashboardIcon,
 		},
 		[MenuItem.MEMBERS]: {
-			title: t("Members"),
+			title: t("Members & Front"),
 			href: resolve("/members"),
 			iconComponent: PeopleIcon,
 		},

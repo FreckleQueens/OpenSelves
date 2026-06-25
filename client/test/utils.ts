@@ -30,7 +30,7 @@ export async function registerAndLoginUser(page: Page, persistSession: boolean =
 	}
 	await page.locator("#login-button").click();
 
-	await page.waitForURL("/front?user_logged_in=1");
+	await page.waitForURL("/dashboard?user_logged_in=1");
 
 	return {
 		email,
@@ -156,7 +156,7 @@ export async function verifyEmail(
 	assert(gotoResponse);
 	assert(gotoResponse.ok());
 	await page.locator("#success-continue-button").click();
-	await page.waitForURL("/front?verified_email=1");
+	await page.waitForURL("/dashboard?verified_email=1");
 
 	await page.goto("/account");
 	await page.waitForSelector("#email-status.ready.verified", {

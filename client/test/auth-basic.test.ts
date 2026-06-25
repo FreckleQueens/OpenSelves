@@ -19,7 +19,7 @@ test("register", async ({ page }) => {
 
 	await page.locator("#login-button").click();
 
-	await page.waitForURL("/front?user_logged_in=1");
+	await page.waitForURL("/dashboard?user_logged_in=1");
 	await page.goto("/account");
 	await expect(page.locator("body")).toContainText(email);
 });
@@ -35,7 +35,7 @@ test("login", async ({ page }) => {
 	await form.locator("input[name=password]").fill(user.password);
 	await form.getByRole("button", { name: "Login" }).click();
 
-	await page.waitForURL("/front?user_logged_in=1");
+	await page.waitForURL("/dashboard?user_logged_in=1");
 	await page.goto("/account");
 	await expect(page.locator("body")).toContainText(user.email);
 });
@@ -66,7 +66,7 @@ test("change password", async ({ page }) => {
 	await page.locator("input[name=email]").fill(user.email);
 	await page.locator("input[name=password]").fill(newPassword);
 	await page.locator("#login-button").click();
-	await page.waitForURL("/front?user_logged_in=1");
+	await page.waitForURL("/dashboard?user_logged_in=1");
 
 	await page.goto("/account/change-password");
 	await page.locator("input[name=oldPassword]").fill(newPassword);

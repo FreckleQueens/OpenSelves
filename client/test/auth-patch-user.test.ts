@@ -118,7 +118,7 @@ test("recover password", async ({ page }) => {
 	await page.fill("input[name=email]", user.email);
 	await page.fill("input[name=password]", newPassword);
 	await page.locator("#login-button").click();
-	await page.waitForURL("/front?user_logged_in=1");
+	await page.waitForURL("/dashboard?user_logged_in=1");
 });
 
 test("send single form page with captcha and expired access token", async ({ page }) => {

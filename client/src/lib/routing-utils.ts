@@ -32,7 +32,7 @@ export async function gotoHomeRoute(
 
 	let url: string;
 	if (appState.isAuthenticated) {
-		url = resolve("/front");
+		url = resolve("/dashboard");
 	} else {
 		if (await PersistentStorage.getInstance().get(USER_LANDED_STORAGE_KEY, true)) {
 			url = resolve("/auth");

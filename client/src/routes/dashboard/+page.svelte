@@ -42,7 +42,7 @@
 	subscribeToModel(idb.front, fronts);
 </script>
 
-<AppPage title="" bind:pageContent activeMenuItem={MenuItem.FRONT}>
+<AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD}>
 	<a href={resolve("/members")}>
 		<BlockTitle medium>Currently fronting</BlockTitle>
 		<Block id="current-fronting-members" class="pt-2 pb-2">
