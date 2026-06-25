@@ -9,7 +9,7 @@ import {
 	randomInt,
 	verifySolution,
 } from "altcha-lib";
-import { deriveKey } from "altcha-lib/algorithms/argon2id";
+import { deriveKey } from "altcha-lib/algorithms/pbkdf2";
 import { randomBytes } from "crypto";
 import { type Request } from "express";
 import ipaddr from "ipaddr.js";
@@ -77,11 +77,17 @@ export class CaptchaService {
 		});
 
 		const challengeParams: CreateChallengeOptions = {
-			algorithm: "ARGON2ID",
-			cost: 3,
-			memoryCost: 65536,
-			parallelism: 1,
-			counter: randomInt(80 * factor, 40 * factor),
+			// TODO: argon2id algorithm crashes with multiple workers in chrome on certain android devices
+			//  this can be tested on https://playground.altcha.org/#/pow
+			//  see https://github.com/altcha-org/altcha/issues/192
+			// algorithm: "ARGON2ID",
+			// cost: 3,
+			// memoryCost: 65536,
+			// parallelism: 1,
+			// counter: randomInt(80 * factor, 40 * factor),
+			algorithm: "PBKDF2/SHA-256",
+			cost: 5000,
+			counter: randomInt(1000 * factor, 500 * factor),
 			deriveKey,
 			hmacSignatureSecret: this.configService.getOrThrow("CAPTCHA_SECRET", {
 				infer: true,

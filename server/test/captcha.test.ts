@@ -1,12 +1,13 @@
 import { CACHE_MANAGER, Cache } from "@nestjs/cache-manager";
 import { type Solution, solveChallenge } from "altcha-lib";
-import { deriveKey } from "altcha-lib/algorithms/argon2id";
+import { deriveKey } from "altcha-lib/algorithms/pbkdf2";
 import assert from "node:assert";
 import { after, afterEach, describe, mock, test } from "node:test";
 
 import type { TestEnv } from "./utils.ts";
 
-const EXPECTED_MIN_COUNTER = 40;
+// const EXPECTED_MIN_COUNTER = 40;
+const EXPECTED_MIN_COUNTER = 500;
 
 async function mockRandomInt(
 	callback: (max: number, min?: number) => number = (max, min) =>
@@ -61,10 +62,12 @@ describe("/captcha/generate", async () => {
 		assert.notStrictEqual(challenge.signature, undefined);
 		assert.partialDeepStrictEqual(challenge, {
 			parameters: {
-				algorithm: "ARGON2ID",
-				cost: 3,
-				memoryCost: 65536,
-				parallelism: 1,
+				algorithm: "PBKDF2/SHA-256",
+				cost: 5000,
+				// algorithm: "ARGON2ID",
+				// cost: 3,
+				// memoryCost: 65536,
+				// parallelism: 1,
 			},
 		});
 		for (const param of [
