@@ -18,6 +18,7 @@
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
+	import SearchIcon from "$lib/components/icons/SearchIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDB } from "$lib/idb";
 	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
@@ -30,9 +31,11 @@
 		Chip,
 		Dialog,
 		DialogButton,
+		Link,
 		List,
 		ListInput,
 		ListItem,
+		Searchbar,
 		Toggle,
 	} from "konsta/svelte";
 	import { type Front, type Member } from "openselves-common/db";
@@ -48,6 +51,9 @@
 		records: [],
 	});
 
+	let showSearchbar: boolean = $state(false);
+	let memberSearch: string = $state("");
+
 	let currentFronts = $derived(
 		fronts.records
 			.filter((front) => members.loaded && !front.endedAt)
@@ -62,6 +68,7 @@
 					frontingFor: Date.now() - front.startedAt.getTime(),
 				};
 			})
+			.filter((front) => front.member.name.toLowerCase().includes(memberSearch.toLowerCase()))
 			.sort(sortBy((front) => front.member.name)),
 	);
 	let frontInputMap: Record<string, () => void> = $state({});
@@ -75,7 +82,8 @@
 			.filter(
 				(member) =>
 					(showArchivedMembers || !member.isArchived) &&
-					!currentFronts.find((front) => front.member.id === member.id),
+					!currentFronts.find((front) => front.member.id === member.id) &&
+					member.name.toLowerCase().includes(memberSearch.toLowerCase()),
 			)
 			.sort(sortBy((member) => member.name)),
 	);
@@ -187,7 +195,22 @@
 	});
 </script>
 
-<AppPage title="" activeMenuItem={MenuItem.MEMBERS} bind:pageContent>
+{#snippet searchbar()}
+	<Searchbar
+		placeholder={t("Search by name...")}
+		class="p-4 rounded-3xl"
+		clearButton
+		bind:value={memberSearch}
+		onClear={() => (memberSearch = "")}
+	/>
+{/snippet}
+
+<AppPage
+	title=""
+	activeMenuItem={MenuItem.MEMBERS}
+	bind:pageContent
+	subnavbar={showSearchbar ? searchbar : undefined}
+>
 	<BlockTitle>Currently fronting</BlockTitle>
 	<Block id="current-fronting-members">
 		<div>
@@ -286,7 +309,9 @@
 				{/snippet}
 			</MemberCard>
 		{:else}
-			<p class="no-front">No one is currently fronting.</p>
+			{#if !memberSearch}
+				<p class="no-front">No one is currently fronting.</p>
+			{/if}
 		{/each}
 	</Block>
 
@@ -306,6 +331,12 @@
 			/>
 		{/each}
 	</Block>
+
+	{#snippet navbarRight()}
+		<Link onclick={() => (showSearchbar = !showSearchbar)}>
+			<SearchIcon button />
+		</Link>
+	{/snippet}
 
 	{#snippet bottomNav()}
 		<FabMenu

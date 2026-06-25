@@ -1,7 +1,7 @@
 <script lang="ts">
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
+	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
 	import { Block, Navbar, Searchbar, Sheet } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
 
@@ -29,17 +29,9 @@
 				(member) =>
 					!member.isArchived &&
 					!excludedMembers.find((excludedMember) => excludedMember.id === member.id) &&
-					member.name.includes(memberSearch),
+					member.name.toLowerCase().includes(memberSearch.toLowerCase()),
 			)
-			.sort((a, b) => {
-				if (a.name < b.name) {
-					return -1;
-				}
-				if (a.name > b.name) {
-					return 1;
-				}
-				return 0;
-			}),
+			.sort(sortBy((member) => member.name)),
 	);
 
 	subscribeToModel(IDB.getInstance().member, members);
