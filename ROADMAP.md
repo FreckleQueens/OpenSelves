@@ -223,7 +223,7 @@ a short-lived one
 ## 🚧 0.6.2
 - [x] add a word of thanks for contributors in the repo, the app and the website
 - [x] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
-- [ ] does the client actually use its `idb` dependency?
+- [x] does the client actually use its `idb` dependency? -> no, remove it
 - [ ] (to be further expanded from feedback) Add multi-select to the member select sheet
 
 ## 🚧 0.7.0 - Import data from Simply Plural
