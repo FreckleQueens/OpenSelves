@@ -1,6 +1,6 @@
 {
 	"name": "openselves",
-	"version": "0.6.1",
+	"version": "0.6.2",
 	"scripts": {
 		"dev": "concurrently --kill-others \"cd common && yarn dev\" \"cd common-ui && yarn dev\" \"cd client && yarn dev\" \"cd server && yarn dev\" \"cd www && yarn dev\"",
 		"clean": "yarn workspaces foreach -Ap run clean",

@@ -220,7 +220,11 @@ a short-lived one
 
 </details>
 
-## 🚧 0.6.2
+## ✅ 0.6.2
+
+<details>
+  <summary>todolist</summary>
+
 - [x] add a word of thanks for contributors in the repo, the app and the website
 - [x] Make the success message when clicking "Resend verification email" clearer (separate success and time to retry)
 - [x] does the client actually use its `idb` dependency? -> no, remove it
@@ -239,9 +243,11 @@ a short-lived one
 - [x] fix: Fronter's fronting time wraps below secondary actions, which doesn't feel right
 - [x] fix: captcha makes some devices crash
 
-## 🚧 0.7.0 - Import data from Simply Plural
+</details>
+
+## 🚧 0.7.0 - Willow data model, encryption and moving to a zero-trust model
 - [ ] find an alternative to playwright
-- [ ] Willow data model, e2e encryption and moving to a zero-trust model
+- [ ] Willow data model
   As per https://willowprotocol.org/specs/data-model/index.html#data_model
   - [ ] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
     - [ ] migrate the database to the new format
@@ -281,8 +287,6 @@ a short-lived one
     - [ ] For each uploaded entry, delete all entries in the same namespace AND subspace AND whose path is prefixed by the uploaded entry
     - [ ] insert remaining entries in DB
     - [ ] initial sync is no longer a separate process. to retrieve all data, call /sync/pull with the timestamp set to 0
-- [ ] simply plural data importer (save all simply plural ids!)
-- [ ] simply plural data vault
 - [ ] encryption (client side)
   - [ ] make sure the password is never sent to the server (srp? opaque?)
   - [ ] use PBKDF2 to derive the KEK from the password, store it securely (idb?)
@@ -293,20 +297,9 @@ a short-lived one
   - [ ] encrypt path components
   - [ ] encrypt payloads
 
-## 0.8.0 - Optimizations
-- [ ] client
-  - [ ] drop prior unsynced create and update operations when deleting a record
-  - [ ] leverage @capacitor/background-runner
-  - [ ] leverage Background Sync API when available
-  - [ ] detect unused translations and fail build
-- [ ] server
-  - [ ] preload all records used by sub-functions of computeOperations (solveHistory, filterCascadeDeletedRecordsOperations...) in computeOperations 
-  - [ ] purge logs that don't have an effect anymore
-  - [ ] use @nestjs/cache-manager to cache s3 get responses
-  - [ ] throttle requests using @nestjs/throttler
-  - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
-  - [ ] turn on Secure flag on cookies (except in dev and test mode)
-  - [ ] lock rows in sync engine operations transaction
+## 0.8.0 - Simply Plural import
+- [ ] simply plural data importer (save all simply plural ids!)
+- [ ] simply plural data vault
 
 ## 0.9.0 - Exclusive-offline mode
 - [ ] add data export to zip file (json files + image files)
@@ -319,20 +312,36 @@ a short-lived one
 - [ ] add a way to copy data to the active local profile from any other local profile
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
 
-## 0.10.0 - UI tweaks
-- [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
-- [ ] show proper language names in language switcher
-- [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
-- [ ] fab menus: don't use fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
-- [ ] ListInput: make the text field focus when clicking anywhere inside the whole visible box (+ cursor change)
-- [ ] member edit: make profile picture edit button always visible (maybe move it outside the image's box)
-- [ ] ListInput: make clear button better (example: member edit form color field)
-- [ ] bug: click on a member's card image captures click events, preventing from performing card click action
-- [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
-- [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
-- [ ] normalize all dialog `buttons()` to `DialogButton` instead of `Button`
-- [ ] add <title> to all client pages
-- [ ] add app setting to choose landing page on app open
+## 0.10.0 - Optimizations and UI tweaks
+- [ ] client
+  - [ ] drop prior unsynced create and update operations when deleting a record
+  - [ ] leverage @capacitor/background-runner
+  - [ ] leverage Background Sync API when available
+  - [ ] detect unused translations and fail build
+- [ ] server
+  - [ ] preload all records used by sub-functions of computeOperations (solveHistory, filterCascadeDeletedRecordsOperations...) in computeOperations
+  - [ ] purge logs that don't have an effect anymore
+  - [ ] use @nestjs/cache-manager to cache s3 get responses
+  - [ ] throttle requests using @nestjs/throttler
+  - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
+  - [ ] turn on Secure flag on cookies (except in dev and test mode)
+  - [ ] lock rows in sync engine operations transaction
+- [ ] UI tweaks
+  - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
+  - [ ] show proper language names in language switcher
+  - [ ] current fronts: buttons are unclear, show hint tooltip on long press (and vibrate)
+  - [ ] fab menus: don't use fab menus, always show "add" action (with a tooltip), put secondary actions in a toolbar?
+  - [ ] ListInput: make the text field focus when clicking anywhere inside the whole visible box (+ cursor change)
+  - [ ] member edit: make profile picture edit button always visible (maybe move it outside the image's box)
+  - [ ] ListInput: make clear button better (example: member edit form color field)
+  - [ ] bug: click on a member's card image captures click events, preventing from performing card click action
+  - [ ] Member color picker: use a custom color picker (android doesn't let you customize it)
+  - [ ] bug: s3-uploaded profile pictures aren't loaded on browser tab restore (caching issue?)
+  - [ ] normalize all dialog `buttons()` to `DialogButton` instead of `Button`
+  - [ ] add <title> to all client pages
+  - [ ] add app setting to choose landing page on app open
+  - [ ] /members: when clicking on the search button to show the searchbar, focus the searchbar
+  - [ ] /members: when clicking on the add note button of a member, focus the textarea
 
 ## 1.0.0 - Official release
 - [ ] general UI/UX accessibility check
@@ -359,6 +368,9 @@ a short-lived one
 - [ ] Add rich html version of emails
 - [ ] Translate emails
 - [ ] Translate form validation errors received from server
+- [ ] Translate www
+- [ ] Add user manual to www
+- [ ] Add technical documentation to www
 
 ---
 
@@ -395,10 +407,7 @@ a short-lived one
 
 ## Ideas for future releases
 - data trust and privacy
-  - encrypt and decrypt synced data in client
   - sign sync operations in client and verify incoming operations
-  - move reduction and conflict resolution algorithm to client?
-- save a backup of remote (url) images (member pfp) in IDB as data uris
 - warn the user when the remote image doesn't load and allow them to use the backup image instead
 - Member onboarding procedure (needs thought out UX)
 - Make different types of groups? (sub-system, geographical, tag...) -> "visual only"
