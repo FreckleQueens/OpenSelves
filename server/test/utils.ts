@@ -4,7 +4,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
 import { createId } from "@paralleldrive/cuid2";
 import { type Challenge, type Solution, solveChallenge } from "altcha-lib";
-import { deriveKey } from "altcha-lib/algorithms/pbkdf2";
+import { deriveKey } from "altcha-lib/algorithms/argon2id";
 import { inArray } from "drizzle-orm";
 import methods from "methods";
 import assert from "node:assert";
