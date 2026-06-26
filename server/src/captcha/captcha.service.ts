@@ -79,7 +79,7 @@ export class CaptchaService {
 		const challengeParams: CreateChallengeOptions = {
 			algorithm: "ARGON2ID",
 			cost: 3,
-			memoryCost: 65536,
+			memoryCost: 16384,
 			parallelism: 1,
 			counter: randomInt(80 * factor, 40 * factor),
 			deriveKey,

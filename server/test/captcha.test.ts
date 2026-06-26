@@ -63,7 +63,7 @@ describe("/captcha/generate", async () => {
 			parameters: {
 				algorithm: "ARGON2ID",
 				cost: 3,
-				memoryCost: 65536,
+				memoryCost: 16384,
 				parallelism: 1,
 			},
 		});

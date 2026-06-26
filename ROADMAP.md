@@ -237,7 +237,7 @@ a short-lived one
   - [x] rename to /dashboard "Dashboard"
 - [x] Ignore case when sorting stuff by name
 - [x] fix: Fronter's fronting time wraps below secondary actions, which doesn't feel right
-- [ ] fix: captcha makes some devices crash
+- [x] fix: captcha makes some devices crash
 
 ## 🚧 0.7.0 - Import data from Simply Plural
 - [ ] find an alternative to playwright

@@ -30,7 +30,7 @@
 		globalThis.$altcha.defaults.set({
 			name: "captcha",
 			language: localeState.locale || undefined,
-			workers: 8,
+			workers: 4,
 			retryOnOutOfMemoryError: true,
 			hideLogo: true,
 			hideFooter: true,
