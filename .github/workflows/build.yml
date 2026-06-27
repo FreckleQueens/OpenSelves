@@ -19,6 +19,8 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
       - run: yarn lint
 
   test-client:
@@ -136,6 +138,8 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
       - run: yarn build
       - run: yarn workspace openselves-server db:migrate:test
         env:
