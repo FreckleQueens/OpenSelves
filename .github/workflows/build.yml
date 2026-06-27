@@ -67,6 +67,8 @@ jobs:
           path: |
             ~/.cache/puppeteer
           key: ${{ runner.os }}-puppeteer-${{ env.PUPPETEER_VERSION }}
+      - name: Disable AppArmor
+        run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
 
       - run: yarn install --immutable
       - run: yarn build
