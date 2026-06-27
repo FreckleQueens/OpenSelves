@@ -2,6 +2,7 @@
 	import "../app.css";
 
 	import { App, Page } from "konsta/svelte";
+	import { onDestroy, onMount } from "svelte";
 
 	let { children } = $props();
 
@@ -19,6 +20,14 @@
 			(navigator.userAgent.includes("Mac") && "ontouchend" in document)
 		);
 	}
+
+	let mounted: boolean = $state(false);
+	onMount(() => {
+		mounted = true;
+	});
+	onDestroy(() => {
+		mounted = false;
+	});
 </script>
 
 <svelte:head>
@@ -30,6 +39,10 @@
 		rel="stylesheet"
 	/>
 </svelte:head>
+
+{#if mounted}
+	<div class="hidden layout-mounted"></div>
+{/if}
 
 <App safeAreas theme={isIos() ? "ios" : "material"}>
 	<div class="safe-areas">

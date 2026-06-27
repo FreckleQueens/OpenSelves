@@ -1,57 +1,66 @@
-import { expect, test } from "@playwright/test";
-import type { Page } from "playwright";
+import assert from "node:assert";
+import test, { describe } from "node:test";
 
-import { createMember, expectNoAppError, getMemberEntry, registerAndLoginUser } from "./utils";
+import { setupPuppeteer } from "./utils.js";
 
-async function createFront(page: Page, member: { name: string; pronouns: string }) {
-	await page.goto("/members");
-	await getMemberEntry(page.locator("#not-fronting-members"), member)
-		.locator(".start-front-button")
-		.click();
-	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
+describe("Front", () => {
+	const ctx = setupPuppeteer();
 
-	await page.goto("/dashboard");
-	await expect(getMemberEntry(page.locator("#current-fronting-members"), member)).toHaveCount(1);
+	async function createFront(member: { name: string; pronouns: string }) {
+		await ctx.goto("/members");
+		await ctx
+			.locator(
+				`#not-fronting-members ${ctx.getMemberEntrySelector(member)} .start-front-button`,
+			)
+			.click();
+		const frontingMemberEntrySelector = `#current-fronting-members ${ctx.getMemberEntrySelector(member)}`;
+		await ctx.locator(frontingMemberEntrySelector).setTimeout(5000).wait();
+		assert.strictEqual((await ctx.page.$$(frontingMemberEntrySelector)).length, 1);
 
-	await page.goto("/members");
-}
+		await ctx.goto("/dashboard", undefined, true);
+		assert.strictEqual((await ctx.page.$$(frontingMemberEntrySelector)).length, 1);
 
-test("create front", async ({ page }) => {
-	await registerAndLoginUser(page);
-	const member = await createMember(page);
-	await createFront(page, member);
-});
+		await ctx.goto("/members");
+	}
 
-test("create front then delete member", async ({ page }) => {
-	await registerAndLoginUser(page);
-	const member = await createMember(page);
-	await createFront(page, member);
-
-	await page.goto("/members");
-	await getMemberEntry(page, member).locator(".member-card").click();
-	await page.locator("#settings-tab-button").click();
-	await page.locator("#delete-record-button").click();
-	await page.locator("#delete-record-confirm-button").click();
-	await page.waitForURL("/members");
-
-	await expect(getMemberEntry(page, member)).toHaveCount(0);
-
-	await page.goto("/dashboard");
-	await expect(page.locator(".no-front")).toHaveCount(1);
-	await expect(getMemberEntry(page, member)).toHaveCount(0);
-	await expectNoAppError(page);
-});
-
-test("end front", async ({ page }) => {
-	await registerAndLoginUser(page);
-	const member = await createMember(page);
-	await createFront(page, member);
-
-	const memberEntry = getMemberEntry(page.locator("#current-fronting-members"), member);
-	await memberEntry.locator(`.end-front-button`).click();
-	await memberEntry.waitFor({
-		timeout: 5000,
+	test("create front", async () => {
+		await ctx.registerAndLoginUser();
+		const member = await ctx.createMember();
+		await createFront(member);
 	});
-	await expect(memberEntry).toHaveCount(0);
-	await expectNoAppError(page);
+
+	test("create front then delete member", async () => {
+		await ctx.registerAndLoginUser();
+		const member = await ctx.createMember();
+		await createFront(member);
+
+		await ctx.goto("/members");
+		await ctx.locator(`${ctx.getMemberEntrySelector(member)} .member-card`).click();
+		await ctx.locator("#settings-tab-button").click();
+		await ctx.locator("#delete-record-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("delete-record-confirm-button");
+
+		await ctx.waitForNavigation("/members", undefined, true);
+		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
+
+		await ctx.goto("/dashboard", undefined, true);
+		assert.strictEqual((await ctx.page.$$(".no-front")).length, 1);
+		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
+		await ctx.expectNoAppError();
+	});
+
+	test("end front", async () => {
+		await ctx.registerAndLoginUser();
+		const member = await ctx.createMember();
+		await createFront(member);
+
+		const memberEntrySelector = `#current-fronting-members ${ctx.getMemberEntrySelector(member)}`;
+		await ctx.locator(`${memberEntrySelector} .end-front-button`).click();
+		await ctx
+			.locator(`#not-fronting-members ${ctx.getMemberEntrySelector(member)}`)
+			.setTimeout(5000)
+			.wait();
+		assert.strictEqual((await ctx.page.$$(memberEntrySelector)).length, 0);
+		await ctx.expectNoAppError();
+	});
 });

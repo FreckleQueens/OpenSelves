@@ -24,6 +24,8 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
       - run: yarn build
 
       - name: Install server dependencies

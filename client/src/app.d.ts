@@ -5,6 +5,7 @@ import "../auto-imports";
 import type { PersistentStorage } from "$lib/PersistentStorage.ts";
 import { IDB } from "$lib/idb";
 import type { SyncWorker } from "$lib/idb/SyncWorker.js";
+import type { tick } from "svelte";
 
 declare global {
 	function t(key: string, ...args: string[]): string;
@@ -22,6 +23,7 @@ declare global {
 			IDB: typeof IDB;
 			PersistentStorage: typeof PersistentStorage;
 			SyncWorker: typeof SyncWorker;
+			tick: typeof tick;
 		};
 	}
 }

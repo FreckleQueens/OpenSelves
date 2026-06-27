@@ -1,13 +1,28 @@
-{ pkgs ? import <nixpkgs> {} }:
-  pkgs.mkShell {
-    nativeBuildInputs = with pkgs; [
-      playwright-driver.browsers
-      mailpit
-    ];
-
-    shellHook = ''
-      export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
-      export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-      export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu-24.04"
-    '';
-}
+{ pkgs ? import <nixpkgs> {}, run ? "bash" }:
+(pkgs.buildFHSEnv {
+  name = "puppeteer-env";
+  targetPkgs = pkgs: with pkgs; [
+    nix-index
+    glib
+    libx11
+    nss_latest
+    nspr
+    atk
+    dbus
+    cups
+    expat
+    libxcb
+    libxkbcommon
+    libgbm
+    alsa-lib
+    libxext
+    cairo
+    pango
+    udev
+    libxcomposite
+    libxdamage
+    libxfixes
+    libxrandr
+  ];
+  runScript = "${run}";
+}).env

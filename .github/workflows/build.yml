@@ -54,25 +54,23 @@ jobs:
           path: ~/.yarn
       - run: sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
       - run: sudo ln -s /usr/local/bin/mailpit /usr/sbin/sendmail
+
+      - name: Get installed puppeteer version
+        id: puppeteer-version
+        run: 'cd client && echo "PUPPETEER_VERSION=$(yarn info --name-only "puppeteer" | cut -d: -f2)" >> $GITHUB_ENV'
+      - name: Cache puppeteer binaries
+        uses: actions/cache@v5
+        id: puppeteer-cache
+        with:
+          path: |
+            ~/.cache/puppeteer
+          key: ${{ runner.os }}-puppeteer-${{ env.PUPPETEER_VERSION }}
+
       - run: yarn install --immutable
       - run: yarn build
       - run: yarn workspace openselves-server db:migrate
         env:
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-      - name: Get installed Playwright version
-        id: playwright-version
-        run: 'cd client && echo "PLAYWRIGHT_VERSION=$(yarn info --name-only "@playwright/test" | cut -d"@" -f3 | cut -d: -f2)" >> $GITHUB_ENV'
-      - name: Cache playwright binaries
-        uses: actions/cache@v5
-        id: playwright-cache
-        with:
-          path: |
-            ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
-      - run: yarn workspace openselves-client playwright install --with-deps
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-      - run: yarn workspace openselves-client playwright install-deps
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
       - run: mkdir server/tmp_upload
       - run: yarn workspace openselves-client test
         env:
@@ -100,7 +98,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: puppeteer-report
           path: client/test-results/
           retention-days: 30
 

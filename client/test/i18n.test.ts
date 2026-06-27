@@ -1,22 +1,31 @@
-import { test } from "@playwright/test";
+import test, { describe } from "node:test";
 
-test("land page", async ({ page }) => {
-	await page.goto("/");
-	await page.waitForURL("/land?from_index_page=1");
+import { setupPuppeteer } from "./utils.js";
 
-	await page.locator("select[name=language]").selectOption("fr");
-	await page.locator("#continue-button").click();
-	await page.waitForURL("/auth?landed=1");
-});
+describe("i18n", () => {
+	const ctx = setupPuppeteer();
 
-test("change lang", async ({ page }) => {
-	await page.goto("/auth");
+	test("land page", async () => {
+		await ctx.goto("/");
+		await ctx.waitForNavigation("/land?from_index_page=1");
 
-	await page.locator("#settings-link").click();
-	await page.locator("select[name=language]").selectOption("fr");
-	await page.locator("#back-link").click();
-	await page.locator("#settings-link").click();
-	await page.locator("select[name=language]").selectOption("en");
-	await page.locator("#back-link").click();
-	await page.locator("#settings-link").click();
+		await ctx.locator("select[name=language]").wait();
+		await ctx.page.select("select[name=language]", "fr");
+		await ctx.locator("#continue-button").click();
+		await ctx.waitForNavigation("/auth?landed=1");
+	});
+
+	test("change lang", async () => {
+		await ctx.goto("/auth");
+
+		await ctx.locator("#settings-link").click();
+		await ctx.locator("select[name=language]").wait();
+		await ctx.page.select("select[name=language]", "fr");
+		await ctx.locator("#back-link").click();
+		await ctx.locator("#settings-link").click();
+		await ctx.locator("select[name=language]").wait();
+		await ctx.page.select("select[name=language]", "en");
+		await ctx.locator("#back-link").click();
+		await ctx.locator("#settings-link").click();
+	});
 });

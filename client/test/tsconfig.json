@@ -1,0 +1,11 @@
+{
+	"extends": "openselves-common/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "./",
+		"rootDirs": ["./"],
+		"outDir": "./dist",
+		"tsBuildInfoFile": "./dist/.tsbuildinfo",
+		"types": ["node", "../.svelte-kit/ambient.d.ts", "../src/app.d.ts"]
+	},
+	"include": ["./**/*"]
+}

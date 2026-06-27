@@ -20,6 +20,8 @@ jobs:
           key: yarn
           path: ~/.yarn
       - run: yarn install --immutable
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
 
       # This also calls `yarn build`
       - run: yarn lint

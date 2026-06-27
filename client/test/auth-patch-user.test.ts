@@ -1,152 +1,131 @@
 import { createId } from "@paralleldrive/cuid2";
-import { test } from "@playwright/test";
 import assert from "node:assert";
-import type { Response } from "playwright";
+import test, { describe } from "node:test";
+import type { HTTPResponse } from "puppeteer";
 
-import {
-	debugPromise,
-	expectNoAppError,
-	getEmailLink,
-	logout,
-	registerAndLoginUser,
-	verifyEmail,
-	waitForRequest,
-} from "./utils";
+import { setupPuppeteer } from "./utils.js";
 
-test("verify email", async ({ page }) => {
-	const { email } = await registerAndLoginUser(page);
-	await verifyEmail(page, email);
-});
+describe("Auth patch user", () => {
+	const ctx = setupPuppeteer();
 
-test("resend verification email", async ({ page }) => {
-	const { email } = await registerAndLoginUser(page);
-	await page.goto("/account");
-	await page.waitForSelector(".resend-verification-email-comp", {
-		timeout: 3000,
+	test("verify email", async () => {
+		const { email } = await ctx.registerAndLoginUser();
+		await ctx.verifyEmail(email);
 	});
-	await page.locator("#resend-verification-email-button").click();
-	await page
-		.locator("span", {
-			hasText: "Verification email sent.",
-		})
-		.waitFor({
-			timeout: 5000,
+
+	test("resend verification email", async () => {
+		const { email } = await ctx.registerAndLoginUser();
+		await ctx.goto("/account");
+		await ctx.locator(".resend-verification-email-comp").setTimeout(3000).wait();
+		await ctx.locator("#resend-verification-email-button").click();
+		await ctx
+			.locator("form:has(#resend-verification-email-button) + span")
+			.filter((el) => el.textContent.includes("Verification email sent."))
+			.setTimeout(5000)
+			.wait();
+		await ctx.locator("#resend-verification-email-button[disabled]").wait();
+		await ctx.locator(".resend-verification-email-comp").wait();
+		await ctx.expectNoAppError();
+
+		await ctx.verifyEmail(email, 2, 1);
+		assert.strictEqual(await ctx.page.$("#resend-verification-email-button"), null);
+		assert.strictEqual(await ctx.page.$(".resend-verification-email-comp"), null);
+
+		await ctx.expectNoAppError();
+	});
+
+	test("change email", async () => {
+		const user = await ctx.registerAndLoginUser();
+		await ctx.goto("/account");
+		await ctx.locator("[href='/account/change-email']").click();
+		await ctx.waitForNavigation("/account/change-email");
+
+		await ctx.locator("input[name=email]").fill(user.email);
+		await ctx.locator("#change-email-button").click();
+		await ctx.locator(".form-global-error").wait();
+		await ctx.expectNoAppError();
+
+		await ctx.locator("input[name=email]").fill(createId() + "@example.com");
+		await ctx.locator("#change-email-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+		await ctx.waitForNavigation("/account");
+		await ctx.expectNoAppError();
+
+		await ctx.locator("[href='/account/change-email']").click();
+		await ctx.waitForNavigation("/account/change-email");
+
+		const newEmail = createId() + "@example.com";
+		await ctx.locator("input[name=email]").fill(newEmail);
+		await ctx.locator("#change-email-button").click();
+
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+		await ctx.waitForNavigation("/account");
+
+		await ctx.verifyEmail(newEmail);
+
+		await ctx.expectNoAppError();
+	});
+
+	test("recover password", async () => {
+		const user = await ctx.registerAndLoginUser();
+		await ctx.logout();
+
+		const wrongEmail = "wrongemail@example.com";
+		await ctx.goto("/auth");
+		await ctx.locator("input[name=email]").fill(wrongEmail);
+		const targetUrl = "/auth/recover-password?email=" + wrongEmail;
+		await ctx.locator(`[href='${targetUrl}']`).click();
+
+		await ctx.waitForNavigation(targetUrl);
+		assert.strictEqual(await ctx.page.$eval("input[name=email]", (el) => el.value), wrongEmail);
+
+		await ctx.locator("#recover-password-button").click();
+		await ctx.locator(".form-global-error").wait();
+
+		await ctx.locator("input[name=email]").fill(user.email);
+		await ctx.locator("#recover-password-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+		await ctx.waitForNavigation("/auth");
+
+		const link = await ctx.getEmailLink(user.email, 2, 1);
+		assert(link.indexOf("/recover-password/") >= 0);
+		const gotoResponse = await ctx.goto(link);
+		assert(gotoResponse);
+		assert(gotoResponse.ok());
+		const newPassword = createId();
+		await ctx.locator("input[name=newPassword]").fill(newPassword);
+		await ctx.locator("#recover-password-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+
+		await ctx.waitForNavigation("/auth");
+		await ctx.locator("input[name=email]").fill(user.email);
+		await ctx.locator("input[name=password]").fill(newPassword);
+		await ctx.locator("#login-button").click();
+		await ctx.waitForNavigation("/dashboard?user_logged_in=1");
+	});
+
+	test("send single form page with captcha and expired access token", async () => {
+		await ctx.registerAndLoginUser();
+		await ctx.goto("/account");
+		await ctx.locator("[href='/account/change-email']").click();
+		await ctx.waitForNavigation("/account/change-email");
+
+		await ctx.locator("input[name=email]").fill(createId() + "@example.com");
+		let response: HTTPResponse;
+		do {
+			response = await ctx.waitForResponse("/sync/pull");
+		} while (!response.ok());
+		await ctx.page.evaluate(() => {
+			window.openselves.SyncWorker.getInstance().pause();
 		});
-	assert(await page.locator("#resend-verification-email-button[disabled]").isVisible());
-	assert(await page.isVisible(".resend-verification-email-comp"));
-	await expectNoAppError(page);
+		// Wait for access token to expire (see package.json)
+		await ctx.waitForTimeout(4000);
+		await ctx.locator("#change-email-button").click();
+		await ctx.waitForResponse("/user/", false);
+		await ctx.waitForResponse("/user/");
 
-	await verifyEmail(page, email, 2, 1);
-	assert(await page.isHidden("#resend-verification-email-button"));
-	assert(
-		await page
-			.locator("span", {
-				hasText: "Verification email sent.",
-			})
-			.isHidden(),
-	);
-	assert(await page.isHidden(".resend-verification-email-comp"));
-	await expectNoAppError(page);
-});
-
-test("change email", async ({ page }) => {
-	const user = await registerAndLoginUser(page);
-	await page.goto("/account");
-	await page.locator("[href='/account/change-email']").click();
-	await page.waitForURL("/account/change-email");
-
-	await page.locator("input[name=email]").fill(user.email);
-	await page.locator("#change-email-button").click();
-	await page.waitForSelector(".form-global-error");
-	await expectNoAppError(page);
-
-	await page.locator("input[name=email]").fill(createId() + "@example.com");
-	await page.locator("#change-email-button").click();
-	await page.locator("#success-dialog-continue-button").click();
-	await page.waitForURL("/account");
-	await expectNoAppError(page);
-
-	await page.locator("[href='/account/change-email']").click();
-	await page.waitForURL("/account/change-email");
-
-	const newEmail = createId() + "@example.com";
-	await page.locator("input[name=email]").fill(newEmail);
-	await page.locator("#change-email-button").click();
-
-	await page.locator("#success-dialog-continue-button").click({
-		timeout: 5000,
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button", 5000);
+		await ctx.waitForNavigation("/account");
+		await ctx.expectNoAppError();
 	});
-	await page.waitForURL("/account");
-
-	await verifyEmail(page, newEmail);
-
-	await expectNoAppError(page);
-});
-
-test("recover password", async ({ page }) => {
-	const user = await registerAndLoginUser(page);
-	await logout(page);
-
-	const wrongEmail = "wrongemail@example.com";
-	await page.goto("/auth");
-	await page.locator("input[name=email]").fill(wrongEmail);
-	const targetUrl = "/auth/recover-password?email=" + wrongEmail;
-	await page.locator(`[href='${targetUrl}']`).click();
-
-	await page.waitForURL(targetUrl);
-	assert.strictEqual(await page.inputValue("input[name=email]"), wrongEmail);
-
-	await page.locator("#recover-password-button").click();
-	await page.waitForSelector(".form-global-error");
-
-	await page.fill("input[name=email]", user.email);
-	await page.locator("#recover-password-button").click();
-	await page.locator("#success-dialog-continue-button").click();
-	await page.waitForURL("/auth");
-
-	const link = await getEmailLink(user.email, 2, 1);
-	assert(link.indexOf("/recover-password/") >= 0);
-	const gotoResponse = await page.goto(link);
-	assert(gotoResponse);
-	assert(gotoResponse.ok());
-	const newPassword = createId();
-	await page.fill("input[name=newPassword]", newPassword);
-	await page.locator("#recover-password-button").click();
-	await page.locator("#success-dialog-continue-button").click();
-
-	await page.waitForURL("/auth");
-	await page.fill("input[name=email]", user.email);
-	await page.fill("input[name=password]", newPassword);
-	await page.locator("#login-button").click();
-	await page.waitForURL("/dashboard?user_logged_in=1");
-});
-
-test("send single form page with captcha and expired access token", async ({ page }) => {
-	await registerAndLoginUser(page);
-	await page.goto("/account");
-	await page.locator("[href='/account/change-email']").click();
-	await page.waitForURL("/account/change-email");
-
-	await page.locator("input[name=email]").fill(createId() + "@example.com");
-	let response: Response;
-	do {
-		response = await waitForRequest(page, "/sync/pull");
-	} while (!response.ok());
-	await page.evaluate(() => {
-		window.openselves.SyncWorker.getInstance().pause();
-	});
-	// Wait for access token to expire (see playwright.config.ts)
-	await page.waitForTimeout(4000);
-	await page.locator("#change-email-button").click();
-	await waitForRequest(page, "/user/", false);
-	await waitForRequest(page, "/user/");
-
-	await debugPromise(
-		page,
-		page.locator("#success-dialog-continue-button").click({
-			timeout: 5000,
-		}),
-	);
-	await page.waitForURL("/account");
-	await expectNoAppError(page);
 });

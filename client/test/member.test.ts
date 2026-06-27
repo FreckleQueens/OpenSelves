@@ -1,30 +1,39 @@
-import { expect, test } from "@playwright/test";
+import assert from "node:assert";
+import test, { describe } from "node:test";
 
-import { createMember, getLogsCount, getMemberEntry, registerAndLoginUser } from "./utils";
+import { setupPuppeteer } from "./utils.js";
 
-test("create member", async ({ page }) => {
-	await registerAndLoginUser(page);
+describe("Member", () => {
+	const ctx = setupPuppeteer();
 
-	const pushRequest = page.waitForResponse(/\/sync\/push/);
-	const member = await createMember(page);
+	test("create member", async () => {
+		await ctx.registerAndLoginUser();
 
-	expect((await pushRequest).ok()).toBe(true);
+		const pushRequest = ctx.waitForResponse("/sync/push");
+		const member = await ctx.createMember();
 
-	await expect(getMemberEntry(page.locator("#not-fronting-members"), member)).toHaveCount(1);
-});
+		assert.strictEqual((await pushRequest).ok(), true);
 
-test("update member no change", async ({ page }) => {
-	await registerAndLoginUser(page);
-	const member = await createMember(page);
+		assert.strictEqual(
+			(await ctx.page.$$(`#not-fronting-members ${ctx.getMemberEntrySelector(member)}`))
+				.length,
+			1,
+		);
+	});
 
-	const previousLogsCount = await getLogsCount(page);
-	await getMemberEntry(page.locator("#not-fronting-members"), member)
-		.locator(".member-card")
-		.click();
-	await page.locator("#save-record-button").click();
+	test("update member no change", async () => {
+		await ctx.registerAndLoginUser();
+		const member = await ctx.createMember();
 
-	await page.waitForURL("/members");
+		const previousLogsCount = await ctx.getLogsCount();
+		await ctx
+			.locator(`#not-fronting-members ${ctx.getMemberEntrySelector(member)} .member-card`)
+			.click();
+		await ctx.locator("#save-record-button").click();
 
-	const newLogsCount = await getLogsCount(page);
-	expect(newLogsCount).toBe(previousLogsCount);
+		await ctx.waitForNavigation("/members");
+
+		const newLogsCount = await ctx.getLogsCount();
+		assert.strictEqual(newLogsCount, previousLogsCount);
+	});
 });

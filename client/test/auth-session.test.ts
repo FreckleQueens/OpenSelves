@@ -1,30 +1,32 @@
-import { test } from "@playwright/test";
 import assert from "node:assert";
+import test, { describe } from "node:test";
 
-import { registerAndLoginUser, waitForRequest } from "./utils";
+import { setupPuppeteer } from "./utils.js";
 
-test("short lived session logs out", async ({ page }) => {
-	await registerAndLoginUser(page);
-	await page.goto("about:blank");
-	// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see playwright.config.ts)
-	await page.waitForTimeout(10000);
-	await page.goto("/account");
-	await waitForRequest(page, "/user/", false);
-	await page.waitForURL(/\/land\?session_expired=1/, {
-		timeout: 5000,
+describe("Auth session", () => {
+	const ctx = setupPuppeteer();
+
+	test("short lived session logs out", async () => {
+		await ctx.registerAndLoginUser();
+		await ctx.goto("about:blank");
+		// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see package.json)
+		await ctx.waitForTimeout(10000);
+		await ctx.goto("/account");
+		await ctx.waitForResponse("/user/", false);
+		await ctx.waitForNavigation(/\/land\?session_expired=1/, 5000);
 	});
-});
 
-test("long lived session doesn't log out", async ({ page }) => {
-	await registerAndLoginUser(page, true);
-	await page.goto("about:blank");
-	// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see playwright.config.ts)
-	await page.waitForTimeout(10000);
-	await page.goto("/account");
+	test("long lived session doesn't log out", async () => {
+		await ctx.registerAndLoginUser(true);
+		await ctx.goto("about:blank");
+		// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see package.json)
+		await ctx.waitForTimeout(10000);
+		await ctx.goto("/account");
 
-	await waitForRequest(page, "/user/", false);
-	await waitForRequest(page, "/user/", true);
+		await ctx.waitForResponse("/user/", false);
+		await ctx.waitForResponse("/user/", true);
 
-	await page.waitForTimeout(3000);
-	assert(page.url().endsWith("/account"));
+		await ctx.waitForTimeout(3000);
+		assert(ctx.page.url().endsWith("/account"));
+	});
 });

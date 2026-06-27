@@ -1,79 +1,103 @@
 import { createId } from "@paralleldrive/cuid2";
-import { expect, test } from "@playwright/test";
+import test, { describe } from "node:test";
 
-import { expectNoAppError, logout, registerAndLoginUser } from "./utils";
+import { setupPuppeteer } from "./utils.js";
 
-test("register", async ({ page }) => {
-	await page.goto("/auth");
+describe("Auth basic", () => {
+	const ctx = setupPuppeteer();
 
-	await page.getByRole("button", { name: "Register" }).click();
+	test("register", async () => {
+		await ctx.goto("/auth");
 
-	const form = page.locator("form.register");
-	expect(form.getByRole("button", { name: "Register" }));
-	const email = createId() + "@example.com";
-	await form.locator("input[name=email]").fill(email);
-	await form.locator("input[name=password]").fill("12345678");
-	await form.locator('input[name="registrationPassword"]').fill("12345678");
-	await form.getByRole("button", { name: "Register" }).click();
-	await page.locator("#autofill-login-button").click();
+		await ctx
+			.locator(".k-segmented button:nth-child(2)")
+			.filter((el) => el.textContent.trim() === "Register")
+			.click({
+				debugHighlight: true,
+			});
 
-	await page.locator("#login-button").click();
+		const form = ctx.within("form.register");
+		const submitButton = form
+			.locator("button")
+			.filter((el) => el.textContent.trim() === "Register");
+		await submitButton.wait();
+		const email = createId() + "@example.com";
+		await form.locator("input[name=email]").fill(email);
+		await form.locator("input[name=password]").fill("12345678");
+		await form.locator('input[name="registrationPassword"]').fill("12345678");
+		await submitButton.click();
 
-	await page.waitForURL("/dashboard?user_logged_in=1");
-	await page.goto("/account");
-	await expect(page.locator("body")).toContainText(email);
-});
+		await ctx.clickOnOpeningDialogButtonWithId("autofill-login-button");
 
-test("login", async ({ page }) => {
-	const user = await registerAndLoginUser(page);
-	await logout(page);
+		await ctx.locator("#login-button").click();
 
-	await page.goto("/auth");
+		await ctx.waitForNavigation("/dashboard?user_logged_in=1");
+		await ctx.goto("/account");
+		await ctx
+			.locator("body")
+			// @ts-expect-error this is authorized
+			.filter(`el => el.innerHTML.indexOf(${JSON.stringify(email)}) >= 0`)
+			.wait();
+	});
 
-	const form = page.locator("form.login");
-	await form.locator("input[name=email]").fill(user.email);
-	await form.locator("input[name=password]").fill(user.password);
-	await form.getByRole("button", { name: "Login" }).click();
+	test("login", async () => {
+		const user = await ctx.registerAndLoginUser();
+		await ctx.logout();
 
-	await page.waitForURL("/dashboard?user_logged_in=1");
-	await page.goto("/account");
-	await expect(page.locator("body")).toContainText(user.email);
-});
+		await ctx.goto("/auth");
 
-test("change password", async ({ page }) => {
-	const user = await registerAndLoginUser(page);
-	await page.goto("/account");
-	await page.locator("[href='/account/change-password']").click();
-	await page.waitForURL("/account/change-password");
+		const form = ctx.within("form.login");
+		await form.locator("input[name=email]").fill(user.email);
+		await form.locator("input[name=password]").fill(user.password);
+		await form
+			.locator("button")
+			.filter((el) => el.textContent.trim() === "Login")
+			.click();
 
-	const newPassword = createId();
+		await ctx.waitForNavigation("/dashboard?user_logged_in=1");
+		await ctx.goto("/account");
+		await ctx
+			.locator("body")
+			// @ts-expect-error this is authorized
+			.filter(`el => el.innerHTML.indexOf(${JSON.stringify(user.email)}) >= 0`)
+			.wait();
+	});
 
-	await page.locator("input[name=oldPassword]").fill("wrong password");
-	await page.locator("input[name=newPassword]").fill(newPassword);
-	await page.locator("#change-password-button").click();
-	await page.waitForSelector(".form-global-error");
-	await expectNoAppError(page);
+	test("change password", async () => {
+		const user = await ctx.registerAndLoginUser();
+		await ctx.goto("/account");
+		await ctx.locator("[href='/account/change-password']").click();
+		await ctx.waitForNavigation("/account/change-password");
 
-	await page.locator("input[name=oldPassword]").fill(user.password);
-	await page.locator("#change-password-button").click();
-	await page.locator("#success-dialog-continue-button").click();
-	await page.waitForURL("/account");
-	await expectNoAppError(page);
+		const newPassword = createId();
 
-	await logout(page);
+		await ctx.locator("input[name=oldPassword]").fill("wrong password");
+		await ctx.locator("input[name=newPassword]").fill(newPassword);
+		await ctx.locator("#change-password-button").click();
+		await ctx.locator(".form-global-error").wait();
+		await ctx.expectNoAppError();
 
-	await page.goto("/auth");
-	await page.locator("input[name=email]").fill(user.email);
-	await page.locator("input[name=password]").fill(newPassword);
-	await page.locator("#login-button").click();
-	await page.waitForURL("/dashboard?user_logged_in=1");
+		await ctx.locator("input[name=oldPassword]").fill(user.password);
+		await ctx.locator("#change-password-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+		await ctx.waitForNavigation("/account");
+		await ctx.expectNoAppError();
 
-	await page.goto("/account/change-password");
-	await page.locator("input[name=oldPassword]").fill(newPassword);
-	await page.locator("input[name=newPassword]").fill(user.password);
-	await page.locator("#change-password-button").click();
-	await page.locator("#success-dialog-continue-button").click();
-	await page.waitForURL("/account");
+		await ctx.logout();
 
-	await expectNoAppError(page);
+		await ctx.goto("/auth");
+		await ctx.locator("input[name=email]").fill(user.email);
+		await ctx.locator("input[name=password]").fill(newPassword);
+		await ctx.locator("#login-button").click();
+		await ctx.waitForNavigation("/dashboard?user_logged_in=1");
+
+		await ctx.goto("/account/change-password");
+		await ctx.locator("input[name=oldPassword]").fill(newPassword);
+		await ctx.locator("input[name=newPassword]").fill(user.password);
+		await ctx.locator("#change-password-button").click();
+		await ctx.clickOnOpeningDialogButtonWithId("success-dialog-continue-button");
+		await ctx.waitForNavigation("/account");
+
+		await ctx.expectNoAppError();
+	});
 });

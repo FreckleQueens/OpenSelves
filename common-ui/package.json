@@ -13,6 +13,7 @@
 	"exports": {
 		".": {
 			"import": "./dist/index.js",
+			"svelte": "./dist/index.js",
 			"style": "./dist/index.css"
 		},
 		"./config": "./dist/config/index.js"

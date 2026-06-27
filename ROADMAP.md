@@ -246,7 +246,8 @@ a short-lived one
 </details>
 
 ## 🚧 0.7.0 - Willow data model, encryption and moving to a zero-trust model
-- [ ] find an alternative to playwright
+- [x] replace playwright with puppeteer
+- [ ] run client tests on firefox too
 - [ ] Willow data model
   As per https://willowprotocol.org/specs/data-model/index.html#data_model
   - [ ] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
