@@ -1,96 +1,102 @@
-import * as fs from "node:fs";
+import { type GetObjectCommandOutput, NoSuchKey } from "@aws-sdk/client-s3";
 import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
 import test, { describe } from "node:test";
-import type { FrontCreate, Log, Member, MemberCreate, User } from "openselves-common/db";
-
+import { shuffleArray } from "openselves-common";
+import { BaseSchema, EntryDataModel, Front, Member, type Schema } from "openselves-common/client";
 import {
-	type ClientAttachment,
-	type ClientLog,
-	type ClientLogWithPushedAt,
+	type Entry,
+	type EntryWithPayload,
+	EntryWrapper,
+	MAX_IN_DB_PAYLOAD_LENGTH,
+	MAX_PATH_LENGTH,
+	MAX_UINT64,
+	OPENSELVES_NAMESPACE_ID,
+	hashPayload,
+	isEntryWithPayload,
+	isJsonFriendlyEntryWithPayload,
+	j2000Now,
+} from "openselves-common/willow";
+
+import { S3Service } from "../src/sync/s3.service.js";
+import {
+	type FileRef,
 	LARGE_IMAGE_FILE_PATH,
 	TEST_IMAGE_DATA_URL,
 	TEST_IMAGE_LONG_DATA_URL,
-	attachFileToLog,
-	getLogAttachmentUrl,
-	makeMemberWithLog,
-	putLog as originalPutLog,
-	putLogs as originalPutLogs,
+	makeMember,
+	putEntries as originalPutEntries,
+	putEntry as originalPutEntry,
 	pullEndpoint,
 	pushEndpoint,
+	readFile,
 } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
+async function timeModelEntries(
+	model: EntryDataModel<Schema & typeof BaseSchema>,
+	timestamp: bigint,
+): Promise<Entry[]> {
+	return (await model.flushDirtyEntries()).map(
+		(entry): Entry => ({
+			...entry.entryMaybeWithPayload,
+			timestamp,
+		}),
+	);
+}
+
 describe(pushEndpoint, () => {
 	let env: TestEnvWithUsers;
-	const putLog = (
-		log: ClientLog,
+	const putEntry = (
+		entry: Entry | EntryWrapper | Record<string, unknown>,
 		expectCode: number = 200,
 		cookies: string = env.users.cookies,
-	) => originalPutLog(env, log, expectCode, cookies);
-	const putLogs = (
-		logs: ClientLog[],
+		processEntryObjects: boolean = true,
+	) => originalPutEntry(env, entry, expectCode, cookies, processEntryObjects);
+	const putEntries = (
+		entries: (Entry | EntryWrapper | Record<string, unknown>)[],
 		expectCode: number = 200,
 		cookies: string = env.users.cookies,
-	) => originalPutLogs(env, logs, expectCode, cookies);
+		processEntryObjects: boolean = true,
+	) => originalPutEntries(env, entries, expectCode, cookies, processEntryObjects);
 
-	function makeFrontWithLog(date: Date, memberCreateLog: ClientLog) {
-		if (!memberCreateLog.memberId) {
-			throw new Error("Missing memberId on memberCreateLog");
-		}
-		const front: Omit<FrontCreate, "userId" | "id"> = {
-			memberId: memberCreateLog.memberId,
+	function makeFront(member: Member, date: Date) {
+		const front = new Front(member.subspaceId, {
+			memberId: member.id,
 			note: "A note on this front",
 			startedAt: new Date(),
 			endedAt: new Date(Date.now() + 60 * 1000),
 			createdAt: date,
-			updatedAt: date,
-		};
-		const createLog: ClientLog & {
-			frontId: string;
-		} = {
-			id: createId(),
-			frontId: createId(),
-			operationType: "create",
-			data: front,
-			executedAt: date,
-		};
-		return { front, createLog, memberCreateLog, date };
+		});
+		return { front, date };
 	}
 
-	async function createMember(date?: Date, image?: string | ClientAttachment | null) {
-		const { member, createLog } = makeMemberWithLog(date, image);
-		const response = await putLog(createLog);
-		assert.strictEqual(response.body.logs, undefined);
-		await checkLogIsServed(createLog);
-		return { member, createLog, response };
+	async function createMember(userId: string, date?: Date, image?: string | FileRef | null) {
+		const { member } = await makeMember(userId, date, image);
+		const entries = await member.flushDirtyEntries();
+		const response = await putEntries(entries);
+		assert.strictEqual(response.body.entries, undefined);
+		await checkEntriesAreServed(entries);
+		return { member, entries, response };
 	}
-	async function createAndDeleteMember() {
-		const { member, createLog } = await createMember();
-
-		const deleteLog: ClientLog & {
-			memberId: string;
-		} = {
-			...createLog,
-			id: createId(),
-			operationType: "delete",
-			data: null,
-			executedAt: new Date(),
-		};
-		const response = await putLog(deleteLog);
-		return { member, deleteLog, response };
+	async function createAndDeleteMember(userId: string = env.users.user.id) {
+		const { member, entries } = await createMember(userId);
+		const deleteEntry = await member.getPermanentDeleteEntry();
+		const response = await putEntry(deleteEntry);
+		return { member, createEntries: entries, deleteEntry, response };
 	}
 
-	async function createFrontEntry() {
-		const { member, createLog: memberCreateLog } = await createMember();
-		const { front, createLog } = makeFrontWithLog(new Date(), memberCreateLog);
-		const response = await putLog(createLog);
-		assert.strictEqual(response.body.logs, undefined);
-		await checkLogIsServed(createLog);
-		return { front, createLog, member, memberCreateLog, response };
+	async function createFront(userId: string) {
+		const { member, entries: memberEntries } = await createMember(userId);
+		const { front } = makeFront(member, new Date());
+		const entries = await front.flushDirtyEntries();
+		const response = await putEntries(entries);
+		assert.strictEqual(response.body.entries, undefined);
+		await checkEntriesAreServed(entries);
+		return { front, entries, member, memberEntries, response };
 	}
 
-	async function getSyncFrom(timestamp: number | "init", cookies: string = env.users.cookies) {
+	async function getSyncFrom(timestamp: string, cookies: string = env.users.cookies) {
 		const response = await env.request
 			.post(pullEndpoint)
 			.send({
@@ -99,135 +105,57 @@ describe(pushEndpoint, () => {
 			.set("Cookie", cookies)
 			.expect(200)
 			.expect("Content-Type", /json/);
-		assert(Array.isArray(response.body.logs));
-		assert(response.body.logs.length >= 1);
+		assert(Array.isArray(response.body.entries));
 		return response;
 	}
 
-	function checkAndExtractLogAttachments(inputLog: ClientLog, user: User) {
-		const outputLog = { ...inputLog };
-		const attachments: ClientAttachment[] = [];
-		if (outputLog.attachments) {
-			if (!outputLog.data) {
-				throw new Error("Log has attachments but not data", { cause: outputLog });
-			}
-			for (const [key, value] of Object.entries(outputLog.data)) {
-				const attachment = outputLog.attachments.find(
-					(attachment) => value === "attachment:" + attachment.name,
-				);
-				if (attachment) {
-					attachments.push(attachment);
-					outputLog.data[key] = getLogAttachmentUrl(
-						env,
-						user.id,
-						outputLog,
-						key,
-					).absolute;
-				}
-			}
-			if (outputLog.attachments?.length !== attachments.length) {
-				throw new Error("Not all attachments were mapped", { cause: outputLog });
-			}
-			delete outputLog.attachments;
-		}
-		return {
-			log: outputLog,
-			attachments: attachments,
-		};
-	}
-
-	async function checkLogIsServed(
-		logToCheck: ClientLog,
-		user: User = env.users.user,
+	async function checkEntriesAreServed(
+		entries: (EntryWrapper | Entry | EntryWithPayload)[],
 		cookies: string = env.users.cookies,
 	) {
-		const { log: expectedClientLog, attachments } = checkAndExtractLogAttachments(
-			logToCheck,
-			user,
+		assert(entries.length > 0);
+
+		const response = await getSyncFrom("", cookies);
+		const responseEntries = response.body.entries;
+		assert(Array.isArray(responseEntries));
+		assert(responseEntries.length > 0);
+
+		const actualEntries = (
+			await Promise.all(responseEntries.map((entry: unknown) => EntryWrapper.load(entry)))
+		).map((entry) => entry.entryMaybeWithPayload);
+
+		const expectedEntries = entries.map((entry) =>
+			entry instanceof EntryWrapper ? entry.entryMaybeWithPayload : entry,
 		);
-
-		const logToCheckServer: Omit<Log, "userId" | "pushedAt" | "deletedId"> = {
-			memberId: null,
-			frontId: null,
-			...expectedClientLog,
-		};
-		const response = await getSyncFrom(0, cookies);
-		const pulledLogs = response.body.logs as Array<unknown>;
-		const pulledLog = pulledLogs.find(
-			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
-		);
-		assert.notStrictEqual(pulledLog, undefined);
-		assert.deepStrictEqual(
-			pulledLog,
-			Object.fromEntries(
-				Object.entries(logToCheckServer).map(([key, value]) => {
-					if (value instanceof Date) {
-						value = value.toISOString();
-					} else if (value && typeof value === "object") {
-						for (const key of Object.keys(value)) {
-							if (value[key] instanceof Date) {
-								value[key] = value[key].toISOString();
-							}
-						}
-					}
-					return [key, value];
-				}),
-			),
-		);
-
-		if (attachments.length > 0) {
-			// Handling multiple attachments per log can be done once needed.
-			assert.strictEqual(attachments.length, 1);
-
-			const attachmentUrl = getLogAttachmentUrl(
-				env,
-				env.users.user.id,
-				logToCheck,
-				"image",
-			).relative;
-			await env.request.get(attachmentUrl).expect(401);
-			await env.request.get(attachmentUrl).set("Cookie", env.users.cookies2).expect(404);
-			const response = await env.request
-				.get(attachmentUrl)
-				.set("Cookie", env.users.cookies)
-				.expect(200)
-				.expect("Content-Type", "image/png");
-			assert.deepStrictEqual(response.body, fs.readFileSync(attachments[0].path));
-
-			await env.request
-				.get(attachmentUrl)
-				.set("Cookie", env.users.cookies)
-				.set("If-None-Match", response.headers["etag"])
-				.expect(304);
+		for (const expectedEntry of expectedEntries) {
+			const actualEntry = actualEntries.find((entry) => entry.path === expectedEntry.path);
+			assert(actualEntry);
+			assert.deepStrictEqual(actualEntry, expectedEntry);
 		}
 	}
 
-	async function checkLogIsNotServed(logToCheck: ClientLog, user: User = env.users.user) {
-		const { attachments } = checkAndExtractLogAttachments(logToCheck, user);
-
-		const response = await getSyncFrom(0);
-		const pulledLogs = response.body.logs as Array<unknown>;
-		const pulledLog = pulledLogs.find(
-			(log) => log && typeof log === "object" && "id" in log && log.id === logToCheck.id,
+	async function checkEntriesAreNotServed(entries: (EntryWrapper | Entry | EntryWithPayload)[]) {
+		const response = await getSyncFrom("");
+		const responseEntries = response.body.entries;
+		assert(Array.isArray(responseEntries));
+		const actualEntries = await Promise.all(
+			responseEntries.map((entry: unknown) => EntryWrapper.load(entry)),
 		);
-		assert.strictEqual(pulledLog, undefined);
 
-		if (attachments.length > 0) {
-			// Handling multiple attachments per log can be done once needed.
-			assert.strictEqual(attachments.length, 1);
-
-			const attachmentUrl = getLogAttachmentUrl(
-				env,
-				env.users.user.id,
-				logToCheck,
-				"image",
-			).relative;
-			await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(404);
+		for (const expectedEntry of entries) {
+			for (const actualEntry of actualEntries) {
+				assert.notDeepStrictEqual(
+					actualEntry?.entryMaybeWithPayload,
+					expectedEntry instanceof EntryWrapper
+						? expectedEntry.entryMaybeWithPayload
+						: expectedEntry,
+				);
+			}
 		}
 	}
 
 	function testImage(
-		testFn: (image: string | ClientAttachment | null | undefined) => Promise<ClientLog>,
+		testFn: (image: string | FileRef | null | undefined) => Promise<EntryWrapper>,
 	) {
 		describe("image", () => {
 			for (const { testName, image, expectCode, isServed } of [
@@ -244,6 +172,20 @@ describe(pushEndpoint, () => {
 					isServed: true,
 				},
 				{
+					testName: "long data url (>8kB) 200",
+					image: TEST_IMAGE_LONG_DATA_URL,
+					expectCode: 200,
+					isServed: true,
+				},
+				{
+					testName: "raw file upload 200",
+					image: {
+						filePath: LARGE_IMAGE_FILE_PATH,
+					},
+					expectCode: 200,
+					isServed: true,
+				},
+				{
 					testName: "undefined 200",
 					image: undefined,
 					expectCode: 200,
@@ -255,67 +197,50 @@ describe(pushEndpoint, () => {
 					expectCode: 200,
 					isServed: true,
 				},
-				{
-					testName: "file upload 200",
-					image: {
-						path: LARGE_IMAGE_FILE_PATH,
-					},
-					expectCode: 200,
-					isServed: true,
-				},
-				{
-					testName: "data url too long (>8kB) 400",
-					image: TEST_IMAGE_LONG_DATA_URL,
-					expectCode: 400,
-					isServed: false,
-				},
-				{
-					testName: "invalid data url 400",
-					image: "data:notavaliddataurl",
-					expectCode: 400,
-					isServed: false,
-				},
-				{
-					testName: "empty string 400",
-					image: "",
-					expectCode: 400,
-					isServed: false,
-				},
-				{
-					testName: "invalid url 400",
-					image: "invalid url",
-					expectCode: 400,
-					isServed: false,
-				},
 			]) {
 				test(testName, async () => {
-					const log = await testFn(image);
-					await putLog(log, expectCode, undefined);
+					const entry = await testFn(image);
+					await putEntry(entry, expectCode, undefined);
 
 					if (isServed) {
-						await checkLogIsServed(log);
+						await checkEntriesAreServed([entry]);
 					} else {
-						await checkLogIsNotServed(log);
+						await checkEntriesAreNotServed([entry]);
 					}
 				});
 			}
 		});
 	}
 
-	async function testAttachmentIsDeleted(
-		log: ClientLog,
-		dataKey: string,
-		callback: () => Promise<void>,
-	) {
-		const attachmentUrl = getLogAttachmentUrl(env, env.users.user.id, log, dataKey).relative;
-		await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(200);
+	async function testPayloadIsDeletedFromS3(entry: Entry, callback: () => Promise<void>) {
+		const s3Service = env.app.get(S3Service);
+
+		let getObjectResult: GetObjectCommandOutput | undefined = await s3Service.getObject(
+			entry.payloadDigest,
+		);
+		assert(getObjectResult);
+
 		await callback();
-		await env.request.get(attachmentUrl).set("Cookie", env.users.cookies).expect(404);
+
+		getObjectResult = undefined;
+		let error: unknown;
+		try {
+			getObjectResult = await s3Service.getObject(entry.payloadDigest);
+		} catch (e) {
+			error = e;
+		}
+		assert(!getObjectResult);
+		assert(error);
+		assert(error instanceof NoSuchKey);
 	}
 
-	setupTestSuiteWithUsers((testEnv) => {
-		env = testEnv;
-	});
+	setupTestSuiteWithUsers(
+		(testEnv) => {
+			env = testEnv;
+		},
+		true,
+		true,
+	);
 
 	test("GET 404", async () => {
 		await env.request.get(pushEndpoint).expect(404);
@@ -341,509 +266,754 @@ describe(pushEndpoint, () => {
 				.send({})
 				.expect(400);
 		});
-		test("empty logs array 400", async () => {
+		test("empty entries array 400", async () => {
 			await env.request
 				.put(pushEndpoint)
 				.set("Cookie", env.users.cookies)
-				.send({ logs: [] })
+				.send({ entries: [] })
 				.expect(400);
 		});
-		test("log with non-null pushedAt 400", async () => {
-			const { createLog, date } = makeMemberWithLog();
-			const createLogWithPushedAt: ClientLogWithPushedAt = {
-				...createLog,
-				pushedAt: date,
+
+		describe("forged and invalid entries", () => {
+			type TestCase = {
+				name: string;
+				forgeEntry: (
+					entry: Partial<EntryWithPayload> & Record<string, unknown>,
+				) => Promise<void> | void;
+				expectCode?: number;
 			};
-			await putLog(createLogWithPushedAt, 400);
-		});
-		test("log data with userId 400", async () => {
-			const { createLog } = makeMemberWithLog();
-			await putLog(
+			const testCases: TestCase[] = [
 				{
-					...createLog,
-					data: { ...(createLog.data as Member), userId: env.users.user2.id },
+					name: "control 200",
+					forgeEntry: () => {},
+					expectCode: 200,
 				},
-				400,
+
+				// namespaceId
+				{
+					name: "empty namespaceId 400",
+					forgeEntry: (entry) => {
+						entry.namespaceId = "";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "wrong namespaceId 400",
+					forgeEntry: (entry) => {
+						entry.namespaceId = "not the correct namespaceId";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+
+				// subspaceId
+				{
+					name: "correct subspaceId 200",
+					forgeEntry: (entry) => {
+						entry.subspaceId = env.users.user.id;
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "empty subspaceId 403",
+					forgeEntry: (entry) => {
+						entry.subspaceId = "";
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 403,
+				},
+				{
+					name: "wrong subspaceId 403",
+					forgeEntry: (entry) => {
+						entry.subspaceId = "not the correct subspaceId";
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 403,
+				},
+				{
+					name: "other user's subspaceId 403",
+					forgeEntry: (entry) => {
+						entry.subspaceId = env.users.user2.id;
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 403,
+				},
+
+				// path
+				{
+					name: "empty path 400",
+					forgeEntry: (entry) => {
+						entry.path = "";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "/ path 400",
+					forgeEntry: (entry) => {
+						entry.path = "/";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "single component path 200",
+					forgeEntry: (entry) => {
+						entry.path = "/hi";
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "missing starting / path 400",
+					forgeEntry: (entry) => {
+						entry.path = "hi";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "trailing / path 400",
+					forgeEntry: (entry) => {
+						entry.path = "/hi/";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "empty component path 400",
+					forgeEntry: (entry) => {
+						entry.path = "/a//b/c";
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "too long path 400",
+					forgeEntry: (entry) => {
+						entry.path = "/" + "a".repeat(MAX_PATH_LENGTH);
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "just long enough path 200",
+					forgeEntry: (entry) => {
+						entry.path = "/" + "a".repeat(MAX_PATH_LENGTH - 1);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+
+				// timestamp
+				{
+					name: "now timestamp 200",
+					forgeEntry: (entry) => {
+						entry.timestamp = j2000Now();
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "0 timestamp 200",
+					forgeEntry: (entry) => {
+						entry.timestamp = 0n;
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "negative timestamp 400",
+					forgeEntry: (entry) => {
+						entry.timestamp = -1n;
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "timestamp 15min in the future 400",
+					forgeEntry: (entry) => {
+						entry.timestamp = j2000Now() + 15n * 60n * 1000_000n;
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "timestamp 5min in the future 200",
+					forgeEntry: (entry) => {
+						entry.timestamp = j2000Now() + 5n * 60n * 1000_000n;
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "timestamp max uint64 with non-empty payload 400",
+					forgeEntry: (entry) => {
+						entry.timestamp = MAX_UINT64;
+						assert(isEntryWithPayload(entry));
+					},
+				},
+				{
+					name: "timestamp max uint64 with empty payload 200",
+					forgeEntry: async (entry) => {
+						entry.timestamp = MAX_UINT64;
+						entry.payload = "";
+						entry.payloadLength = 0n;
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+
+				// payloadLength
+				{
+					name: "wrong payloadLength 400",
+					forgeEntry: (entry) => {
+						const forgedLength = 999999999n;
+						assert(entry.payload);
+						assert.notStrictEqual(Number(forgedLength), entry.payload.length);
+						entry.payloadLength = forgedLength;
+						assert(isEntryWithPayload(entry));
+					},
+				},
+
+				// payloadDigest
+				{
+					name: "wrong payloadDigest 400",
+					forgeEntry: async (entry) => {
+						const forgedPayload = crypto
+							.getRandomValues(Buffer.alloc(32))
+							.toString("hex");
+						assert.notStrictEqual(forgedPayload, entry.payload);
+
+						const forgedDigest = await hashPayload(forgedPayload);
+						assert.notStrictEqual(forgedDigest, entry.payloadDigest);
+
+						entry.payloadDigest = forgedDigest;
+						assert(isEntryWithPayload(entry));
+					},
+				},
+
+				// payload
+				{
+					name: "empty payload 200",
+					forgeEntry: async (entry) => {
+						entry.payload = "";
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "empty payload with wrong payloadLength 400",
+					forgeEntry: async (entry) => {
+						entry.payload = "";
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 400,
+				},
+				{
+					name: "empty payload with wrong payloadDigest 400",
+					forgeEntry: (entry) => {
+						entry.payload = "";
+						entry.payloadLength = BigInt(entry.payload.length);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 400,
+				},
+				{
+					name: "small payload (<=8192) 200",
+					forgeEntry: async (entry) => {
+						entry.payload = "a".repeat(8192);
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "large payload (>8192) 200",
+					forgeEntry: async (entry) => {
+						entry.payload = "a".repeat(8193);
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "payload length at limit 200",
+					forgeEntry: async (entry) => {
+						entry.payload = "a".repeat(
+							env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
+								infer: true,
+							}),
+						);
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+				{
+					name: "payload length over limit 413",
+					forgeEntry: async (entry) => {
+						entry.payload = "a".repeat(
+							env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
+								infer: true,
+							}) + 1,
+						);
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 413,
+				},
+				{
+					name: "payload with null byte 200",
+					forgeEntry: async (entry) => {
+						entry.payload = "\x00";
+						entry.payloadLength = BigInt(entry.payload.length);
+						entry.payloadDigest = await hashPayload(entry.payload);
+						assert(isEntryWithPayload(entry));
+					},
+					expectCode: 200,
+				},
+			];
+
+			testCases.push(
+				...[
+					"namespaceId",
+					"subspaceId",
+					"path",
+					"timestamp",
+					"payloadLength",
+					"payloadDigest",
+					"payload",
+				].map(
+					(field): TestCase => ({
+						name: "missing " + field + " 400",
+						forgeEntry: (entry) => {
+							assert(isEntryWithPayload(entry));
+							delete entry[field];
+							assert(!isEntryWithPayload(entry));
+						},
+					}),
+				),
 			);
+
+			for (const testCase of testCases) {
+				test(testCase.name, async () => {
+					const { member } = await makeMember(env.users.user.id);
+					const entry = (await member.flushDirtyEntries())[0].entryMaybeWithPayload;
+					assert(isEntryWithPayload(entry));
+
+					await testCase.forgeEntry(entry as EntryWithPayload & Record<string, unknown>);
+
+					const processedEntry = { ...entry };
+					for (const [key, value] of Object.entries(processedEntry)) {
+						if (typeof value === "bigint") {
+							processedEntry[key] = value.toString();
+						}
+					}
+
+					await putEntry(
+						processedEntry,
+						typeof testCase.expectCode === "number" ? testCase.expectCode : 400,
+						undefined,
+						false,
+					);
+
+					if (testCase.expectCode === 200) {
+						await checkEntriesAreServed([entry]);
+					} else {
+						await checkEntriesAreNotServed([entry]);
+					}
+				});
+			}
+		});
+
+		test("Putting an entry twice only has an effect the first time", async () => {
+			const { member } = await makeMember(env.users.user.id);
+			const entries = await member.flushDirtyEntries();
+			const unrelatedEntry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + createId(),
+				j2000Now(),
+				"hi",
+			);
+
+			await putEntries([...entries, unrelatedEntry]);
+			await checkEntriesAreServed([...entries, unrelatedEntry]);
+
+			const memberDeleteEntry = await member.getPermanentDeleteEntry();
+			await putEntry(memberDeleteEntry);
+			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
+			await checkEntriesAreNotServed(entries);
+
+			await putEntry(memberDeleteEntry);
+			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
+			await checkEntriesAreNotServed(entries);
+		});
+
+		test("Putting an entry that is superseded by another entry of the same path has no effect", async () => {
+			const root = createId();
+			const entry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root + "/a",
+				1n,
+				"hi",
+			);
+			const supersedingEntry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root + "/a",
+				2n,
+				"bye",
+			);
+
+			await putEntry(supersedingEntry);
+			await checkEntriesAreServed([supersedingEntry]);
+
+			await putEntry(entry);
+			await checkEntriesAreNotServed([entry]);
+			await checkEntriesAreServed([supersedingEntry]);
+		});
+
+		test("Putting an entry that is superseded by another entry of a prefixing path has no effect", async () => {
+			const root = createId();
+			const entry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root + "/child",
+				1n,
+				"hi",
+			);
+			const supersedingEntry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root,
+				2n,
+				"bye",
+			);
+
+			await putEntry(supersedingEntry);
+			await checkEntriesAreServed([supersedingEntry]);
+
+			await putEntry(entry);
+			await checkEntriesAreNotServed([entry]);
+			await checkEntriesAreServed([supersedingEntry]);
+		});
+
+		test("Putting an entry older than another entry it prefixes after the latter keeps both entries", async () => {
+			const root = createId();
+			const parentEntry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root,
+				1n,
+				"hi",
+			);
+			const childEntry = await EntryWrapper.create(
+				OPENSELVES_NAMESPACE_ID,
+				env.users.user.id,
+				"/test/" + root + "/child",
+				2n,
+				"bye",
+			);
+
+			await putEntry(childEntry);
+			await checkEntriesAreServed([childEntry]);
+
+			await putEntry(parentEntry);
+			await checkEntriesAreServed([parentEntry, childEntry]);
 		});
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
-				const { createLog } = makeMemberWithLog();
+				const { member } = await makeMember(env.users.user.id);
 
-				await putLog(createLog);
-				await checkLogIsServed(createLog);
+				const entries = await member.flushDirtyEntries();
+				await putEntries(entries);
+				await checkEntriesAreServed(entries);
 			});
 
 			test("minimal create data 200", async () => {
-				const { createLog } = makeMemberWithLog(undefined, undefined, true);
+				const { member } = await makeMember(env.users.user.id, undefined, undefined, true);
 
-				await putLog(createLog);
-				await checkLogIsServed(createLog);
+				const entries = await member.flushDirtyEntries();
+				await putEntries(entries);
+				await checkEntriesAreServed(entries);
 			});
 
-			test("send create operation twice succeeds 200", async () => {
-				const { createLog } = makeMemberWithLog();
-				await putLog(createLog);
-				await putLog(createLog);
-			});
+			testImage(async (image) => {
+				const { member } = await makeMember(env.users.user.id);
 
-			test("create member with same id fails 409", async () => {
-				const { createLog } = makeMemberWithLog();
-				const { createLog: createLog2 } = makeMemberWithLog();
-				createLog2.memberId = createLog.memberId;
+				if (image && typeof image !== "string") {
+					await member.set("image", readFile(image.filePath));
+				} else {
+					await member.set("image", image === null ? undefined : image);
+				}
 
-				await putLog(createLog);
-
-				await putLog(createLog2, 409);
-			});
-
-			testImage((image) => {
-				const { createLog } = makeMemberWithLog(new Date(), image);
-				return Promise.resolve(createLog);
+				const entry = (await member.flushDirtyEntries()).find((entry) =>
+					entry.path.endsWith("/image"),
+				);
+				assert(entry);
+				return entry;
 			});
 		});
 
 		describe("PUT delete Member", () => {
 			test("200", async () => {
-				const { deleteLog } = await createAndDeleteMember();
-				await checkLogIsServed(deleteLog);
+				const { createEntries, deleteEntry } = await createAndDeleteMember();
+				await checkEntriesAreServed([deleteEntry]);
+				await checkEntriesAreNotServed(createEntries);
 			});
 
-			test("delete member from 2 different clients (same user) succeeds 200", async () => {
-				const { deleteLog } = await createAndDeleteMember();
+			test("delete member twice succeeds 200", async () => {
+				const { member } = await createAndDeleteMember();
 
-				deleteLog.id = createId();
-				await putLog(deleteLog);
+				await putEntry(await member.getPermanentDeleteEntry());
 			});
 
 			test("delete member of another user fails 404", async () => {
-				const { createLog } = await createMember();
+				const { member, entries } = await createMember(env.users.user.id);
 
-				const deleteLog: ClientLog = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "delete",
-					data: undefined,
-					executedAt: new Date(),
-				};
-				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
-				assert.strictEqual(response2.body.logs, undefined);
+				const deleteEntry = await member.getDeleteEntry();
+				const response = await putEntry(deleteEntry, 403, env.users.cookies2);
+				assert.strictEqual(response.body.entries, undefined);
 
 				// Check member was not deleted
-				await checkLogIsServed(createLog);
-			});
-
-			test("retrieve log from another user fails 404", async () => {
-				const { createLog } = await createMember();
-
-				const deleteLog: ClientLog = {
-					id: createLog.id,
-					memberId: createId(),
-					operationType: "delete",
-					data: undefined,
-					executedAt: new Date(),
-				};
-				const response2 = await putLog(deleteLog, 404, env.users.cookies2);
-				assert.strictEqual(response2.body.logs, undefined);
+				await checkEntriesAreServed(entries);
 			});
 
 			test("Delete member with image deletes image from s3", async () => {
-				const { createLog } = await createMember(undefined, {
-					path: LARGE_IMAGE_FILE_PATH,
-				});
+				const { member, entries } = await createMember(
+					env.users.user.id,
+					undefined,
+					readFile(LARGE_IMAGE_FILE_PATH) +
+						crypto.getRandomValues(Buffer.alloc(32)).toString(),
+				);
 
-				await testAttachmentIsDeleted(createLog, "image", async () => {
-					const deleteLog = {
-						id: createId(),
-						memberId: createLog.memberId,
-						operationType: "delete",
-						data: null,
-						executedAt: new Date(),
-					} satisfies ClientLog;
-					await putLog(deleteLog, 200);
+				const imageEntry = entries.find((entry) => entry.path.endsWith("/image"));
+				assert(imageEntry);
+
+				await testPayloadIsDeletedFromS3(imageEntry, async () => {
+					await putEntry(await member.getDeleteEntry(), 200);
+				});
+			});
+
+			test("Delete member's image deletes image from s3", async () => {
+				const { entries } = await createMember(
+					env.users.user.id,
+					undefined,
+					readFile(LARGE_IMAGE_FILE_PATH) +
+						crypto.getRandomValues(Buffer.alloc(32)).toString(),
+				);
+
+				const imageEntry = entries.find((entry) => entry.path.endsWith("/image"));
+				assert(imageEntry);
+
+				await testPayloadIsDeletedFromS3(imageEntry, async () => {
+					const deleteEntry = await EntryWrapper.load(imageEntry);
+					await deleteEntry.setPayload("");
+					await putEntry(deleteEntry, 200);
 				});
 			});
 		});
 
 		describe("PUT update Member", () => {
 			test("200", async () => {
-				const { createLog } = makeMemberWithLog();
+				const { member } = await createMember(env.users.user.id);
 
-				await putLog(createLog);
+				await member.assign({
+					pronouns: "she/they",
+					description: "a member of our& system who went through some changes",
+					isArchived: true,
+					archivedReason: "a reason for archival",
+				});
+				const updateEntries = await member.flushDirtyEntries();
+				await putEntries(updateEntries);
 
-				const date = new Date();
-				const updateLog: ClientLog = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "update",
-					data: {
-						pronouns: "she/they",
-						description: "a member of our& system who went through some changes",
-						isArchived: true,
-						archivedReason: "a reason for archival",
-					},
-					executedAt: date,
-				};
-				await putLog(updateLog);
-
-				await checkLogIsServed(updateLog);
-
-				const response = await getSyncFrom("init");
-				assert(response.body.logs.length >= 1);
-				const memberLog = (response.body.logs as Array<Log>).find(
-					(log) => log.operationType === "create" && log.memberId === createLog.memberId,
-				);
-				assert.notStrictEqual(memberLog, undefined);
-				assert.partialDeepStrictEqual(memberLog?.data, updateLog.data);
+				await checkEntriesAreServed(updateEntries);
 			});
 
-			test("empty update data 400", async () => {
-				const { createLog } = makeMemberWithLog();
+			test("update member of another user fails 403", async () => {
+				const { member, entries } = await createMember(env.users.user.id);
+				const expectedEntries = entries.map((entry) => entry.entryMaybeWithPayload);
 
-				await putLog(createLog);
+				await member.set("name", "a new name");
+				const updateEntries = await member.flushDirtyEntries();
+				const response2 = await putEntries(updateEntries, 403, env.users.cookies2);
 
-				const date = new Date();
-				const updateLog: ClientLog = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "update",
-					data: {},
-					executedAt: date,
-				};
-				const response = await putLog(updateLog, 400);
-				assert.strictEqual(response.body.logs, undefined);
-			});
-
-			test("update member of another user fails 404", async () => {
-				const { createLog } = await createMember();
-
-				const updateLog: ClientLog = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "update",
-					data: {
-						name: "a new name",
-					},
-					executedAt: new Date(),
-				};
-				const response2 = await putLog(updateLog, 404, env.users.cookies2);
-
-				assert.strictEqual(response2.body.logs, undefined);
-
-				// Check member was not deleted
-				assert.notStrictEqual(createLog.data, undefined);
-				const createName = (createLog.data as Record<string, unknown>)["name"];
-				assert.notStrictEqual(createName, undefined);
-				assert.notStrictEqual(createName, (updateLog.data as Record<string, unknown>).name);
-				await checkLogIsServed(createLog);
+				assert.strictEqual(response2.body.entries, undefined);
+				await checkEntriesAreServed(expectedEntries);
+				await checkEntriesAreNotServed(updateEntries);
 			});
 
 			test("update member that was already deleted succeeds 200", async () => {
-				const { deleteLog } = await createAndDeleteMember();
-				const updateLog: ClientLog = {
-					id: createId(),
-					memberId: deleteLog.memberId,
-					operationType: "update",
-					data: {
-						name: "a new name",
-					},
-					executedAt: new Date(),
-				};
+				const { member } = await createAndDeleteMember();
+				await member.set("name", "a new name");
 
-				await putLog(updateLog);
+				const entries = await member.flushDirtyEntries();
+				await putEntries(entries);
+				await checkEntriesAreNotServed(entries);
 			});
 
 			testImage(async (image) => {
-				const { createLog } = await createMember();
-				const updateLog: ClientLog & {
-					data: {
-						name: string;
-						image?: string | null;
-					};
-				} = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "update",
-					data: {
-						name: "A new name",
-						image: typeof image === "string" ? image : null,
-					},
-					executedAt: new Date(),
-				} satisfies ClientLog;
-
-				if (image === undefined) {
-					delete updateLog.data.image;
-				}
+				const { member } = await createMember(env.users.user.id);
 
 				if (image && typeof image !== "string") {
-					attachFileToLog(image, updateLog, "image");
+					await member.set("image", readFile(image.filePath));
+				} else {
+					await member.set("image", image === null ? undefined : image);
 				}
 
-				return updateLog;
+				return (await member.flushDirtyEntries())[0];
 			});
 		});
 
-		test("Set member with image image's to null deletes image from s3", async () => {
-			const { createLog } = await createMember(undefined, {
-				path: LARGE_IMAGE_FILE_PATH,
+		test("Set member with image image's to undefined deletes image from s3", async () => {
+			const randomValues = crypto.getRandomValues(Buffer.alloc(5000));
+			const bigData = randomValues.toString("hex");
+			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
+			const { member, entries } = await createMember(env.users.user.id, undefined, bigData);
+
+			const originalImageEntry = entries.find((entry) =>
+				entry.path.endsWith("/image"),
+			)?.entryMaybeWithPayload;
+			assert(originalImageEntry);
+
+			await member.set("image", undefined);
+
+			const deleteImageEntry = (await member.flushDirtyEntries())[0];
+
+			await testPayloadIsDeletedFromS3(originalImageEntry, async () => {
+				await putEntry(deleteImageEntry, 200);
 			});
+		});
 
-			await testAttachmentIsDeleted(createLog, "image", async () => {
-				const updateLog = {
-					id: createId(),
-					memberId: createLog.memberId,
-					operationType: "update",
-					data: {
-						image: null,
-					},
-					executedAt: new Date(),
-				} satisfies ClientLog;
-				await putLog(updateLog, 200);
+		async function testPuttingALotOfEntries(
+			callback: ({
+				cookies,
+				entries,
+			}: {
+				cookies: string;
+				entries: Entry[];
+			}) => Promise<void>,
+		) {
+			const user = env.users.user;
+			const cookies = env.users.cookies;
+			const { member: memberToDelete } = await makeMember(user.id);
+
+			await putEntries(await timeModelEntries(memberToDelete, 0n), undefined, cookies);
+
+			const members = await Promise.all([
+				makeMember(user.id),
+				makeMember(user.id),
+				makeMember(user.id),
+			]);
+
+			const entries: Entry[] = [
+				...(await timeModelEntries(members[0].member, 1n)),
+				...(await timeModelEntries(members[1].member, 2n)),
+				await EntryWrapper.create(
+					OPENSELVES_NAMESPACE_ID,
+					user.id,
+					members[1].member.getPathRoot() + "/description",
+					3n,
+					"a new description",
+				),
+				...(await timeModelEntries(members[2].member, 4n)),
+				await EntryWrapper.create(
+					OPENSELVES_NAMESPACE_ID,
+					user.id,
+					members[0].member.getPathRoot() + "/pronouns",
+					5n,
+					"iel/ellui",
+				),
+				await memberToDelete.getDeleteEntry(6n),
+			];
+			await members[2].member.assign({
+				pronouns: "they/them",
+				isArchived: true,
+				archivedReason: "a reason",
 			});
-		});
+			entries.push(...(await timeModelEntries(members[2].member, 7n)));
 
-		test("PUT create, update and delete members all at once 200", async () => {
-			const memberToDelete = makeMemberWithLog(new Date(0));
-			await putLog(memberToDelete.createLog);
-			const members = [
-				makeMemberWithLog(new Date(1)),
-				makeMemberWithLog(new Date(2)),
-				makeMemberWithLog(new Date(4)),
-			];
-			const logs: (ClientLog & {
-				memberId: string;
-			})[] = [
-				members[0].createLog,
-				members[1].createLog,
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: members[1].createLog.memberId,
-					data: {
-						description: "a new description",
-					},
-					executedAt: new Date(3),
-				},
-				members[2].createLog,
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: members[0].createLog.memberId,
-					data: {
-						pronouns: "iel/ellui",
-					},
-					executedAt: new Date(5),
-				},
-				{
-					id: createId(),
-					operationType: "delete",
-					memberId: memberToDelete.createLog.memberId,
-					data: undefined,
-					executedAt: new Date(6),
-				},
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: members[2].createLog.memberId,
-					data: {
-						pronouns: "they/them",
-						isArchived: true,
-						archivedReason: "a reason",
-					},
-					executedAt: new Date(7),
-				},
-			];
+			await callback({ cookies, entries });
 
-			await putLogs(logs);
-
-			const dbRecords = await env.db.query.members.findMany({
-				where: {
-					userId: env.users.user.id,
-					id: {
-						in: [memberToDelete.createLog.memberId, ...logs.map((log) => log.memberId)],
-					},
-				},
-			});
-			assert.strictEqual(dbRecords.length, 3);
-			for (const record of dbRecords) {
-				const member = members.find((member) => member.createLog.memberId === record.id);
-				assert.notStrictEqual(member, undefined);
-
-				let expectedData = Object.assign({}, member?.createLog.data);
-				for (const log of logs) {
-					if (log.memberId === member?.createLog.memberId) {
-						expectedData = Object.assign(expectedData, log.data);
-					}
-				}
-				assert.partialDeepStrictEqual(record, expectedData);
-			}
-		});
-
-		test("PUT out of order logs 400", async () => {
-			const members = [
-				makeMemberWithLog(new Date(1)),
-				makeMemberWithLog(new Date(2)),
-				makeMemberWithLog(new Date(4)),
-			];
-
-			const outOfOrderLogs: ClientLog[] = [
-				members[1].createLog,
-				members[2].createLog,
-				members[0].createLog,
-			];
-			await putLogs(outOfOrderLogs, 400);
-
-			const orderedLogs: ClientLog[] = [
-				members[0].createLog,
-				members[1].createLog,
-				members[2].createLog,
-			];
-			await putLogs(orderedLogs, 200);
-		});
-
-		test("PUT create and delete in one request fails 400", async () => {
-			const member = makeMemberWithLog();
-
-			await putLogs(
-				[
-					member.createLog,
-					{
-						...member.createLog,
-						id: createId(),
-						operationType: "delete",
-						data: undefined,
-					},
-				],
-				400,
-			);
-		});
-
-		test("PUT update and delete in one request fails 400", async () => {
-			const member = makeMemberWithLog();
-
-			await putLog(member.createLog);
-			await putLogs(
-				[
-					{
-						...member.createLog,
-						id: createId(),
-						operationType: "update",
-						data: {
-							name: "a new name",
-						},
-					},
-					{
-						...member.createLog,
-						id: createId(),
-						operationType: "delete",
-						data: undefined,
-					},
-				],
-				400,
-			);
-		});
-
-		test("PUT create front and delete its member in the same request 200", async () => {
-			const { createLog: memberCreateLog } = await createMember();
-			const { createLog: frontCreateLog } = makeFrontWithLog(new Date(), memberCreateLog);
-
-			const deleteLog = {
-				...memberCreateLog,
-				id: createId(),
-				operationType: "delete",
-				executedAt: new Date(),
-			} satisfies ClientLog;
-			delete deleteLog.data;
-
-			await putLogs([frontCreateLog, deleteLog], 200);
-		});
-
-		test("PUT update front and delete its member in the same request 200", async () => {
-			const { createLog, memberCreateLog } = await createFrontEntry();
-
-			const updateLog = {
-				...createLog,
-				id: createId(),
-				operationType: "update",
-				executedAt: new Date(),
-			} satisfies ClientLog;
-			const deleteLog = {
-				...memberCreateLog,
-				id: createId(),
-				operationType: "delete",
-				executedAt: new Date(),
-			} satisfies ClientLog;
-			delete deleteLog.data;
-
-			await putLogs([updateLog, deleteLog], 200);
-		});
-
-		async function setupLogMatrix() {
-			const member = await createMember(new Date(0));
-			const client1Logs: ClientLog[] = [
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: member.createLog.memberId,
-					data: {
-						name: "1",
-						pronouns: "1",
-						description: "1",
-						isArchived: true,
-						archivedReason: "1",
-					},
-					executedAt: new Date(1),
-				},
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: member.createLog.memberId,
-					data: {
-						description: "3",
-						archivedReason: "3",
-					},
-					executedAt: new Date(3),
-				},
-			];
-
-			const client2Logs: ClientLog[] = [
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: member.createLog.memberId,
-					data: {
-						pronouns: "2",
-						description: "2",
-						archivedReason: "2",
-					},
-					executedAt: new Date(2),
-				},
-				{
-					id: createId(),
-					operationType: "update",
-					memberId: member.createLog.memberId,
-					data: {
-						archivedReason: "4",
-					},
-					executedAt: new Date(4),
-				},
-			];
-			return { member, client1Logs, client2Logs };
+			const response = await getSyncFrom("", cookies);
+			const responseEntries = response.body.entries;
+			assert(responseEntries);
+			assert(Array.isArray(responseEntries));
+			// 3 members times 8 fields plus one deleted member
+			assert.strictEqual(responseEntries.length, 3 * 8 + 1);
 		}
 
-		async function verifyLogMatrixResult(member: {
-			member: Omit<MemberCreate, "userId" | "id">;
-			createLog: ClientLog;
-		}) {
-			const dbRecord = await env.db.query.members.findFirst({
-				where: {
-					userId: env.users.user.id,
-					id: member.createLog.memberId,
-				},
+		test("PUT create, update and delete members all at once 200", async () => {
+			await testPuttingALotOfEntries(async ({ cookies, entries }) => {
+				await putEntries(entries, undefined, cookies);
 			});
-			assert.notStrictEqual(dbRecord, undefined);
-			assert.partialDeepStrictEqual(dbRecord, {
+		});
+
+		test("PUT create, update and delete members one by one in random order 200", async () => {
+			await testPuttingALotOfEntries(async ({ cookies, entries }) => {
+				const shuffledEntries = shuffleArray(entries);
+				for (const entry of shuffledEntries) {
+					await putEntry(entry, undefined, cookies);
+				}
+			});
+		});
+
+		async function setupEntryMatrix() {
+			const member = await makeMember(env.users.user.id);
+			await putEntries(await timeModelEntries(member.member, 0n));
+
+			const client1Entries: Entry[] = [];
+			await member.member.assign({
+				name: "1",
+				pronouns: "1",
+				description: "1",
+				isArchived: true,
+				archivedReason: "1",
+			});
+			client1Entries.push(...(await timeModelEntries(member.member, 1n)));
+			await member.member.assign({
+				description: "3",
+				archivedReason: "3",
+			});
+			client1Entries.push(...(await timeModelEntries(member.member, 3n)));
+
+			const client2Entries: Entry[] = [];
+			await member.member.assign({
+				pronouns: "2",
+				description: "2",
+				archivedReason: "2",
+			});
+			client2Entries.push(...(await timeModelEntries(member.member, 2n)));
+			await member.member.assign({
+				archivedReason: "4",
+			});
+			client2Entries.push(...(await timeModelEntries(member.member, 4n)));
+
+			return { member, client1Entries, client2Entries };
+		}
+
+		async function verifyEntryMatrixResult(member: Member) {
+			const response = await getSyncFrom("");
+			const responseEntries = response.body.entries;
+			assert(responseEntries);
+			assert(Array.isArray(responseEntries));
+			assert(responseEntries.every((entry) => isJsonFriendlyEntryWithPayload(entry)));
+
+			const reconstructedMember = new Member(
+				member.subspaceId,
+				undefined,
+				await Promise.all(
+					responseEntries
+						.filter((entry) => entry.path.startsWith(member.getPathRoot()))
+						.map((entry) => EntryWrapper.load(entry, entry.payload)),
+				),
+			);
+
+			assert.partialDeepStrictEqual(reconstructedMember.data, {
 				name: "1",
 				pronouns: "2",
 				description: "3",
@@ -854,141 +1024,44 @@ describe(pushEndpoint, () => {
 
 		test("PUT reconstruct data correctly when receiving out-of-order sync from previously offline client 200", async () => {
 			{
-				const { member, client1Logs, client2Logs } = await setupLogMatrix();
+				const { member, client1Entries, client2Entries } = await setupEntryMatrix();
 
-				await putLogs(client1Logs);
-				await putLogs(client2Logs);
+				await putEntries(client1Entries);
+				await putEntries(client2Entries);
 
-				await verifyLogMatrixResult(member);
+				await verifyEntryMatrixResult(member.member);
 			}
 			{
-				const { member, client1Logs, client2Logs } = await setupLogMatrix();
+				const { member, client1Entries, client2Entries } = await setupEntryMatrix();
 
-				await putLogs(client2Logs);
-				await putLogs(client1Logs);
+				await putEntries(client2Entries);
+				await putEntries(client1Entries);
 
-				await verifyLogMatrixResult(member);
+				await verifyEntryMatrixResult(member.member);
 			}
-		});
-
-		test("can handle date fields", async () => {
-			const { createLog } = await createMember();
-
-			await putLog({
-				id: createId(),
-				memberId: createLog.memberId,
-				operationType: "update",
-				data: {
-					updatedAt: new Date(),
-				},
-				executedAt: new Date(),
-			});
 		});
 
 		test("create front", async () => {
-			await createFrontEntry();
+			await createFront(env.users.user.id);
 		});
 
-		test("update front", async () => {
-			const { createLog } = await createFrontEntry();
-			const updateLog: ClientLog = {
-				id: createId(),
-				frontId: createLog.frontId,
-				operationType: "update",
-				data: {
-					note: "hi",
-					endedAt: new Date(),
-				},
-				executedAt: new Date(),
-			};
-			await putLog(updateLog);
-			await checkLogIsServed(updateLog);
+		test.only("update front", async () => {
+			const { front } = await createFront(env.users.user.id);
+			await front.assign({
+				note: "hi",
+				endedAt: new Date(),
+			});
+			const entries = await front.flushDirtyEntries();
+			await putEntries(entries);
+			await checkEntriesAreServed(entries);
 		});
 
-		test("delete front", async () => {
-			const { createLog } = await createFrontEntry();
-			const deleteLog: ClientLog = {
-				id: createId(),
-				frontId: createLog.frontId,
-				operationType: "delete",
-				data: null,
-				executedAt: new Date(),
-			};
-			await putLog(deleteLog);
-			await checkLogIsServed(deleteLog);
-		});
-
-		test("create member and front in same request", async () => {
-			const date = new Date();
-			const { createLog: memberCreateLog } = makeMemberWithLog(date);
-			const { createLog: frontCreateLog } = makeFrontWithLog(date, memberCreateLog);
-			await putLogs([memberCreateLog, frontCreateLog]);
-			await checkLogIsServed(memberCreateLog);
-			await checkLogIsServed(frontCreateLog);
-		});
-
-		test("do operations on both members and fronts in a single request", async () => {
-			const date = new Date();
-			const { createLog: frontCreateLog, memberCreateLog } = await createFrontEntry();
-			const { createLog: frontCreateLogToDelete, memberCreateLog: memberCreateLogToDelete } =
-				await createFrontEntry();
-			const { createLog: member2CreateLog } = makeMemberWithLog(date);
-			const { createLog: front2CreateLog } = makeFrontWithLog(date, memberCreateLog);
-			const logs: ClientLog[] = [
-				member2CreateLog,
-				front2CreateLog,
-				{
-					id: createId(),
-					memberId: memberCreateLog.memberId,
-					operationType: "update",
-					data: {
-						description: "a new description",
-						updatedAt: new Date(),
-					},
-					executedAt: new Date(),
-				},
-				{
-					id: createId(),
-					frontId: frontCreateLog.frontId,
-					operationType: "update",
-					data: {
-						memberId: member2CreateLog.memberId,
-						note: "oopsie",
-						updatedAt: new Date(),
-					},
-					executedAt: new Date(),
-				},
-				{
-					id: createId(),
-					memberId: member2CreateLog.memberId,
-					operationType: "update",
-					data: {
-						description: "another new description",
-						updatedAt: new Date(),
-					},
-					executedAt: new Date(),
-				},
-				{
-					id: createId(),
-					frontId: frontCreateLogToDelete.frontId,
-					operationType: "delete",
-					data: null,
-					executedAt: new Date(),
-				},
-				{
-					id: createId(),
-					memberId: memberCreateLogToDelete.memberId,
-					operationType: "delete",
-					data: null,
-					executedAt: new Date(),
-				},
-			];
-			await putLogs(logs);
-
-			await getSyncFrom("init");
-			for (const log of logs.slice(0, -2)) {
-				await checkLogIsServed(log);
-			}
+		test.only("delete front", async () => {
+			const { front, entries } = await createFront(env.users.user.id);
+			const deleteEntry = await front.getDeleteEntry();
+			await putEntry(deleteEntry);
+			await checkEntriesAreServed([deleteEntry]);
+			await checkEntriesAreNotServed(entries);
 		});
 	});
 });

@@ -1,9 +1,8 @@
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { and, asc, eq, isNull, lt } from "drizzle-orm";
-import { serverJobs } from "openselves-common/db";
+import { jobs } from "openselves-common/db";
 
-import { InjectDb } from "../db/db.service.js";
-import type { DB } from "../db/drizzle.js";
+import { DB } from "../db/drizzle.js";
 import { type IJob, Job, MAX_JOB_ATTEMPTS } from "./job.js";
 
 @Injectable()
@@ -15,7 +14,7 @@ export class QueueService implements OnApplicationShutdown {
 	private failedJobs: number = 0;
 	private flushJobsCallback: (() => void) | undefined;
 
-	constructor(@InjectDb() private readonly db: DB) {
+	constructor(private readonly db: DB) {
 		this.runnerInterval = setInterval(() => {
 			this.run().catch((err) => {
 				console.error("Uncaught error in QueueService.run()", err);
@@ -53,7 +52,7 @@ export class QueueService implements OnApplicationShutdown {
 	}
 
 	public async queue(job: IJob) {
-		await this.db.insert(serverJobs).values(job.toDb());
+		await this.db.insert(jobs).values(job.toDb());
 		this.mayHaveJobsInDb = true;
 	}
 
@@ -75,14 +74,9 @@ export class QueueService implements OnApplicationShutdown {
 				const dbJob = (
 					await tx
 						.select()
-						.from(serverJobs)
-						.where(
-							and(
-								isNull(serverJobs.completedAt),
-								lt(serverJobs.attempts, MAX_JOB_ATTEMPTS),
-							),
-						)
-						.orderBy(asc(serverJobs.scheduledAt))
+						.from(jobs)
+						.where(and(isNull(jobs.completedAt), lt(jobs.attempts, MAX_JOB_ATTEMPTS)))
+						.orderBy(asc(jobs.scheduledAt))
 						.limit(1)
 						.for("update", {
 							skipLocked: true,
@@ -114,9 +108,9 @@ export class QueueService implements OnApplicationShutdown {
 					this.failedJobs++;
 				}
 				if (values.completedAt && job.shouldDeleteOnSuccess) {
-					await tx.delete(serverJobs).where(eq(serverJobs.id, dbJob.id));
+					await tx.delete(jobs).where(eq(jobs.id, dbJob.id));
 				} else {
-					await tx.update(serverJobs).set(values).where(eq(serverJobs.id, dbJob.id));
+					await tx.update(jobs).set(values).where(eq(jobs.id, dbJob.id));
 				}
 			});
 

@@ -20,7 +20,7 @@ import { Throttle } from "@nestjs/throttler";
 import { DrizzleQueryError } from "drizzle-orm";
 import type { Request } from "express";
 import type { GetUserResult, PartialBy } from "openselves-common";
-import type { ServerUserEmailChangeRequest, User } from "openselves-common/db";
+import type { User, UserEmailChangeRequest } from "openselves-common/db";
 
 import { Captcha } from "../../captcha/decorators/captcha.decorator.js";
 import type { ConfigData } from "../../config.data.js";
@@ -268,7 +268,7 @@ export class UserController {
 	private getUserResponseForOwner(
 		user: PartialBy<
 			User & {
-				emailChangeRequest: ServerUserEmailChangeRequest | null;
+				emailChangeRequest: UserEmailChangeRequest | null;
 			},
 			"passwordHash"
 		>,

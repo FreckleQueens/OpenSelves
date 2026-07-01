@@ -1,5 +1,5 @@
 import type { JSONCompatible } from "openselves-common";
-import type { ServerJob, ServerJobCreate } from "openselves-common/db";
+import type { Job as DbJob, JobCreate } from "openselves-common/db";
 
 export type JobType<
 	TypeDbName extends string,
@@ -7,12 +7,12 @@ export type JobType<
 	Class extends Job<TypeDbName, Data> = Job<TypeDbName, Data>,
 > = {
 	type: TypeDbName;
-	new (dbJob: ServerJob): Class;
+	new (dbJob: DbJob): Class;
 };
 
 export interface IJob {
 	get shouldDeleteOnSuccess(): boolean;
-	toDb(): ServerJobCreate;
+	toDb(): JobCreate;
 	run(): Promise<void>;
 }
 
@@ -26,7 +26,7 @@ export abstract class Job<
 	private static jobTypes: Map<
 		string,
 		{
-			new (dbJob: ServerJob): IJob;
+			new (dbJob: DbJob): IJob;
 		}
 	> = new Map();
 	public static registerJobType<TypeDbName extends string, Data extends JSONCompatible<Data>>(
@@ -35,7 +35,7 @@ export abstract class Job<
 		this.jobTypes.set(jobType.type, jobType);
 	}
 
-	public static fromDb(dbJob: ServerJob): IJob {
+	public static fromDb(dbJob: DbJob): IJob {
 		const jobType = this.jobTypes.get(dbJob.type);
 		if (!jobType) {
 			throw new Error("No queue found for name " + dbJob.type);
@@ -49,7 +49,7 @@ export abstract class Job<
 	private completedAt: Date | undefined = undefined;
 	protected readonly createdAt: Date | undefined;
 
-	protected constructor(jobType: JobType<TypeDbName, Data>, dbJob?: Partial<ServerJob>) {
+	protected constructor(jobType: JobType<TypeDbName, Data>, dbJob?: Partial<DbJob>) {
 		this.typeDbName = jobType.type;
 		if (dbJob) {
 			this.assertValidData(dbJob.data);
@@ -59,7 +59,7 @@ export abstract class Job<
 		this.createdAt = dbJob?.createdAt;
 	}
 
-	public toDb(): ServerJobCreate {
+	public toDb(): JobCreate {
 		return {
 			type: this.typeDbName,
 			data: this.data,

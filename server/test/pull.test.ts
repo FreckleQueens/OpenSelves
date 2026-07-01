@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
 import assert from "node:assert";
 import test, { before, describe } from "node:test";
-import { type Log, type LogCreate, type Member, members, models } from "openselves-common/db";
+import { Member } from "openselves-common/client";
+import { type EntryCreate, entries } from "openselves-common/db";
+import { EntryWrapper, J2000_TO_UNIX_DIFFERENCE, uint64ToInt64 } from "openselves-common/willow";
 
-import { LARGE_IMAGE_FILE_PATH, makeMemberWithLog, putLog } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pullEndpoint = "/sync/pull";
@@ -12,8 +12,9 @@ describe("/sync/pull", () => {
 	let env: TestEnvWithUsers;
 	let members1: Member[];
 	let deletedMember1: Member;
+	const entries1: EntryWrapper[] = [];
 	let members2: Member[];
-	let logs1: Log[];
+	const entries2: EntryWrapper[] = [];
 	setupTestSuiteWithUsers((testEnv) => {
 		env = testEnv;
 	});
@@ -21,128 +22,65 @@ describe("/sync/pull", () => {
 	before(async () => {
 		let timestamp: number = Date.now() - 1000;
 		const getDate = () => new Date(timestamp++);
-		members1 = await env.db
-			.insert(members)
-			.values([
-				{
-					userId: env.users.user.id,
-					name: "Alice",
-					pronouns: "she/her",
-					description: "a member of our& system",
-					createdAt: getDate(),
-					updatedAt: getDate(),
-				},
-				{
-					userId: env.users.user.id,
-					name: "Bob",
-					pronouns: "he/him",
-					description: "another member of our& system",
-					createdAt: getDate(),
-					updatedAt: getDate(),
-				},
-			])
-			.returning();
-		deletedMember1 = (
-			await env.db
-				.insert(members)
-				.values([
-					{
-						userId: env.users.user.id,
-						name: "Dex",
-						pronouns: "they/them",
-						description: "a deleted member of our& system",
-						createdAt: getDate(),
-						updatedAt: getDate(),
-					},
-				])
-				.returning()
-		)[0];
-		await env.db.delete(members).where(eq(members.id, deletedMember1.id));
-
-		members2 = await env.db
-			.insert(members)
-			.values([
-				{
-					userId: env.users.user2.id,
-					name: "Claire",
-					pronouns: "they/them",
-					description: "someone else somewhere else",
-					createdAt: getDate(),
-					updatedAt: getDate(),
-				},
-			])
-			.returning();
-
-		logs1 = await env.db
-			.insert(models.logs)
-			.values([
-				...members1.map((member) => {
-					const { id, userId, ...memberData } = member;
-					const log: LogCreate = {
-						userId: userId,
-						memberId: id,
-						operationType: "create",
-						data: memberData,
-						executedAt: member.createdAt,
-						pushedAt: member.createdAt,
-					};
-					return log;
-				}),
-				{
-					userId: env.users.user.id,
-					memberId: members1[0].id,
-					operationType: "update",
-					data: {
-						name: "a new name",
-					},
-					executedAt: getDate(),
-					pushedAt: getDate(),
-				},
-				{
-					userId: env.users.user.id,
-					memberId: members1[1].id,
-					operationType: "update",
-					data: {
-						description: "a new description",
-					},
-					executedAt: getDate(),
-					pushedAt: getDate(),
-				},
-				{
-					userId: env.users.user.id,
-					deletedId: `members.${deletedMember1.id}`,
-					operationType: "delete",
-					data: null,
-					executedAt: getDate(),
-					pushedAt: getDate(),
-				},
-			])
-			.returning();
-
-		await env.db.insert(models.logs).values([
-			...members2.map((member) => {
-				const { id, userId, ...memberData } = member;
-				const log: LogCreate = {
-					userId: userId,
-					memberId: id,
-					operationType: "create",
-					data: memberData,
-					executedAt: member.createdAt,
-					pushedAt: member.createdAt,
-				};
-				return log;
+		members1 = [
+			new Member(env.users.user.id, {
+				name: "Alice",
+				pronouns: "she/her",
+				description: "a member of our& system",
+				createdAt: getDate(),
 			}),
-			{
-				userId: env.users.user2.id,
-				memberId: members2[0].id,
-				operationType: "update",
-				data: {
-					pronouns: "rad/af",
-				},
-				executedAt: getDate(),
-				pushedAt: getDate(),
-			},
-		]);
+			new Member(env.users.user.id, {
+				name: "Bob",
+				pronouns: "he/him",
+				description: "another member of our& system",
+				createdAt: getDate(),
+			}),
+		];
+
+		deletedMember1 = new Member(env.users.user.id, {
+			name: "Dex",
+			pronouns: "they/them",
+			description: "a deleted member of our& system",
+			createdAt: getDate(),
+		});
+
+		await members1[0].set("name", "a new name");
+		await members1[1].set("description", "a new description");
+
+		entries1.push(
+			...(await Promise.all(members1.map((member) => member.flushDirtyEntries()))).flat(),
+			await deletedMember1.getPermanentDeleteEntry(),
+		);
+
+		members2 = [
+			new Member(env.users.user2.id, {
+				name: "Claire",
+				pronouns: "they/them",
+				description: "someone else somewhere else",
+				createdAt: getDate(),
+			}),
+		];
+
+		await members2[0].set("pronouns", "rad/af");
+
+		entries2.push(
+			...(await Promise.all(members2.map((member) => member.flushDirtyEntries()))).flat(),
+		);
+
+		const valuesToInsert = [...entries1, ...entries2].map(
+			(entry): EntryCreate => ({
+				subspaceId: entry.subspaceId,
+				path: entry.path,
+				timestamp: uint64ToInt64(entry.timestamp),
+				payloadLength: uint64ToInt64(entry.payloadLength),
+				payloadDigest: entry.payloadDigest,
+				payload: typeof entry.payload === "string" ? Buffer.from(entry.payload) : null,
+			}),
+		);
+
+		assert.strictEqual(valuesToInsert.length, 3 * 6 + 1);
+		const inserted = await env.db.insert(entries).values(valuesToInsert).returning();
+		assert.strictEqual(inserted.length, 3 * 6 + 1);
 	});
 
 	test("GET 404", async () => {
@@ -169,22 +107,26 @@ describe("/sync/pull", () => {
 				.set("Cookie", env.users.cookies)
 				.expect(400)
 				.expect("Content-type", /json/);
-			assert.strictEqual(response.body.logs, undefined);
+			assert.strictEqual(response.body.entries, undefined);
 		});
 
-		async function callPull(timestamp: number | "init", expectCode: number, cookies: string) {
-			return env.request
+		async function callPull(timestamp: string, expectCode: number, cookies: string) {
+			const response = await env.request
 				.post(pullEndpoint)
 				.send({
 					timestamp: timestamp,
 				})
 				.set("Cookie", cookies)
-				.expect(expectCode)
 				.expect("Content-type", /json/);
+			if (response.status !== expectCode) {
+				console.log(response.body);
+			}
+			assert.strictEqual(response.status, expectCode);
+			return response;
 		}
 
-		async function callPullAndGetLogs(
-			timestamp: number | "init",
+		async function callPullAndGetEntries(
+			timestamp: string,
 			expectCode: number,
 			cookies: string,
 		) {
@@ -194,121 +136,81 @@ describe("/sync/pull", () => {
 			assert.strictEqual(Number.isFinite(responseTimestamp), true);
 			assert(Math.abs((responseTimestamp - date.getTime()) / 1000) < 0.5);
 
-			const logs: unknown[] = response.body.logs;
-			assert.notStrictEqual(logs, undefined);
-			assert(Array.isArray(logs));
-			return logs;
+			const entries: unknown[] = response.body.entries;
+			assert.notStrictEqual(entries, undefined);
+			assert(Array.isArray(entries));
+			return await Promise.all(
+				entries.map((entry) => {
+					return EntryWrapper.load(entry);
+				}),
+			);
 		}
 
 		test("initial sync 200", async () => {
-			const date = new Date();
+			const entries = await callPullAndGetEntries("", 200, env.users.cookies);
 
-			const members = [...members1];
-			const logs = await callPullAndGetLogs("init", 200, env.users.cookies);
-
-			assert.strictEqual(logs.length, members.length + 1);
-			for (const member of members) {
-				const log: Log | undefined = logs.find(
-					(log) => log && typeof log === "object" && log["memberId"] === member.id,
-				) as Log;
-				assert.notStrictEqual(log, undefined);
-				assert.strictEqual(log["operationType"], "create");
-
-				const { id, userId, createdAt, updatedAt, ...memberData } = member;
-				assert.deepStrictEqual(log.data, {
-					...memberData,
-					createdAt: createdAt.toISOString(),
-					updatedAt: updatedAt.toISOString(),
-				});
-
-				assert.strictEqual(typeof log.id, "string");
-				assert(log.id.length > 0);
-
-				const executedAt = new Date(log.executedAt).getTime();
-				assert.strictEqual(Number.isFinite(executedAt), true);
-				assert(Math.abs((executedAt - date.getTime()) / 1000) < 0.5);
-
-				assert.strictEqual(log.userId, undefined);
-				assert.strictEqual(log.deletedId, undefined);
+			assert.strictEqual(entries.length, entries1.length);
+			assert.strictEqual(entries.length, 13);
+			for (const actualEntry of entries) {
+				assert.strictEqual(
+					entries.filter((entry) => entry.path === actualEntry.path).length,
+					1,
+				);
+				const expectedEntry = entries1.findLast((entry) => entry.path === actualEntry.path);
+				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}
-
-			const deleteLog = logs.find(
-				(log) => log && typeof log === "object" && log["memberId"] === deletedMember1.id,
-			);
-			assert.notStrictEqual(deleteLog, undefined);
-			assert.partialDeepStrictEqual(deleteLog, {
-				operationType: "delete",
-				data: null,
-			});
 		});
 
-		test("serves all logs after timestamp 200", async () => {
+		test("serves all entries after timestamp 200", async () => {
 			const date = new Date(Date.now() - 10 * 60 * 60 * 1000); // 10 hours ago
 
-			const logs = await callPullAndGetLogs(date.getTime(), 200, env.users.cookies);
+			const entries = await callPullAndGetEntries(date.toISOString(), 200, env.users.cookies);
 
-			assert.strictEqual(logs.length, logs1.length);
-			for (let i = 0; i < logs.length; i++) {
-				const log: Log = logs[i] as Log;
-				const expectedSentLog = logs1.find((sentLog) => sentLog.id === log.id);
-				assert.notStrictEqual(expectedSentLog, undefined);
-				const { userId, deletedId, executedAt, pushedAt, ...expectedLog }: Log =
-					expectedSentLog as Log;
-				let transformedExpectedLog = expectedLog;
-				if (expectedLog.operationType === "delete") {
-					const memberId = expectedSentLog?.deletedId?.split(".")[1];
-					assert.notStrictEqual(memberId, undefined);
-					transformedExpectedLog = {
-						...expectedLog,
-						memberId: typeof memberId === "string" ? memberId : null,
-					};
-				}
-				assert.deepStrictEqual(log, {
-					...transformedExpectedLog,
-					executedAt: executedAt.toISOString(),
-				});
+			assert.strictEqual(entries.length, entries1.length);
+			assert.strictEqual(entries.length, 13);
+			for (const actualEntry of entries) {
+				const expectedEntry = entries1.findLast((entry) => entry.path === actualEntry.path);
+				assert(expectedEntry);
+				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}
 		});
 
-		test("refuses negative timestamp 400", async () => {
-			const response = await callPull(-1, 400, env.users.cookies);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.logs, undefined);
+		test("accepts timestamp at j2000 epoch 200", async () => {
+			await callPull(
+				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n)).toISOString(),
+				200,
+				env.users.cookies,
+			);
 		});
 
-		test("refuses timestamp in the future 400", async () => {
+		test("refuses timestamp older than j2000 epoch 400", async () => {
 			const response = await callPull(
-				Date.now() + 10 * 60 * 60 * 1000, // 10 hours from now
+				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n - 1n)).toISOString(),
 				400,
 				env.users.cookies,
 			);
 			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.logs, undefined);
+			assert.strictEqual(response.body.entries, undefined);
 		});
 
-		test("initial sync serves the right member image link 200", async () => {
-			const date = new Date();
+		test("refuses timestamp in the future 400", async () => {
+			const response = await callPull(
+				new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now
+				400,
+				env.users.cookies,
+			);
+			assert.strictEqual(response.body.timestamp, undefined);
+			assert.strictEqual(response.body.entries, undefined);
+		});
 
-			const { createLog } = makeMemberWithLog(date, {
-				path: LARGE_IMAGE_FILE_PATH,
-			});
-			await putLog(env, createLog);
-
-			const initialLogs = await callPullAndGetLogs("init", 200, env.users.cookies);
-			const syncLogs = await callPullAndGetLogs(0, 200, env.users.cookies);
-
-			const initialCreateLog = initialLogs.find((log) => {
-				return log && typeof log === "object" && log["memberId"] === createLog.memberId;
-			}) as object;
-			const syncCreateLog = syncLogs.find((log) => {
-				return log && typeof log === "object" && log["memberId"] === createLog.memberId;
-			}) as object;
-
-			const initialImage = initialCreateLog["data"]["image"];
-			const syncImage = syncCreateLog["data"]["image"];
-			assert(initialImage);
-			assert(syncImage);
-			assert.strictEqual(initialImage, syncImage);
+		test("refuses invalid timestamp 400", async () => {
+			const response = await callPull(
+				"this is not a valid timestamp",
+				400,
+				env.users.cookies,
+			);
+			assert.strictEqual(response.body.timestamp, undefined);
+			assert.strictEqual(response.body.entries, undefined);
 		});
 	});
 });

@@ -7,18 +7,17 @@ import { randomBytes } from "crypto";
 import { type BuildQueryResult, type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
 import { type DBQueryConfigWith } from "drizzle-orm/relations";
 import {
-	type ServerUserEmailChangeRequest,
 	type User,
 	type UserCreate,
+	type UserEmailChangeRequest,
 	type UserUpdate,
 	type relations,
-	serverUserEmailChangeRequest,
+	userEmailChangeRequest,
 	users,
 } from "openselves-common/db";
 
 import type { ConfigData } from "../../config.data.js";
-import { InjectDb } from "../../db/db.service.js";
-import type { DB } from "../../db/drizzle.js";
+import { DB } from "../../db/drizzle.js";
 import { MailService } from "../mail/mail.service.js";
 
 @Injectable()
@@ -27,7 +26,7 @@ export class UserService {
 		private readonly config: ConfigService<ConfigData>,
 		@Inject(CACHE_MANAGER)
 		private readonly cache: Cache,
-		@InjectDb() private readonly db: DB,
+		private readonly db: DB,
 		private readonly mailService: MailService,
 	) {}
 
@@ -96,14 +95,14 @@ export class UserService {
 		data: Partial<UserCreate>,
 	): Promise<
 		| (User & {
-				emailChangeRequest: ServerUserEmailChangeRequest | null;
+				emailChangeRequest: UserEmailChangeRequest | null;
 		  })
 		| undefined
 	> {
 		return await this.db.transaction(async (tx) => {
 			data = { ...data };
 
-			let emailChangeRequest: ServerUserEmailChangeRequest | null = null;
+			let emailChangeRequest: UserEmailChangeRequest | null = null;
 			if ("email" in data) {
 				const existingUserWithEmail = await tx.query.users.findFirst({
 					where: {
@@ -116,13 +115,13 @@ export class UserService {
 
 				emailChangeRequest = (
 					await tx
-						.insert(serverUserEmailChangeRequest)
+						.insert(userEmailChangeRequest)
 						.values({
 							userId,
 							email: data.email,
 						})
 						.onConflictDoUpdate({
-							target: serverUserEmailChangeRequest.userId,
+							target: userEmailChangeRequest.userId,
 							set: {
 								email: data.email,
 							},
@@ -157,7 +156,7 @@ export class UserService {
 	public getUserEmailToVerify(
 		user: Omit<
 			User & {
-				emailChangeRequest?: ServerUserEmailChangeRequest | null;
+				emailChangeRequest?: UserEmailChangeRequest | null;
 			},
 			"passwordHash"
 		>,
@@ -200,8 +199,8 @@ export class UserService {
 			if (user.emailChangeRequest) {
 				updateData.email = user.emailChangeRequest.email;
 				await tx
-					.delete(serverUserEmailChangeRequest)
-					.where(eq(serverUserEmailChangeRequest.userId, user.emailChangeRequest.userId));
+					.delete(userEmailChangeRequest)
+					.where(eq(userEmailChangeRequest.userId, user.emailChangeRequest.userId));
 			}
 
 			const updatedUsers = await tx
@@ -223,7 +222,7 @@ export class UserService {
 	public async resendVerificationEmail(
 		user: Omit<
 			User & {
-				emailChangeRequest: ServerUserEmailChangeRequest | null;
+				emailChangeRequest: UserEmailChangeRequest | null;
 			},
 			"passwordHash"
 		>,
@@ -311,7 +310,7 @@ export class UserService {
 	private async sendEmailVerificationEmail(
 		user: Omit<
 			User & {
-				emailChangeRequest: ServerUserEmailChangeRequest | null;
+				emailChangeRequest: UserEmailChangeRequest | null;
 			},
 			"passwordHash"
 		>,

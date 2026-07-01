@@ -248,10 +248,11 @@ a short-lived one
 ## 🚧 0.7.0 - Willow data model, encryption and moving to a zero-trust model
 - [x] replace playwright with puppeteer
 - [ ] run client tests on firefox too
+- [ ] replace zod with joi
 - [ ] Willow data model
   As per https://willowprotocol.org/specs/data-model/index.html#data_model
-  - [ ] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
-    - [ ] migrate the database to the new format
+  - [x] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
+    - [x] migrate the database to the new format
         ```ts
         // MAX_UPLOAD_SIZE=5242880 (5MiB), the maximum individual payload_length at the controller level
         // MAX_STORAGE_PER_USER=5368709120 (5GiB), the maximum sum of payload_length per user at the service level
@@ -259,22 +260,22 @@ a short-lived one
         interface Entry {
             // Not a db field
             readonly namespace_id: "org.openselves";
-            // foreignKey users.userId
+            // foreignKey users.id
             readonly subspace_id: string;
             readonly path: string;
             // was logs.executedAt
-            timestamp: number;
+            timestamp: bigint;
             // length of entries.payload in bytes
-            payload_length: U64;
+            payload_length: bigint;
             // The result of applying hash_payload to the Payload.
             payload_digest: PayloadDigest;
     
-            // null means the payload was not transmitted yet
+            // a null value indicates either external storage or that it was not transmitted yet
             payload: string | null;
 		
             // Server-only field
             // null, 0 to 8192 bytes, payload contains the raw value
-            // "s3", 8193 to Infinity bytes, means payload contains the necessary reference to identify, fetch or delete the s3 object
+            // "s3", 8193 to Infinity bytes, means payload upload was complete and stored in object storage
             payload_storage: null | "s3";
     
             // Server-only field
@@ -284,10 +285,12 @@ a short-lived one
             updated_at: number;
         }
         ```
-    - [ ] Drop uploaded entries for which there exists a newer entry in DB whose path prefixes the uploaded entry
-    - [ ] For each uploaded entry, delete all entries in the same namespace AND subspace AND whose path is prefixed by the uploaded entry
-    - [ ] insert remaining entries in DB
-    - [ ] initial sync is no longer a separate process. to retrieve all data, call /sync/pull with the timestamp set to 0
+    - [x] implement ingesting algorithm (Willow "Store")
+    - [x] refuse entries with timestamps too far in the future, except empty payload plus timestamp equal to the maximum uint64
+  - [ ] Migrate the client to the new format
+    - [ ] Migrate IndexedDB
+    - [x] use `performance.timeOrigin + performance.now()` to get timestamp
+    - [ ] add `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers to increase timestamp precision
 - [ ] encryption (client side)
   - [ ] make sure the password is never sent to the server (srp? opaque?)
   - [ ] use PBKDF2 to derive the KEK from the password, store it securely (idb?)
@@ -297,8 +300,13 @@ a short-lived one
   - [ ] put the public key in a "/public.key"
   - [ ] encrypt path components
   - [ ] encrypt payloads
+- [ ] Move common/db to server
+- [ ] Have the client handle not uploading every entry all at once when it would make the json payload bigger than twice 
+the maximum allowed per-entry payload
+- [ ] obfuscate password recovery request response by always responding with success
 
 ## 0.8.0 - Simply Plural import
+- [ ] drop logs, members and fronts tables
 - [ ] simply plural data importer (save all simply plural ids!)
 - [ ] simply plural data vault
 
@@ -327,6 +335,7 @@ a short-lived one
   - [ ] sign cookies (accessToken, refreshToken) (this should harden against DDOS)
   - [ ] turn on Secure flag on cookies (except in dev and test mode)
   - [ ] lock rows in sync engine operations transaction
+  - [ ] defer long payload uploads and stream them to s3 one-by-one
 - [ ] UI tweaks
   - [ ] make sure FABs menu buttons in members page (and others?) show on screen without the need to scroll on browsers
   - [ ] show proper language names in language switcher

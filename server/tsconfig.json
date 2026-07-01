@@ -5,7 +5,7 @@
 		"rootDirs": ["./src"],
 		"outDir": "./dist",
 		"tsBuildInfoFile": "./dist/.tsbuildinfo",
-		"types": ["node", "multer"],
+		"types": ["node"],
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true
 	},

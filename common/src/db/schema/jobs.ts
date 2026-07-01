@@ -2,7 +2,7 @@ import { camelCase, integer, json, text, timestamp } from "drizzle-orm/pg-core";
 
 import { idPrimaryKey, timestamps } from "./utils.js";
 
-export const serverJobs = camelCase.table("server_jobs", {
+export const jobs = camelCase.table("jobs", {
 	...idPrimaryKey(),
 
 	type: text().notNull(),
@@ -13,6 +13,6 @@ export const serverJobs = camelCase.table("server_jobs", {
 
 	...timestamps(),
 });
-export type ServerJob = typeof serverJobs.$inferSelect;
-export type ServerJobCreate = typeof serverJobs.$inferInsert;
-export type ServerJobUpdate = Partial<ServerJobCreate>;
+export type Job = typeof jobs.$inferSelect;
+export type JobCreate = typeof jobs.$inferInsert;
+export type JobUpdate = Partial<JobCreate>;

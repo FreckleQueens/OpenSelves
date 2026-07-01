@@ -1,7 +1,6 @@
-import { IsNumber, ValidateIf } from "class-validator";
+import { IsString } from "class-validator";
 
 export class PullDto {
-	@IsNumber()
-	@ValidateIf((obj, val) => val !== "init")
-	public readonly timestamp!: number | "init";
+	@IsString()
+	public readonly timestamp!: string;
 }

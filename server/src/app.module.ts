@@ -12,6 +12,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import cookieParser from "cookie-parser";
+import { json } from "express";
 import type { Server } from "node:http";
 import { API_VERSION } from "openselves-common";
 
@@ -74,7 +75,7 @@ export function configureApp(app: NestExpressApplication<Server>) {
 	configService.set("_APP_VERSION", API_VERSION);
 
 	app.set("trust proxy", "loopback");
-
+	app.use(json({ limit: configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true }) * 2 }));
 	app.useGlobalPipes(
 		new ValidationPipe({
 			transform: true,

@@ -5,12 +5,11 @@ import {
 	type ListObjectsCommandOutput,
 	PutObjectCommand,
 	S3Client,
+	S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { confirm } from "@inquirer/prompts";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { type Request } from "express";
-import { createReadStream } from "node:fs";
 
 import { AppCommand } from "../AppCommand.js";
 import type { ConfigData } from "../config.data.js";
@@ -22,10 +21,14 @@ class TransactionAlreadyCommitedError extends Error {
 }
 
 class S3Transaction {
-	private readonly uploadedFiles: string[] = [];
+	private readonly successfulUploads: string[] = [];
 
-	private readonly filesToUpload: { file: Express.Multer.File; key: string }[] = [];
-	private readonly filesToDelete: string[] = [];
+	private readonly queuedUploads: {
+		key: string;
+		content: Buffer<ArrayBufferLike>;
+		unique: boolean;
+	}[] = [];
+	private readonly queuedDeletes: string[] = [];
 
 	private isCommitted: boolean = false;
 
@@ -34,23 +37,23 @@ class S3Transaction {
 		private readonly client?: S3Client,
 	) {}
 
-	public queueUploadFile(file: Express.Multer.File, key: string) {
+	public queuePut(key: string, content: Buffer<ArrayBufferLike>, unique: boolean) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}
 
-		this.filesToUpload.push({ file, key });
+		this.queuedUploads.push({ key, content, unique });
 	}
 
-	public queueDeleteFile(key: string) {
+	public queueDelete(key: string) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}
 
-		this.filesToDelete.push(key);
+		this.queuedDeletes.push(key);
 	}
 
-	public async uploadFile(file: Express.Multer.File, key: string) {
+	public async put(key: string, content: Buffer<ArrayBufferLike>, unique: boolean) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -58,15 +61,22 @@ class S3Transaction {
 		const command = new PutObjectCommand({
 			Bucket: this.bucketName,
 			Key: key,
-			Body: createReadStream(file.path),
-			ContentType: file.mimetype,
-			ContentLength: file.size,
+			Body: content,
+			IfNoneMatch: unique ? "*" : "",
 		});
-		this.uploadedFiles.push(key);
-		await this.client.send(command);
+		try {
+			await this.client.send(command);
+			this.successfulUploads.push(key);
+		} catch (e) {
+			if (
+				!(e instanceof S3ServiceException && e.$metadata.httpStatusCode === 412 && unique)
+			) {
+				throw e;
+			}
+		}
 	}
 
-	public async deleteFiles(keys: string[]) {
+	public async delete(...keys: string[]) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -92,11 +102,11 @@ class S3Transaction {
 		}
 		this.isCommitted = true;
 
-		for (const { file, key } of this.filesToUpload) {
-			await this.uploadFile(file, key);
+		for (const { key, content, unique } of this.queuedUploads) {
+			await this.put(key, content, unique);
 		}
-		if (this.filesToDelete.length > 0) {
-			await this.deleteFiles(this.filesToDelete);
+		if (this.queuedDeletes.length > 0) {
+			await this.delete(...this.queuedDeletes);
 		}
 	}
 
@@ -105,11 +115,11 @@ class S3Transaction {
 			return;
 		}
 
-		if (this.uploadedFiles.length > 0) {
+		if (this.successfulUploads.length > 0) {
 			const command = new DeleteObjectsCommand({
 				Bucket: this.bucketName,
 				Delete: {
-					Objects: this.uploadedFiles.map((key) => ({ Key: key })),
+					Objects: this.successfulUploads.map((key) => ({ Key: key })),
 				},
 			});
 			await this.client.send(command);
@@ -156,7 +166,7 @@ export class S3Service implements OnApplicationShutdown {
 		}
 	}
 
-	public async getObject(key: string, request: Request) {
+	public async getObject(key: string) {
 		if (!this.bucketName || !this.s3Client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -165,7 +175,6 @@ export class S3Service implements OnApplicationShutdown {
 			new GetObjectCommand({
 				Bucket: this.bucketName,
 				Key: key,
-				IfNoneMatch: request.headers["if-none-match"],
 			}),
 		);
 	}

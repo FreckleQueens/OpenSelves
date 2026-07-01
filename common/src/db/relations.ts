@@ -5,10 +5,8 @@ import { models } from "./schema/index.js";
 export const relations = defineRelations(models, (r) => ({
 	users: {
 		sessions: r.many.sessions(),
-		logs: r.many.logs(),
-		members: r.many.members(),
-		fronts: r.many.fronts(),
-		emailChangeRequest: r.one.serverUserEmailChangeRequest(),
+		entries: r.many.entries(),
+		emailChangeRequest: r.one.userEmailChangeRequest(),
 	},
 	sessions: {
 		user: r.one.users({
@@ -16,43 +14,16 @@ export const relations = defineRelations(models, (r) => ({
 			to: r.users.id,
 		}),
 	},
-	serverUserEmailChangeRequest: {
+	userEmailChangeRequest: {
 		user: r.one.users({
-			from: r.serverUserEmailChangeRequest.userId,
+			from: r.userEmailChangeRequest.userId,
 			to: r.users.id,
 		}),
 	},
-	logs: {
+	entries: {
 		user: r.one.users({
-			from: r.logs.userId,
+			from: r.entries.subspaceId,
 			to: r.users.id,
 		}),
-		member: r.one.members({
-			from: [r.logs.userId, r.logs.memberId],
-			to: [r.members.userId, r.members.id],
-		}),
-		front: r.one.fronts({
-			from: [r.logs.userId, r.logs.frontId],
-			to: [r.fronts.userId, r.fronts.id],
-		}),
-	},
-	members: {
-		user: r.one.users({
-			from: r.members.userId,
-			to: r.users.id,
-		}),
-		fronts: r.many.fronts(),
-		logs: r.many.logs(),
-	},
-	fronts: {
-		user: r.one.users({
-			from: r.fronts.userId,
-			to: r.users.id,
-		}),
-		member: r.one.members({
-			from: [r.fronts.userId, r.fronts.memberId],
-			to: [r.members.userId, r.members.id],
-		}),
-		logs: r.many.logs(),
 	},
 }));

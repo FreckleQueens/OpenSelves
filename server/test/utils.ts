@@ -18,8 +18,8 @@ import type { App } from "supertest/types.js";
 
 import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
-import { DBClass, DbService } from "../src/db/db.service.js";
-import type { DB } from "../src/db/drizzle.js";
+import { DbService } from "../src/db/db.service.js";
+import { DB } from "../src/db/drizzle.js";
 import { QueueService } from "../src/queue/queue.service.js";
 
 export type Captcha = {
@@ -47,41 +47,48 @@ export type TestEnvWithUsers = TestEnv & {
 	users: TestEnvUsers;
 };
 
+export async function createAndLoginUser(env: CreateUsersEnv) {
+	const userPassword = "12345678";
+
+	const email = createId() + "@example.com";
+	const user = (
+		await env.request
+			.post("/user")
+			.send({
+				email: email,
+				password: userPassword,
+				registrationPassword: env.registrationPassword,
+				captcha: await solveCaptcha(env, "sendEmail", email),
+			})
+			.expect(201)
+	).body;
+	const response = await env.request.post("/auth/login").send({
+		email: user.email,
+		password: userPassword,
+		captcha: await solveCaptcha(env),
+	});
+	if (response.status !== 200) {
+		console.error(response.body);
+	}
+	assert.strictEqual(response.status, 200);
+	const cookies = convertResponseCookiesToRequestCookies(response);
+	return { user, cookies, userPassword };
+}
+
 async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
 	if (existingUsers) {
 		await env.db
 			.delete(users)
 			.where(inArray(users.id, [existingUsers.user.id, existingUsers.user2.id]));
 	}
-	const userPassword = "12345678";
-	async function createAndLoginUser() {
-		const email = createId() + "@example.com";
-		const user = (
-			await env.request
-				.post("/user")
-				.send({
-					email: email,
-					password: userPassword,
-					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(201)
-		).body;
-		const response = await env.request.post("/auth/login").send({
-			email: user.email,
-			password: userPassword,
-			captcha: await solveCaptcha(env),
-		});
-		if (response.status !== 200) {
-			console.error(response.body);
-		}
-		assert.strictEqual(response.status, 200);
-		const cookies = convertResponseCookiesToRequestCookies(response);
-		return { user, cookies };
-	}
 
-	const { user, cookies } = await createAndLoginUser();
-	const { user: user2, cookies: cookies2 } = await createAndLoginUser();
+	const { user, cookies, userPassword } = await createAndLoginUser(env);
+	const {
+		user: user2,
+		cookies: cookies2,
+		userPassword: userPassword2,
+	} = await createAndLoginUser(env);
+	assert.strictEqual(userPassword, userPassword2);
 
 	return { userPassword, user, cookies, user2, cookies2 };
 }
@@ -114,7 +121,7 @@ export function setupTestSuite(
 		}
 
 		const createUsersEnv: CreateUsersEnv = {
-			db: app.get(DBClass),
+			db: app.get(DB),
 			registrationPassword,
 			get request() {
 				const testAgent = request(server);

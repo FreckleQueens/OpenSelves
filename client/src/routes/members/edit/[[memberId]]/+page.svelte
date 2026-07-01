@@ -26,6 +26,7 @@
 	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toggle } from "konsta/svelte";
 	import type { Member } from "openselves-common/db";
+	import { MAX_IN_DB_PAYLOAD_LENGTH } from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
 	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";
@@ -82,7 +83,7 @@
 			return;
 		}
 
-		const maxDataUrlSize = 8192;
+		const maxDataUrlSize = MAX_IN_DB_PAYLOAD_LENGTH;
 		const maxSizeForDataUrl = (maxDataUrlSize * 3) / 4;
 		const maxFileSize = Math.max(apiState.status?.maxUploadSize || 0, maxSizeForDataUrl);
 		if (file.size > maxFileSize) {
@@ -237,7 +238,7 @@
 				name="image"
 				label={t("Image url")}
 				floatingLabel
-				maxlength="8192"
+				maxlength={MAX_IN_DB_PAYLOAD_LENGTH.toString()}
 				bind:value={member.image}
 				error={formState.errors["image"] || ""}
 				{disabled}

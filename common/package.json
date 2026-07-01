@@ -12,7 +12,9 @@
 	"type": "module",
 	"exports": {
 		".": "./dist/index.js",
+		"./client": "./dist/client/index.js",
 		"./db": "./dist/db/index.js",
+		"./willow": "./dist/willow/index.js",
 		"./drizzle.config": "./drizzle.config.ts",
 		"./eslint.config.mjs": "./eslint.config.mjs",
 		"./tsconfig.json": "./tsconfig.json"

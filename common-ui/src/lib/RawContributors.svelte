@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { shuffleArray } from "openselves-common";
 	import { type Snippet, onMount } from "svelte";
 
 	type Contributor = {
@@ -10,14 +11,7 @@
 	};
 	let { children, contributorsSrc }: { children?: Snippet; contributorsSrc: string } = $props();
 	let contributors: Contributor[] = $state([]);
-	let contributorsSortedRandomly: Contributor[] = $derived.by(() => {
-		const array = [...contributors];
-		for (let i = array.length - 1; i > 0; i--) {
-			const randomIndex = Math.floor(Math.random() * (i + 1));
-			[array[i], array[randomIndex]] = [array[randomIndex], array[i]];
-		}
-		return array;
-	});
+	let contributorsSortedRandomly: Contributor[] = $derived(shuffleArray(contributors));
 	onMount(async () => {
 		const lines = contributorsSrc
 			.split("\n")

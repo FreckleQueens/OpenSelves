@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import type { ServerJob } from "openselves-common/db";
+import type { Job as DbJob } from "openselves-common/db";
 
 import { Job } from "../../queue/job.js";
 import type { IMail } from "./mail.js";
@@ -11,7 +11,7 @@ type SendMailJobData = {
 export class SendMailJob extends Job<"SEND_MAIL", SendMailJobData> {
 	public static readonly type = "SEND_MAIL";
 
-	public constructor(dbJob?: ServerJob, mail?: IMail) {
+	public constructor(dbJob?: DbJob, mail?: IMail) {
 		super(
 			SendMailJob,
 			dbJob || {

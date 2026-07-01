@@ -6,329 +6,83 @@ import { Type } from "class-transformer";
 import {
 	ArrayMinSize,
 	IsArray,
-	IsBoolean,
-	IsDataURI,
-	IsDate,
-	IsHexColor,
 	IsIn,
-	IsNumber,
-	IsOptional,
 	IsString,
-	IsUrl,
+	Matches,
 	MaxLength,
-	ValidateIf,
 	ValidateNested,
 } from "class-validator";
-import type {
-	FrontCreate,
-	FrontUpdate,
-	Log,
-	MemberCreate,
-	MemberUpdate,
-	models,
-} from "openselves-common/db";
+import { MAX_PATH_LENGTH, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 
-import { syncedModels } from "../sync.service.js";
-import { IsCuid2 } from "./is-cuid2.decorator.js";
+import { IsPayloadDigest } from "./is-payload-digest.decorator.js";
+import { IsPayloadLength } from "./is-payload-length.decorator.js";
+import { IsPresentJ2000Timestamp } from "./is-present-j2000-timestamp.decorator.js";
+import { IsUint64 } from "./is-uint64.decorator.js";
 
-type OmitBaseFields<K> = Omit<K, "id" | "userId">;
-
-class PushRecordDto {
-	@IsIn([undefined])
-	public readonly id!: undefined;
-
-	@IsIn([undefined])
-	public readonly userId!: undefined;
-}
-
-export class PushUpdateMemberDto extends PushRecordDto implements OmitBaseFields<MemberUpdate> {
-	@IsString()
-	@IsNumber()
-	@IsIn([undefined])
-	@ValidateIf((object) => {
-		const obj = object as unknown;
-		if (!obj || typeof obj !== "object") return true;
-		return ![
-			"name",
-			"pronouns",
-			"description",
-			"color",
-			"image",
-			"isArchived",
-			"archivedReason",
-			"createdAt",
-			"updatedAt",
-		].find((field) => {
-			return typeof obj[field] !== "undefined";
-		});
-	})
-	public readonly _atLeastOneFieldIsRequired!: undefined;
-
-	@IsOptional()
-	@IsString()
-	public readonly name?: string;
-
-	@IsOptional()
-	@IsString()
-	public readonly pronouns?: string;
-
-	@IsOptional()
-	@IsString()
-	public readonly description?: string;
+export class PushEntryDto {
+	@IsIn([OPENSELVES_NAMESPACE_ID])
+	public readonly namespaceId!: string;
 
 	@IsString()
-	@IsHexColor()
-	@ValidateIf((object, value) => value !== undefined && value !== null)
-	public readonly color?: string | null;
+	public readonly subspaceId!: string;
 
-	@IsOptional()
 	@IsString()
-	@MaxLength(8 * 1024) // 8kB
-	@IsUrl(
-		{
-			allow_fragments: false,
-			validate_length: false,
-		},
-		{
-			validateIf(object, value) {
-				return typeof value === "string" && !value.startsWith("data:");
-			},
-		},
-	)
-	@IsDataURI({
-		validateIf(object, value) {
-			return typeof value === "string" && value.startsWith("data:");
+	@MaxLength(MAX_PATH_LENGTH)
+	@Matches(/^(\/[^/]+)+$/g)
+	public readonly path!: string;
+
+	@IsUint64()
+	@IsPresentJ2000Timestamp({
+		validateIf(obj: unknown) {
+			return !(obj && typeof obj === "object" && "payload" in obj && obj["payload"] === "");
 		},
 	})
-	@ValidateIf(
-		(object, value) =>
-			value !== null && !(typeof value === "string" && value.startsWith("attachment:")),
-	)
-	public readonly image?: string | null;
+	public readonly timestamp!: bigint;
 
-	@IsOptional()
-	@IsBoolean()
-	public readonly isArchived?: boolean;
-
-	@IsOptional()
-	@IsString()
-	@ValidateIf((object, value) => value !== null)
-	public readonly archivedReason?: string | null;
-
-	@IsOptional()
-	@IsDate()
-	public readonly createdAt?: Date;
-
-	@IsOptional()
-	@IsDate()
-	public readonly updatedAt?: Date;
-}
-
-export class PushCreateMemberDto
-	extends PushUpdateMemberDto
-	implements OmitBaseFields<MemberCreate>
-{
-	@IsString()
-	declare public readonly name: string;
-
-	@IsString()
-	declare public readonly pronouns: string;
-
-	@IsString()
-	declare public readonly description: string;
-
-	@IsDate()
-	declare public readonly createdAt: Date;
-
-	@IsDate()
-	declare public readonly updatedAt: Date;
-}
-
-export class PushUpdateFrontDto extends PushRecordDto implements OmitBaseFields<FrontUpdate> {
-	@IsString()
-	@IsNumber()
-	@IsIn([undefined])
-	@ValidateIf((object) => {
-		const obj = object as unknown;
-		if (!obj || typeof obj !== "object") return true;
-		return !["memberId", "startedAt", "endedAt", "note", "createdAt", "updatedAt"].find(
-			(field) => {
-				return typeof obj[field] !== "undefined";
-			},
-		);
+	@IsUint64()
+	@IsPayloadLength({
+		validateIf(obj: unknown) {
+			return !!(
+				obj &&
+				typeof obj === "object" &&
+				"payload" in obj &&
+				typeof obj.payload === "string"
+			);
+		},
 	})
-	public readonly _atLeastOneFieldIsRequired!: undefined;
+	public readonly payloadLength!: bigint;
 
-	@IsOptional()
-	@IsCuid2()
-	public readonly memberId?: string;
-
-	@IsOptional()
-	@IsDate()
-	public readonly startedAt?: Date;
-
-	@IsOptional()
-	@IsDate()
-	@Type(() => Date)
-	@ValidateIf((object, value) => value !== null)
-	public readonly endedAt?: Date | null;
-
-	@IsOptional()
 	@IsString()
-	@ValidateIf((object, value) => value !== null)
-	public readonly note?: string | null;
+	@IsPayloadDigest({
+		validateIf(obj: unknown) {
+			return !!(
+				obj &&
+				typeof obj === "object" &&
+				"payload" in obj &&
+				typeof obj.payload === "string"
+			);
+		},
+	})
+	public readonly payloadDigest!: string;
 
-	@IsOptional()
-	@IsDate()
-	public readonly createdAt?: Date;
-
-	@IsOptional()
-	@IsDate()
-	public readonly updatedAt?: Date;
-}
-
-export class PushCreateFrontDto extends PushUpdateFrontDto implements OmitBaseFields<FrontCreate> {
-	@IsCuid2()
-	declare public readonly memberId: string;
-
-	@IsDate()
-	declare public readonly startedAt: Date;
-
-	@IsDate()
-	declare public readonly createdAt: Date;
-
-	@IsDate()
-	declare public readonly updatedAt: Date;
-}
-
-export const syncedModelsDataDtoTypes = {
-	members: { create: PushCreateMemberDto, update: PushUpdateMemberDto },
-	fronts: { create: PushCreateFrontDto, update: PushUpdateFrontDto },
-} satisfies {
-	[K in keyof typeof syncedModels]: {
-		create: {
-			new (): PushRecordDto & OmitBaseFields<(typeof models)[K]["$inferInsert"]>;
-		};
-		update: {
-			new (): PushRecordDto & OmitBaseFields<Partial<(typeof models)[K]["$inferInsert"]>>;
-		};
-	};
-};
-
-export type CreateOperation<K extends keyof typeof syncedModels = keyof typeof syncedModels> = {
-	type: "create";
-	data: (typeof syncedModelsDataDtoTypes)[K]["create"]["prototype"];
-	recordId: string | null;
-	deletedId: null;
-};
-export type UpdateOperation<K extends keyof typeof syncedModels = keyof typeof syncedModels> = {
-	type: "update";
-	data: (typeof syncedModelsDataDtoTypes)[K]["update"]["prototype"];
-	recordId: string | null;
-	deletedId: null;
-};
-export type DeleteOperation = {
-	type: "delete";
-	data: undefined;
-	recordId: null;
-	deletedId: string;
-};
-export type OperationType<K extends keyof typeof syncedModels = keyof typeof syncedModels> =
-	| CreateOperation<K>
-	| UpdateOperation<K>
-	| DeleteOperation;
-
-type ClientPushLog = Omit<
-	Log,
-	"userId" | "pushedAt" | "deletedId" | "data" | "memberId" | "frontId"
-> & {
-	memberId?: string;
-	frontId?: string;
-};
-
-export class PushLogDto<Op extends OperationType = OperationType> implements ClientPushLog {
 	@IsString()
-	@IsNumber()
-	@IsIn([undefined])
-	@ValidateIf((object) => {
-		const obj = object as unknown;
-		if (!obj || typeof obj !== "object") return true;
-		return (
-			["memberId", "frontId"].filter((field) => {
-				return typeof obj[field] !== "undefined";
-			}).length !== 1
-		);
-	})
-	public readonly _exactlyOneRecordIdIsRequired!: undefined;
-
-	@IsCuid2()
-	public readonly id!: string;
-
-	@IsOptional()
-	@IsCuid2()
-	public readonly memberId?: string;
-
-	@IsOptional()
-	@IsCuid2()
-	public readonly frontId?: string;
-
-	@IsIn(["create", "update", "delete"])
-	public readonly operationType!: Op["type"];
-
-	@ValidateIf((object) => {
-		const obj = object as unknown;
-		return !!(
-			obj &&
-			typeof obj === "object" &&
-			"operationType" in obj &&
-			obj.operationType !== "delete"
-		);
-	})
-	@ValidateNested()
-	@Type((helper) => {
-		const model = Object.values(syncedModels).find(
-			(model) => helper?.object[model.modelIdLogKey],
-		);
-		if (!model) {
-			return Object;
-		}
-		const dtoType = syncedModelsDataDtoTypes[model.name];
-		switch (helper?.object.operationType) {
-			case "create":
-				return dtoType.create;
-			case "update":
-				return dtoType.update;
-			case "delete":
-			default:
-				return Object;
-		}
-	})
-	public readonly data!: Op["data"];
-
-	@IsDate()
-	public readonly executedAt!: Date;
-
-	@IsIn([undefined])
-	public readonly deletedId!: undefined;
-
-	@IsIn([undefined])
-	public readonly pushedAt!: undefined;
+	public readonly payload!: string;
 }
 
 export class PushDto {
 	@IsArray()
 	@ArrayMinSize(1)
 	@ValidateNested({ each: true })
-	@Type(() => PushLogDto)
-	public readonly logs!: PushLogDto[];
+	@Type(() => PushEntryDto)
+	public readonly entries!: PushEntryDto[];
 }
 
 export class PushDtoTransformPipe implements PipeTransform<unknown, unknown> {
 	transform(value: unknown, metadata: ArgumentMetadata): unknown {
 		const output = value;
 		if (metadata.metatype === PushDto) {
-			if (output && typeof output === "object" && typeof output["logs"] === "string") {
-				output["logs"] = JSON.parse(output["logs"]) as unknown;
+			if (output && typeof output === "object" && typeof output["entries"] === "string") {
+				output["entries"] = JSON.parse(output["entries"]) as unknown;
 			}
 		}
 		return value;
