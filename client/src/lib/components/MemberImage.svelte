@@ -1,11 +1,7 @@
 <script lang="ts">
-	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { appState } from "$lib/appState.svelte";
 	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
-	import { IDB } from "$lib/idb";
-	import type { Attachment } from "$lib/idb/IDBAttachment";
-	import type { Member } from "openselves-common/db";
-	import { type Snippet, onMount } from "svelte";
+	import type { MemberStatic } from "openselves-common/client";
+	import { type Snippet } from "svelte";
 
 	let {
 		children = undefined,
@@ -17,40 +13,16 @@
 		...restProps
 	}: {
 		children?: Snippet;
-		member?: Omit<Member, "userId">;
+		member?: MemberStatic;
 		round?: boolean;
 		class?: string;
 		imageContainerClass?: string;
 		showMemberColor?: boolean;
 	} = $props();
 
-	let attachments: Attachment[] = $state([]);
-
-	let memberImageUrl = $derived.by(() => {
-		if (member?.image?.startsWith("attachment:")) {
-			const data = member?.image.slice("attachment:".length);
-			if (data.startsWith("data:")) {
-				return data;
-			} else {
-				return attachments.find((attachment) => attachment.id === data)?.dataUri;
-			}
-		}
-		return member?.image;
-	});
+	let memberImageUrl: string | undefined = $derived(member?.image);
 
 	let showChildren = $state(false);
-
-	onMount(async () => {
-		if (!appState.isAuthenticated) {
-			return;
-		}
-
-		const idb = IDB.getInstance();
-		attachments = await idb.attachment.getByField(
-			"userId",
-			PersistentStorage.getInstance().getUserId(),
-		);
-	});
 </script>
 
 <svelte:window onclick={() => (showChildren = false)} />

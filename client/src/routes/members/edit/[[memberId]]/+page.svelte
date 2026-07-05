@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { apiState } from "$lib/api.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
@@ -19,14 +21,13 @@
 	import UploadIcon from "$lib/components/icons/UploadIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { localeState } from "$lib/i18n/i18n";
-	import { IDB } from "$lib/idb";
+	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { proxyEntryDataModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
-	import { createId } from "@paralleldrive/cuid2";
 	import { filesize } from "filesize";
-	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toggle } from "konsta/svelte";
-	import type { Member } from "openselves-common/db";
-	import { MAX_IN_DB_PAYLOAD_LENGTH } from "openselves-common/willow";
+	import { Member, type MemberStatic } from "openselves-common/client";
+	import { MAX_IN_DB_PAYLOAD_LENGTH, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
 	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";
@@ -35,21 +36,13 @@
 
 	const { params }: PageProps = $props();
 
+	const storage = PersistentStorage.getInstance();
+
 	let mounted = $state(false);
-	type MemberData = Omit<Member, "userId">;
-	let member: MemberData = $state({
-		id: "",
-		name: "",
-		pronouns: "",
-		description: "",
-		color: null,
-		image: null,
-		isArchived: false,
-		archivedReason: null,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	});
-	let originalMember: MemberData | null = $state(null);
+	let memberObj: Member = $state(new Member(storage.getUserId(), {}));
+	// svelte-ignore state_referenced_locally
+	let initialData = memberObj.data;
+	let member: MemberStatic = $derived(proxyEntryDataModel(memberObj));
 	let formState: FormValidationState = $state({
 		errors: {},
 		generalError: "",
@@ -58,18 +51,20 @@
 	let editImageUrl = $state(false);
 	let imageFiles: FileList | undefined = $state();
 	let imageFileInputEl: HTMLInputElement | undefined = $state();
-	let attachedImage: File | null = $state(null);
 	let deleteRecordButton: Snippet | null = $state(null);
 
 	requireAuth();
-	const storage = PersistentStorage.getInstance();
-	const idb = IDB.getInstance();
+	const idbStore = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
 
 	onMount(async () => {
 		if (params.memberId) {
-			member = await idb.member.getByPrimaryKey(params.memberId);
+			const loadedMember = await idbStore.loadDataModel(Member, params.memberId);
+			if (!loadedMember) {
+				return goto(resolve("/members"));
+			}
+			memberObj = loadedMember;
+			initialData = loadedMember.data;
 		}
-		originalMember = { ...member };
 		mounted = true;
 	});
 
@@ -83,8 +78,7 @@
 			return;
 		}
 
-		const maxDataUrlSize = MAX_IN_DB_PAYLOAD_LENGTH;
-		const maxSizeForDataUrl = (maxDataUrlSize * 3) / 4;
+		const maxSizeForDataUrl = (MAX_IN_DB_PAYLOAD_LENGTH * 3) / 4;
 		const maxFileSize = Math.max(apiState.status?.maxUploadSize || 0, maxSizeForDataUrl);
 		if (file.size > maxFileSize) {
 			formState.errors["image"] = t(
@@ -101,11 +95,8 @@
 			const result = reader.result?.toString() || "";
 			if (result) {
 				formState.errors["image"] = "";
-				if (result.length <= maxSizeForDataUrl) {
+				if (result.length <= maxFileSize) {
 					member.image = result;
-				} else if (result.length <= maxFileSize) {
-					member.image = "attachment:" + result;
-					attachedImage = file;
 				} else {
 					formState.errors["image"] = t(
 						"This file is too big! (max {file.size})",
@@ -124,62 +115,26 @@
 		reader.readAsDataURL(file);
 	});
 
-	const hasMemberChanged = () => JSON.stringify(member) !== JSON.stringify(originalMember);
+	function isDirty() {
+		return JSON.stringify(member) !== JSON.stringify(initialData);
+	}
 
 	async function saveMember() {
-		const userId = storage.getUserId();
-
 		let image = member.image ? member.image : null;
-		if (image) {
-			if (image.startsWith("data:")) {
-				if (!isDataURI(image)) {
-					formState.errors["image"] = t("Image url must be a valid data uri");
-					return false;
-				}
-			} else if (image.startsWith("attachment:")) {
-				if (!attachedImage) {
-					throw new Error("Attached image null");
-				}
-
-				const attachmentId = createId();
-				const dataUri = image.slice("attachment:".length);
-				image = "attachment:" + attachmentId;
-				await IDB.getInstance().attachment.put(attachmentId, {
-					userId: PersistentStorage.getInstance().getUserId(),
-					file: attachedImage,
-					dataUri,
-				});
-			} else {
-				let isValidUrl: boolean;
-				try {
-					new URL(image);
-					isValidUrl = isUrl(image);
-				} catch {
-					isValidUrl = false;
-				}
-
-				if (!isValidUrl) {
-					formState.errors["image"] = t("Image url must be a valid url");
-					return false;
-				}
-			}
+		if (image && image.startsWith("data:") && !isDataURI(image)) {
+			formState.errors["image"] = t("Image url must be a valid data uri");
+			return false;
 		}
 
-		member = await idb.member.saveSynced(
-			userId,
-			{
-				...member,
-				image,
-			},
-			!!member.id,
-		);
-
+		await idbStore.saveDataModel(memberObj);
 		return true;
 	}
 
 	async function deleteMember() {
-		const userId = storage.getUserId();
-		await idb.member.deleteSynced(userId, [member.id]);
+		await idbStore.ingest(
+			[(await memberObj.makePermanentDeleteEntry()).entryWithPayload],
+			undefined,
+		);
 	}
 </script>
 
@@ -198,7 +153,7 @@
 			icon: SettingsIcon,
 		},
 	]}
-	hasRecordChanged={hasMemberChanged}
+	{isDirty}
 	onSave={saveMember}
 	onDelete={deleteMember}
 	bind:formState
@@ -229,10 +184,10 @@
 			</div>
 		</MemberImage>
 
+		<!-- TODO: add a button to convert an http(s) url to a data uri -->
+		<!-- TODO: add a warning for users to convert their (api)/attachment.+ urls to data uris -->
 		<List class={editImageUrl ? "" : "hidden"}>
-			{@const disabled = !!["attachment:", "data:", `${apiState.url}/attachment/`].find(
-				(prefix) => member.image?.startsWith(prefix),
-			)}
+			{@const disabled = !!(member.image && isDataURI(member.image))}
 			<ListInput
 				type="url"
 				name="image"
@@ -259,7 +214,7 @@
 					class={"m-2" + ((member.image?.length || 0) > 0 ? "" : " hidden")}
 					type="button"
 					onclick={() => {
-						member.image = null;
+						member.image = undefined;
 						formState.errors["image"] = "";
 					}}
 				>
@@ -340,7 +295,7 @@
 					bind:value={member.color}
 					error={formState.errors["color"] || ""}
 					clearButton
-					onClear={() => (member.color = null)}
+					onClear={() => (member.color = undefined)}
 				>
 					{#snippet media()}
 						<ColorInputIcon input />

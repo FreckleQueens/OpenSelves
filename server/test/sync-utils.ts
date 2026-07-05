@@ -73,7 +73,7 @@ export function readFile(filePath: string) {
 	return fs.readFileSync(filePath).toString();
 }
 
-export async function makeMember(
+export function makeMember(
 	userId: string,
 	date: Date = new Date(),
 	image: string | FileRef | null = null,
@@ -87,14 +87,14 @@ export async function makeMember(
 		isArchived: false,
 	});
 	if (!minimal) {
-		await member.assign({
+		member.assign({
 			color: "#123abc",
 			archivedReason: "An old archival reason",
 		});
 	}
 
 	if (image && (typeof image !== "string" || !minimal)) {
-		await member.set("image", typeof image === "string" ? image : readFile(image.filePath));
+		member.set("image", typeof image === "string" ? image : readFile(image.filePath));
 	}
 
 	return { member, date };

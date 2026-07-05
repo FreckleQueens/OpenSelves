@@ -17,8 +17,8 @@ import {
 } from "openselves-common/db";
 import {
 	MAX_IN_DB_PAYLOAD_LENGTH,
+	MemoryStore,
 	OPENSELVES_NAMESPACE_ID,
-	Store,
 	hashPayload,
 	int64toUint64,
 	isEntryNewerThan,
@@ -138,9 +138,9 @@ export class SyncService {
 
 		try {
 			await this.db.transaction(async (tx) => {
-				const store = new Store<PushEntryDto>(OPENSELVES_NAMESPACE_ID);
-				store.ingest(...entryDtos);
-				entryDtos = store.entries;
+				const store = new MemoryStore<PushEntryDto>(OPENSELVES_NAMESPACE_ID);
+				await store.ingest(entryDtos);
+				entryDtos = await store.getEntries();
 
 				const entryCreates = this.toEntryCreate(entryDtos);
 

@@ -5,6 +5,7 @@ import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { IDB } from "$lib/idb";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 import { tick } from "svelte";
 
 export const prerender = true;
@@ -16,5 +17,6 @@ if (PUBLIC_TEST_ENVIRONMENT === "1") {
 		PersistentStorage: PersistentStorage,
 		SyncWorker,
 		tick,
+		OPENSELVES_NAMESPACE_ID,
 	};
 }

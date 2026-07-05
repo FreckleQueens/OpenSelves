@@ -19,5 +19,6 @@ export function transformErrorToReadable(error: unknown) {
 		fileName: error?.["fileName"],
 		lineNumber: error?.["lineNumber"],
 		stack: error?.["stack"],
+		cause: error?.["cause"],
 	};
 }

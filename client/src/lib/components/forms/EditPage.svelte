@@ -14,7 +14,7 @@
 		pageTitle = "",
 		thingName,
 		tabs = undefined,
-		hasRecordChanged,
+		isDirty,
 		onSave,
 		onDelete,
 		onDiscard,
@@ -32,7 +32,7 @@
 			title: string;
 			icon: Component;
 		}[];
-		hasRecordChanged: () => Promise<boolean> | boolean;
+		isDirty: () => Promise<boolean> | boolean;
 		onSave: () => Promise<boolean> | boolean;
 		onDelete: () => Promise<void> | void;
 		onDiscard?: () => Promise<void> | void;
@@ -53,7 +53,7 @@
 
 	async function backLinkOnClick(e: Event) {
 		e.preventDefault();
-		if (await hasRecordChanged()) {
+		if (await isDirty()) {
 			showSaveConfirmDialog = true;
 		} else {
 			await discardChanges();
@@ -68,7 +68,7 @@
 	}
 
 	async function saveChanges() {
-		if (hasRecordChanged()) {
+		if (isDirty()) {
 			if (await onSave()) {
 				history.back();
 			}
@@ -91,7 +91,7 @@
 <AppPage title={pageTitle} loading={!ready} showMenu={false}>
 	{#snippet navbarLeft()}
 		<BackLink onClick={backLinkOnClick} />
-		{#if hasRecordChanged()}
+		{#if isDirty()}
 			<Link onClick={() => (showDiscardChangesDialog = true)}>
 				<DiscardIcon button />
 			</Link>

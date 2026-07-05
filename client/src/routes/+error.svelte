@@ -14,6 +14,12 @@
 			true,
 		);
 	}
+
+	$effect(() => {
+		if (error) {
+			console.warn(error);
+		}
+	});
 </script>
 
 <ErrorDialog additionalErrors={[error]} {onDismiss} />

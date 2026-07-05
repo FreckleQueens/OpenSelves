@@ -2,14 +2,13 @@ import { type GetObjectCommandOutput, NoSuchKey } from "@aws-sdk/client-s3";
 import { confirm } from "@inquirer/prompts";
 import assert from "node:assert";
 import {
-	type BaseSchema,
 	type EntryDataModel,
 	Front,
 	FrontSchema,
 	Member,
 	MemberSchema,
-	type Schema,
-	isFieldValueValid,
+	type SchemaType,
+	isValidSchemaFieldValue,
 	serializeValueToPayload,
 } from "openselves-common/client";
 import { entries, fronts, logs, members } from "openselves-common/db";
@@ -17,8 +16,8 @@ import {
 	type EntryWithPayload,
 	EntryWrapper,
 	MAX_UINT64,
+	MemoryStore,
 	OPENSELVES_NAMESPACE_ID,
-	Store,
 	hashPayload,
 	int64toUint64,
 	isEntryWithPayload,
@@ -157,7 +156,7 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 		const convertedEntries: Promise<EntryWrapper>[] = [];
 		for (const log of allLogs) {
 			if (log.operationType === "create" || log.operationType === "update") {
-				let prefix: string, id: string, schema: Schema;
+				let prefix: string, id: string, schema: SchemaType;
 				if (log.memberId) {
 					prefix = "member";
 					id = log.memberId;
@@ -214,7 +213,7 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 						}
 					}
 
-					if (!isFieldValueValid(schema, key, value)) {
+					if (!isValidSchemaFieldValue(schema, key, value)) {
 						throw new Error("Invalid key value", {
 							cause: {
 								key,
@@ -267,21 +266,21 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 		}
 
 		const computedEntries = await Promise.all(convertedEntries);
-		const store = new Store<EntryWithPayload>(OPENSELVES_NAMESPACE_ID);
-		store.ingest(
-			...computedEntries.map((entry) => {
+		const store = new MemoryStore<EntryWithPayload>(OPENSELVES_NAMESPACE_ID);
+		await store.ingest(
+			computedEntries.map((entry) => {
 				const entryMaybeWithPayload = entry.entryMaybeWithPayload;
 				assert(isEntryWithPayload(entryMaybeWithPayload));
 				return entryMaybeWithPayload;
 			}),
 		);
 		const entriesToVerify = await Promise.all(
-			store.entries.map((dto) => EntryWrapper.load(dto)),
+			(await store.getEntries()).map((dto) => EntryWrapper.load(dto)),
 		);
 		console.log(
 			">",
 			computedEntries.length,
-			"Computed entries, ",
+			"Computed entries,",
 			entriesToVerify.length,
 			"after prefix-pruning",
 		);
@@ -309,7 +308,6 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				return {
 					entries: new Member(
 						member.userId,
-						undefined,
 						entriesToVerify.filter(
 							(entry) =>
 								entry.subspaceId === member.userId &&
@@ -329,7 +327,6 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				return {
 					entries: new Front(
 						front.userId,
-						undefined,
 						entriesToVerify.filter(
 							(entry) =>
 								entry.subspaceId === front.userId &&
@@ -338,7 +335,7 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 					),
 					data: new Front(front.userId, {
 						...rest,
-						endedAt: endedAt === null ? undefined : endedAt,
+						endedAt,
 						note: note === null ? undefined : note,
 					}),
 				};
@@ -355,41 +352,44 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 		}
 
 		const entryPairs = await Promise.all(
-			pairs.map(async (pair) => ({
-				entries: Object.values(await pair.entries.computeEntries())
-					.map((entry) => entry.entryMaybeWithPayload)
-					.map((entry) => {
-						const { timestamp, ...rest } = entry;
-						return rest;
-					}),
-				data: (await pair.data.flushDirtyEntries())
-					.map((entry) => entry.entryMaybeWithPayload)
-					.map((entry) => {
-						const { timestamp, ...rest } = entry;
-						return rest;
-					}),
-			})),
+			pairs.map(async (pair) => {
+				await pair.data.flushDirtyEntries();
+				return {
+					entries: pair.entries
+						.getEntries()
+						.map((entry) => entry.entryMaybeWithPayload)
+						.map((entry) => {
+							const { timestamp, ...rest } = entry;
+							return rest;
+						}),
+					data: pair.data
+						.getEntries()
+						.map((entry) => entry.entryMaybeWithPayload)
+						.map((entry) => {
+							const { timestamp, ...rest } = entry;
+							return rest;
+						}),
+				};
+			}),
 		);
 
 		const comparePathFn = (a: { path: string }, b: { path: string }) =>
 			a.path > b.path ? 1 : a.path < b.path ? -1 : 0;
 		let differingEntries = 0;
 		for (const { entries, data } of entryPairs) {
-			const providedEntries = entries.sort(comparePathFn);
-			const inDbData = data.sort(comparePathFn);
-			assert.deepStrictEqual(
-				providedEntries.map((entry) => entry.path),
-				inDbData.map((entry) => entry.path),
-			);
+			const providedEntries = entries.sort(comparePathFn).map((entry) => ({
+				...entry,
+				payloadLength: entry.payloadLength.toString(),
+			}));
+			const inDbData = data.sort(comparePathFn).map((entry) => ({
+				...entry,
+				payloadLength: entry.payloadLength.toString(),
+			}));
+
+			const entriesToVisit = new Set([...providedEntries, ...inDbData]);
 			for (let i = 0; i < providedEntries.length; i++) {
-				const providedEntry = {
-					...providedEntries[i],
-					payloadLength: providedEntries[i].payloadLength.toString(),
-				};
-				const inDbDatum = {
-					...inDbData[i],
-					payloadLength: inDbData[i].payloadLength.toString(),
-				};
+				const providedEntry = providedEntries[i];
+				const inDbDatum = inDbData.find((entry) => entry.path === providedEntry.path);
 				if (JSON.stringify(providedEntry) !== JSON.stringify(inDbDatum)) {
 					differingEntries++;
 					console.log(
@@ -397,11 +397,30 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 						providedEntry.path,
 						providedEntry.payloadLength,
 						"which is different from what was found directly in record:",
-						inDbDatum.path,
-						inDbDatum.payloadLength,
+						inDbDatum?.path,
+						inDbDatum?.payloadLength,
 					);
 				}
+				entriesToVisit.delete(providedEntry);
+				if (inDbDatum) {
+					entriesToVisit.delete(inDbDatum);
+				}
 			}
+
+			for (const notFoundEntry of inDbData.filter(
+				(inDbDatum) =>
+					!providedEntries.find((providedEntry) => providedEntry.path === inDbDatum.path),
+			)) {
+				differingEntries++;
+				console.log(
+					"/!\\ will no save missing entry for data found directly in record:",
+					notFoundEntry.path,
+					notFoundEntry.payloadLength,
+				);
+				entriesToVisit.delete(notFoundEntry);
+			}
+
+			assert.strictEqual(entriesToVisit.size, 0);
 		}
 
 		console.log(
@@ -445,7 +464,12 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 		);
 
 		const allEntries = await tx.select().from(entries);
-		console.log("> There are now", allEntries.length, "in DB");
+		console.log(
+			"> There are now",
+			allEntries.length,
+			"in DB vs previous estimate of",
+			entriesToVerify.length,
+		);
 
 		// Verify in-db data
 		console.log("Verifying in-DB data...");
@@ -492,19 +516,18 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 			);
 		}
 
-		const models: EntryDataModel<Schema & typeof BaseSchema>[] = [];
+		const models: EntryDataModel<typeof MemberSchema | typeof FrontSchema>[] = [];
 		function loadModels(
 			type: {
 				new (
 					id: string,
-					data: undefined,
 					entries: EntryWrapper[],
-				): EntryDataModel<Schema & typeof BaseSchema>;
+				): EntryDataModel<typeof MemberSchema | typeof FrontSchema>;
 			},
 			store: Record<string, EntryWrapper[]>,
 		) {
 			for (const [id, entries] of Object.entries(store)) {
-				models.push(new type(id, undefined, entries));
+				models.push(new type(id, entries));
 			}
 		}
 		loadModels(Member, modelEntries.members);
@@ -515,7 +538,7 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 		console.log("Comparing...");
 		let allExpectedEntries = [...entriesToVerify];
 		for (const model of models) {
-			const actualEntries = Object.values(await model.computeEntries()).sort(comparePathFn);
+			const actualEntries = model.getEntries().sort(comparePathFn);
 			const expectedEntries = allExpectedEntries
 				.filter((entry) => entry.path.startsWith(model.getPathRoot()))
 				.sort(comparePathFn);

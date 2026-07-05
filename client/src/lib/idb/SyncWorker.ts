@@ -1,10 +1,17 @@
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { call } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
+import { IDBSubStore } from "$lib/idb/IDBSubStore";
 import { IDB } from "$lib/idb/idb";
+import {
+	EntryWrapper,
+	OPENSELVES_NAMESPACE_ID,
+	j2000Now,
+	toJsonFriendly,
+} from "openselves-common/willow";
 
-import type { IDBFront } from "./IDBFront";
-import type { IDBMember } from "./IDBMember";
+const PUSH_TIMESTAMP_STORAGE_KEY = "pushTimestamp";
+const PULL_TIMESTAMP_STORAGE_KEY = "pullTimestamp";
 
 export class SyncWorker {
 	private static instance: SyncWorker;
@@ -127,8 +134,6 @@ export class SyncWorker {
 					this.scheduleSync(5000);
 				});
 		}, delay);
-
-		console.debug("Sync scheduled in", delay);
 	}
 
 	private unscheduleSync() {
@@ -139,17 +144,14 @@ export class SyncWorker {
 	}
 
 	private async sync() {
-		console.debug("Sync start");
 		if (await this.push()) {
 			await this.pull();
 		} else {
-			console.debug("skipping pull");
+			console.debug("Push failed, skipping pull");
 		}
-		console.debug("Sync end");
 	}
 
 	private async push(): Promise<boolean> {
-		console.debug("Push start");
 		const storage = PersistentStorage.getInstance();
 		const idb = IDB.getInstance();
 
@@ -158,41 +160,31 @@ export class SyncWorker {
 			return false;
 		}
 
-		const pendingLogs = await idb.log.getByField("userId", userId);
-		const formattedLogs = pendingLogs
-			.map((log) => {
-				const newLog = { ...log };
-				if (typeof newLog.data === "string") {
-					newLog.data = JSON.parse(newLog.data);
-				}
-				return newLog;
-			})
-			.sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
+		let lastPushTimestamp: bigint = 0n;
+		const rawLastPushTimestamp = await storage.get(PUSH_TIMESTAMP_STORAGE_KEY);
+		if (rawLastPushTimestamp) {
+			try {
+				lastPushTimestamp = BigInt(rawLastPushTimestamp);
+			} catch {
+				// ignore
+			}
+		}
 
-		const pendingAttachments = (await idb.attachment.getByField("userId", userId)).filter(
-			(attachment) =>
-				pendingLogs.find(
-					(log) =>
-						log.data &&
-						Object.values(log.data).find(
-							(val) =>
-								typeof val === "string" &&
-								val.startsWith("attachment:") &&
-								val.split(":", 2)[1] === attachment.id,
-						),
-				),
+		const thisPushAttemptTimestamp = j2000Now();
+		const pendingEntries = await idb.entries.getAfterSavedAt(
+			OPENSELVES_NAMESPACE_ID,
+			userId,
+			lastPushTimestamp,
 		);
+		const formattedEntries = pendingEntries.map(toJsonFriendly);
 
-		console.debug("Logs to push:", formattedLogs);
-		console.debug("Attachments to push:", pendingAttachments);
-
-		if (formattedLogs.length > 0) {
+		if (pendingEntries.length > 0) {
+			console.debug("Entries to push:", pendingEntries);
 			const result = await call("/sync/push", {
 				method: "PUT",
 				data: {
-					logs: formattedLogs,
+					entries: formattedEntries,
 				},
-				attachments: pendingAttachments,
 			});
 
 			if (!result) {
@@ -200,42 +192,41 @@ export class SyncWorker {
 				return false;
 			}
 
-			await idb.transaction(["logs", "attachments"], async (tx) => {
-				for (const id of formattedLogs.map((log) => log.id)) {
-					await tx.delete("logs", id);
-				}
-				for (const id of pendingAttachments.map((attachment) => attachment.id)) {
-					await tx.delete("attachments", id);
-				}
-			});
+			await storage.setForUser(
+				userId,
+				PUSH_TIMESTAMP_STORAGE_KEY,
+				thisPushAttemptTimestamp.toString(),
+			);
 		}
 
-		if ((await idb.log.getByField("userId", userId)).length === 0) {
+		if (
+			(
+				await idb.entries.getAfterSavedAt(
+					OPENSELVES_NAMESPACE_ID,
+					userId,
+					thisPushAttemptTimestamp,
+				)
+			).length === 0
+		) {
 			this._hasPushBacklog = false;
 		}
 
-		console.debug("Push end");
 		return true;
 	}
 
 	private async pull(): Promise<void> {
-		console.debug("Pull start");
 		const storage = PersistentStorage.getInstance();
-		const idb = IDB.getInstance();
 
 		const userId = storage.getUserIdOptional();
 		if (!userId) {
 			return;
 		}
 
-		const currentTimestamp = Number(await storage.get("timestamp"));
-		const reqTimestamp =
-			currentTimestamp && Number.isFinite(currentTimestamp) ? currentTimestamp : "init";
-		console.debug("timestamp:", currentTimestamp, reqTimestamp);
+		const lastPullTimestamp = (await storage.get(PULL_TIMESTAMP_STORAGE_KEY)) || "";
 		const result = await call("/sync/pull", {
 			method: "POST",
 			data: {
-				timestamp: reqTimestamp,
+				timestamp: lastPullTimestamp,
 			},
 		});
 
@@ -244,51 +235,26 @@ export class SyncWorker {
 			return;
 		}
 
-		const logs = result.responseBody["logs"];
-		console.debug("Logs to apply:", logs);
-		if (Array.isArray(logs)) {
-			for (const log of logs) {
-				const { memberId, frontId, operationType, data } = log as {
-					frontId?: string;
-					memberId?: string;
-					operationType: string;
-					data: Record<string, unknown>;
-				};
-				let model: IDBMember | IDBFront | undefined;
-				let recordId: string | undefined;
-				if (typeof memberId === "string") {
-					recordId = memberId;
-					model = idb.member;
-				} else if (typeof frontId === "string") {
-					recordId = frontId;
-					model = idb.front;
-				}
+		const rawEntries = result.responseBody["entries"];
+		if (!Array.isArray(rawEntries)) {
+			console.warn("Server reply with a non-array", { cause: rawEntries });
+			return;
+		}
 
-				if (!model || !recordId) {
-					throw new Error("Received log for unknown model");
-				}
+		if (rawEntries.length > 0) {
+			console.debug("Entries to ingest:", rawEntries);
+			const parsedEntry = await Promise.all(
+				rawEntries.map((entry) => EntryWrapper.load(entry)),
+			);
+			const entriesWithPayload = parsedEntry.map((entry) => entry.entryWithPayload);
+			await new IDBSubStore(OPENSELVES_NAMESPACE_ID, userId, false).ingest(
+				entriesWithPayload,
+			);
 
-				switch (operationType) {
-					case "create":
-						await model.saveSynced(userId, { ...data, id: recordId }, false, false);
-						break;
-					case "update":
-						await model.saveSynced(userId, { ...data, id: recordId }, true, false);
-						break;
-					case "delete":
-						await model.deleteSynced(userId, [recordId], false);
-						break;
-					default:
-						throw new Error("unrecognized operation type: " + operationType);
-				}
+			const timestamp = result.responseBody["timestamp"];
+			if (typeof timestamp === "string") {
+				await storage.setForUser(userId, PULL_TIMESTAMP_STORAGE_KEY, timestamp);
 			}
 		}
-
-		const timestamp = result.responseBody["timestamp"];
-		if (typeof timestamp === "number") {
-			await storage.setForUser(userId, "timestamp", timestamp.toString());
-		}
-
-		console.debug("Pull end");
 	}
 }

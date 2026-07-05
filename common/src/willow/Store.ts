@@ -1,15 +1,26 @@
+import { createId } from "@paralleldrive/cuid2";
+
 import { type Entry, isEntryNewerThan } from "./Entry.js";
 
-export class Store<T extends Entry> {
-	private _entries: T[] = [];
-
+export abstract class Store<T extends Entry, Context = void> {
 	constructor(public readonly namespaceId: string) {}
+	public abstract getEntries(context?: Context): Promise<T[]>;
 
-	public get entries(): T[] {
-		return [...this._entries];
-	}
+	protected abstract updateEntries(
+		entryToAdd: T,
+		entriesToRemove: T[],
+		context?: Context,
+	): Promise<void>;
 
-	public ingest(...entries: T[]) {
+	/**
+	 * @returns the surviving, ingested entries
+	 */
+	public async ingest(entries: T[], context?: Context): Promise<T[]> {
+		const mark = `ingest.${createId()}`;
+		performance.mark(mark);
+
+		const ingestedEntries: T[] = [];
+
 		for (const entryToIngest of entries) {
 			if (entryToIngest.namespaceId !== this.namespaceId) {
 				throw new Error("Tried to ingest entry with wrong namespaceId", {
@@ -20,29 +31,34 @@ export class Store<T extends Entry> {
 				});
 			}
 
+			const localEntries = await this.getEntries(context);
+
 			// Drop incoming older path-prefixed entries
 			if (
-				this._entries.find(
+				localEntries.find(
 					(entry) =>
 						entry.subspaceId === entryToIngest.subspaceId &&
 						entryToIngest.path.startsWith(entry.path) &&
-						isEntryNewerThan(entry, entryToIngest),
+						!isEntryNewerThan(entryToIngest, entry),
 				)
 			) {
 				continue;
 			}
 
 			// Delete in-store older path-prefixed entries
-			this._entries = this._entries.filter(
+			const entriesToDelete = localEntries.filter(
 				(entry) =>
-					!(
-						entry.subspaceId === entryToIngest.subspaceId &&
-						entry.path.startsWith(entryToIngest.path) &&
-						isEntryNewerThan(entryToIngest, entry)
-					),
+					entry.subspaceId === entryToIngest.subspaceId &&
+					entry.path.startsWith(entryToIngest.path) &&
+					isEntryNewerThan(entryToIngest, entry),
 			);
 
-			this._entries.push(entryToIngest);
+			await this.updateEntries(entryToIngest, entriesToDelete, context);
+			ingestedEntries.push(entryToIngest);
 		}
+
+		performance.mark(mark);
+
+		return ingestedEntries;
 	}
 }

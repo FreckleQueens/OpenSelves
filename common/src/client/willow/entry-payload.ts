@@ -1,12 +1,12 @@
-import { isFieldValueValid } from "./schema-validator.js";
-import type { Schema, SchemaStatic } from "./types.js";
+import { isValidSchemaFieldValue } from "./schema-validator.js";
+import type { SchemaStatic, SchemaType } from "./types.js";
 
-export function serializeValueToPayload<Model extends Schema>(
+export function serializeValueToPayload<Model extends SchemaType>(
 	schema: Model,
 	key: keyof Model & string,
 	value: unknown,
 ): string {
-	if (!isFieldValueValid(schema, key, value)) {
+	if (!isValidSchemaFieldValue(schema, key, value)) {
 		throw new Error("Invalid value for key " + key, {
 			cause: {
 				value,
@@ -15,6 +15,10 @@ export function serializeValueToPayload<Model extends Schema>(
 		});
 	}
 
+	return serializeValueToPayloadUnsafe(value);
+}
+
+export function serializeValueToPayloadUnsafe(value: unknown): string {
 	switch (typeof value) {
 		case "undefined":
 			return "undefined";
@@ -31,19 +35,19 @@ export function serializeValueToPayload<Model extends Schema>(
 			}
 			break;
 	}
-	throw new Error(`Unsupported type ${typeof value}`, { cause: schema });
+	throw new Error(`Unsupported type ${typeof value}`, { cause: value });
 }
 
-export function deserializeValueFromPayload<Model extends Schema, K extends keyof Model & string>(
-	schema: Model,
-	key: K,
-	payload: string,
-): SchemaStatic<Model>[K] {
+export function deserializeValueFromPayload<
+	Model extends SchemaType,
+	K extends keyof Model & string,
+>(schema: Model, key: K, payload: string): SchemaStatic<Model>[K] {
 	if (payload === "") {
 		throw new Error("empty string payloads are unsupported");
 	}
 
-	const [type, value] = payload.split(";");
+	const [type, ...parts] = payload.split(";");
+	const value = parts.join(";");
 
 	let output: unknown;
 
@@ -58,7 +62,7 @@ export function deserializeValueFromPayload<Model extends Schema, K extends keyo
 			output = value;
 			break;
 		case "boolean":
-			output = Boolean(value);
+			output = value === "true";
 			break;
 		case "number":
 			output = Number(value);
@@ -70,7 +74,7 @@ export function deserializeValueFromPayload<Model extends Schema, K extends keyo
 			throw new Error(`Unsupported type ${type} for key ${key}`, { cause: schema });
 	}
 
-	if (!isFieldValueValid(schema, key, output)) {
+	if (!isValidSchemaFieldValue(schema, key, output)) {
 		throw new Error("Got invalid output for key " + key, {
 			cause: {
 				output,

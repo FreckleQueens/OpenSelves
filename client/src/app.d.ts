@@ -24,6 +24,7 @@ declare global {
 			PersistentStorage: typeof PersistentStorage;
 			SyncWorker: typeof SyncWorker;
 			tick: typeof tick;
+			OPENSELVES_NAMESPACE_ID: typeof OPENSELVES_NAMESPACE_ID;
 		};
 	}
 }

@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { sortBy } from "$lib/component-utils.js";
 	import MemberCard from "$lib/components/MemberCard.svelte";
-	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
+	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { Block, Navbar, Searchbar, Sheet } from "konsta/svelte";
-	import type { Member } from "openselves-common/db";
+	import { Member, type MemberStatic } from "openselves-common/client";
+
+	// TODO: add undefined/null selection option
 
 	let {
 		opened,
@@ -14,17 +16,15 @@
 	}: {
 		opened: boolean;
 		onCancel: () => Promise<void> | void;
-		onSelect: (member: Member) => Promise<void> | void;
-		excludedMembers?: Member[];
+		onSelect: (member: MemberStatic) => Promise<void> | void;
+		excludedMembers?: MemberStatic[];
 		title?: string;
 	} = $props();
 
-	let members: SubscriptionState<Member> = $state({
-		records: [],
-	});
+	let members = $derived.by(subscribeToModel(Member));
 	let memberSearch: string = $state("");
 	let selectableMembers = $derived(
-		members.records
+		members.staticData
 			.filter(
 				(member) =>
 					!member.isArchived &&
@@ -33,8 +33,6 @@
 			)
 			.sort(sortBy((member) => member.name)),
 	);
-
-	subscribeToModel(IDB.getInstance().member, members);
 </script>
 
 <Sheet

@@ -4,4 +4,5 @@ export * from "./payload.js";
 export * from "./time.js";
 export * from "./uint64.js";
 export * from "./Entry.js";
+export * from "./MemoryStore.js";
 export * from "./Store.js";

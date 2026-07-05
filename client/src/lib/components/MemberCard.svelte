@@ -3,7 +3,7 @@
 	import MemberImage from "$lib/components/MemberImage.svelte";
 	import ArchivedIcon from "$lib/components/icons/ArchivedIcon.svelte";
 	import { Button, Card } from "konsta/svelte";
-	import type { Member } from "openselves-common/db";
+	import type { MemberStatic } from "openselves-common/client";
 	import type { Component, Snippet } from "svelte";
 
 	let {
@@ -17,7 +17,7 @@
 		secondaryActions,
 		footer,
 	}: {
-		member?: Omit<Member, "userId">;
+		member?: MemberStatic;
 		onClick?: ClickEventHandler;
 		small?: boolean;
 		inline?: boolean;

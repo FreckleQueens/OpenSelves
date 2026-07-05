@@ -7,34 +7,27 @@
 	import SelectMemberSheet from "$lib/components/forms/SelectMemberSheet.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NoteIcon from "$lib/components/icons/NoteIcon.svelte";
-	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
 	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
-	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, subscribeToModel } from "$lib/idb/component-utils";
+	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { proxyEntryDataModel, subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
-	import type { Front, Member } from "openselves-common/db";
+	import { Front, type FrontStatic, Member, type MemberStatic } from "openselves-common/client";
+	import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
 
 	import type { PageProps } from "./$types";
 
-	type FrontData = Omit<Front, "userId">;
-
 	const { params }: PageProps = $props();
 
-	let members: SubscriptionState<Member> = $state({
-		loaded: false,
-		records: [],
-	});
-	let front: FrontData | null = $state(null);
-	let frontMember: Member | null = $derived(
-		front && members.loaded
-			? members.records.find((member) => member.id === front?.memberId) || null
-			: null,
+	let members = $derived.by(subscribeToModel(Member));
+	let frontObj: Front | null = $state(null);
+	let front: FrontStatic | null = $derived(frontObj ? proxyEntryDataModel(frontObj) : null);
+	let frontMember: MemberStatic | null = $derived(
+		members.staticData.find((member) => member.id === front?.memberId) || null,
 	);
-	let originalFront: FrontData | null = $state(null);
 
 	let mounted = $state(false);
 	let formState: FormValidationState = $state({
@@ -47,41 +40,31 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
-	const idb = IDB.getInstance();
-	subscribeToModel(idb.member, members);
+	const idbStore = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
 
 	onMount(async () => {
 		if (!params.frontId) {
 			throw new Error("frontId route param is required");
 		}
 
-		front = await idb.front.getByPrimaryKey(params.frontId);
-		originalFront = { ...front };
+		frontObj = (await idbStore.loadDataModel(Front, params.frontId)) || null;
 		mounted = true;
 	});
 
-	const hasFrontChanged = () => JSON.stringify(front) !== JSON.stringify(originalFront);
-
 	async function saveFront() {
-		const userId = storage.getUserId();
-		front = await idb.front.saveSynced(
-			userId,
-			{
-				...front,
-			},
-			true,
-		);
-
+		if (!frontObj) {
+			throw new Error("Front not loaded");
+		}
+		await idbStore.saveDataModel(frontObj);
 		return true;
 	}
 
 	async function deleteFront() {
-		if (!front) {
+		if (!frontObj) {
 			throw new Error("Front not loaded");
 		}
 
-		const userId = storage.getUserId();
-		await idb.front.deleteSynced(userId, [front.id]);
+		await idbStore.ingest([(await frontObj.makePermanentDeleteEntry()).entryWithPayload]);
 	}
 </script>
 
@@ -100,7 +83,7 @@
 			icon: SettingsIcon,
 		},
 	]}
-	hasRecordChanged={hasFrontChanged}
+	isDirty={() => !!frontObj?.isDirty()}
 	onSave={saveFront}
 	onDelete={deleteFront}
 	bind:formState
@@ -110,24 +93,12 @@
 	{#if front}
 		<div class:hidden={activeTab !== "info"}>
 			<Block>
-				{#if frontMember}
-					<MemberCard
-						onClick={() => {
-							showSelectMemberSheet = true;
-						}}
-						member={frontMember}
-					/>
-				{:else}
-					Unknown member
-					<Button
-						onClick={() => {
-							showSelectMemberSheet = true;
-						}}
-					>
-						<PersonIcon button before />
-						Select member
-					</Button>
-				{/if}
+				<MemberCard
+					onClick={() => {
+						showSelectMemberSheet = true;
+					}}
+					member={frontMember || undefined}
+				/>
 
 				<Button
 					tonal

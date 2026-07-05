@@ -3,7 +3,13 @@ import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
 import test, { describe } from "node:test";
 import { shuffleArray } from "openselves-common";
-import { BaseSchema, EntryDataModel, Front, Member, type Schema } from "openselves-common/client";
+import {
+	BaseSchema,
+	EntryDataModel,
+	Front,
+	Member,
+	type SchemaType,
+} from "openselves-common/client";
 import {
 	type Entry,
 	type EntryWithPayload,
@@ -34,7 +40,7 @@ import {
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 async function timeModelEntries(
-	model: EntryDataModel<Schema & typeof BaseSchema>,
+	model: EntryDataModel<SchemaType & typeof BaseSchema>,
 	timestamp: bigint,
 ): Promise<Entry[]> {
 	return (await model.flushDirtyEntries()).map(
@@ -62,7 +68,7 @@ describe(pushEndpoint, () => {
 
 	function makeFront(member: Member, date: Date) {
 		const front = new Front(member.subspaceId, {
-			memberId: member.id,
+			memberId: member.get("id"),
 			note: "A note on this front",
 			startedAt: new Date(),
 			endedAt: new Date(Date.now() + 60 * 1000),
@@ -72,7 +78,7 @@ describe(pushEndpoint, () => {
 	}
 
 	async function createMember(userId: string, date?: Date, image?: string | FileRef | null) {
-		const { member } = await makeMember(userId, date, image);
+		const { member } = makeMember(userId, date, image);
 		const entries = await member.flushDirtyEntries();
 		const response = await putEntries(entries);
 		assert.strictEqual(response.body.entries, undefined);
@@ -81,7 +87,7 @@ describe(pushEndpoint, () => {
 	}
 	async function createAndDeleteMember(userId: string = env.users.user.id) {
 		const { member, entries } = await createMember(userId);
-		const deleteEntry = await member.getPermanentDeleteEntry();
+		const deleteEntry = await member.makePermanentDeleteEntry();
 		const response = await putEntry(deleteEntry);
 		return { member, createEntries: entries, deleteEntry, response };
 	}
@@ -518,7 +524,7 @@ describe(pushEndpoint, () => {
 				{
 					name: "small payload (<=8192) 200",
 					forgeEntry: async (entry) => {
-						entry.payload = "a".repeat(8192);
+						entry.payload = "a".repeat(MAX_IN_DB_PAYLOAD_LENGTH);
 						entry.payloadLength = BigInt(entry.payload.length);
 						entry.payloadDigest = await hashPayload(entry.payload);
 						assert(isEntryWithPayload(entry));
@@ -528,7 +534,7 @@ describe(pushEndpoint, () => {
 				{
 					name: "large payload (>8192) 200",
 					forgeEntry: async (entry) => {
-						entry.payload = "a".repeat(8193);
+						entry.payload = "a".repeat(MAX_IN_DB_PAYLOAD_LENGTH + 1);
 						entry.payloadLength = BigInt(entry.payload.length);
 						entry.payloadDigest = await hashPayload(entry.payload);
 						assert(isEntryWithPayload(entry));
@@ -598,7 +604,7 @@ describe(pushEndpoint, () => {
 
 			for (const testCase of testCases) {
 				test(testCase.name, async () => {
-					const { member } = await makeMember(env.users.user.id);
+					const { member } = makeMember(env.users.user.id);
 					const entry = (await member.flushDirtyEntries())[0].entryMaybeWithPayload;
 					assert(isEntryWithPayload(entry));
 
@@ -628,7 +634,7 @@ describe(pushEndpoint, () => {
 		});
 
 		test("Putting an entry twice only has an effect the first time", async () => {
-			const { member } = await makeMember(env.users.user.id);
+			const { member } = makeMember(env.users.user.id);
 			const entries = await member.flushDirtyEntries();
 			const unrelatedEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
@@ -641,7 +647,7 @@ describe(pushEndpoint, () => {
 			await putEntries([...entries, unrelatedEntry]);
 			await checkEntriesAreServed([...entries, unrelatedEntry]);
 
-			const memberDeleteEntry = await member.getPermanentDeleteEntry();
+			const memberDeleteEntry = await member.makePermanentDeleteEntry();
 			await putEntry(memberDeleteEntry);
 			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
 			await checkEntriesAreNotServed(entries);
@@ -727,7 +733,7 @@ describe(pushEndpoint, () => {
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
-				const { member } = await makeMember(env.users.user.id);
+				const { member } = makeMember(env.users.user.id);
 
 				const entries = await member.flushDirtyEntries();
 				await putEntries(entries);
@@ -735,7 +741,7 @@ describe(pushEndpoint, () => {
 			});
 
 			test("minimal create data 200", async () => {
-				const { member } = await makeMember(env.users.user.id, undefined, undefined, true);
+				const { member } = makeMember(env.users.user.id, undefined, undefined, true);
 
 				const entries = await member.flushDirtyEntries();
 				await putEntries(entries);
@@ -743,12 +749,12 @@ describe(pushEndpoint, () => {
 			});
 
 			testImage(async (image) => {
-				const { member } = await makeMember(env.users.user.id);
+				const { member } = makeMember(env.users.user.id);
 
 				if (image && typeof image !== "string") {
-					await member.set("image", readFile(image.filePath));
+					member.set("image", readFile(image.filePath));
 				} else {
-					await member.set("image", image === null ? undefined : image);
+					member.set("image", image === null ? undefined : image);
 				}
 
 				const entry = (await member.flushDirtyEntries()).find((entry) =>
@@ -769,13 +775,13 @@ describe(pushEndpoint, () => {
 			test("delete member twice succeeds 200", async () => {
 				const { member } = await createAndDeleteMember();
 
-				await putEntry(await member.getPermanentDeleteEntry());
+				await putEntry(await member.makePermanentDeleteEntry());
 			});
 
 			test("delete member of another user fails 404", async () => {
 				const { member, entries } = await createMember(env.users.user.id);
 
-				const deleteEntry = await member.getDeleteEntry();
+				const deleteEntry = await member.makeDeleteEntry();
 				const response = await putEntry(deleteEntry, 403, env.users.cookies2);
 				assert.strictEqual(response.body.entries, undefined);
 
@@ -795,7 +801,7 @@ describe(pushEndpoint, () => {
 				assert(imageEntry);
 
 				await testPayloadIsDeletedFromS3(imageEntry, async () => {
-					await putEntry(await member.getDeleteEntry(), 200);
+					await putEntry(await member.makeDeleteEntry(), 200);
 				});
 			});
 
@@ -822,7 +828,7 @@ describe(pushEndpoint, () => {
 			test("200", async () => {
 				const { member } = await createMember(env.users.user.id);
 
-				await member.assign({
+				member.assign({
 					pronouns: "she/they",
 					description: "a member of our& system who went through some changes",
 					isArchived: true,
@@ -838,7 +844,7 @@ describe(pushEndpoint, () => {
 				const { member, entries } = await createMember(env.users.user.id);
 				const expectedEntries = entries.map((entry) => entry.entryMaybeWithPayload);
 
-				await member.set("name", "a new name");
+				member.set("name", "a new name");
 				const updateEntries = await member.flushDirtyEntries();
 				const response2 = await putEntries(updateEntries, 403, env.users.cookies2);
 
@@ -849,7 +855,7 @@ describe(pushEndpoint, () => {
 
 			test("update member that was already deleted succeeds 200", async () => {
 				const { member } = await createAndDeleteMember();
-				await member.set("name", "a new name");
+				member.set("name", "a new name");
 
 				const entries = await member.flushDirtyEntries();
 				await putEntries(entries);
@@ -860,9 +866,9 @@ describe(pushEndpoint, () => {
 				const { member } = await createMember(env.users.user.id);
 
 				if (image && typeof image !== "string") {
-					await member.set("image", readFile(image.filePath));
+					member.set("image", readFile(image.filePath));
 				} else {
-					await member.set("image", image === null ? undefined : image);
+					member.set("image", image === null ? undefined : image);
 				}
 
 				return (await member.flushDirtyEntries())[0];
@@ -880,7 +886,7 @@ describe(pushEndpoint, () => {
 			)?.entryMaybeWithPayload;
 			assert(originalImageEntry);
 
-			await member.set("image", undefined);
+			member.set("image", undefined);
 
 			const deleteImageEntry = (await member.flushDirtyEntries())[0];
 
@@ -900,15 +906,11 @@ describe(pushEndpoint, () => {
 		) {
 			const user = env.users.user;
 			const cookies = env.users.cookies;
-			const { member: memberToDelete } = await makeMember(user.id);
+			const { member: memberToDelete } = makeMember(user.id);
 
 			await putEntries(await timeModelEntries(memberToDelete, 0n), undefined, cookies);
 
-			const members = await Promise.all([
-				makeMember(user.id),
-				makeMember(user.id),
-				makeMember(user.id),
-			]);
+			const members = [makeMember(user.id), makeMember(user.id), makeMember(user.id)];
 
 			const entries: Entry[] = [
 				...(await timeModelEntries(members[0].member, 1n)),
@@ -928,9 +930,9 @@ describe(pushEndpoint, () => {
 					5n,
 					"iel/ellui",
 				),
-				await memberToDelete.getDeleteEntry(6n),
+				await memberToDelete.makeDeleteEntry(6n),
 			];
-			await members[2].member.assign({
+			members[2].member.assign({
 				pronouns: "they/them",
 				isArchived: true,
 				archivedReason: "a reason",
@@ -963,11 +965,11 @@ describe(pushEndpoint, () => {
 		});
 
 		async function setupEntryMatrix() {
-			const member = await makeMember(env.users.user.id);
+			const member = makeMember(env.users.user.id);
 			await putEntries(await timeModelEntries(member.member, 0n));
 
 			const client1Entries: Entry[] = [];
-			await member.member.assign({
+			member.member.assign({
 				name: "1",
 				pronouns: "1",
 				description: "1",
@@ -975,20 +977,20 @@ describe(pushEndpoint, () => {
 				archivedReason: "1",
 			});
 			client1Entries.push(...(await timeModelEntries(member.member, 1n)));
-			await member.member.assign({
+			member.member.assign({
 				description: "3",
 				archivedReason: "3",
 			});
 			client1Entries.push(...(await timeModelEntries(member.member, 3n)));
 
 			const client2Entries: Entry[] = [];
-			await member.member.assign({
+			member.member.assign({
 				pronouns: "2",
 				description: "2",
 				archivedReason: "2",
 			});
 			client2Entries.push(...(await timeModelEntries(member.member, 2n)));
-			await member.member.assign({
+			member.member.assign({
 				archivedReason: "4",
 			});
 			client2Entries.push(...(await timeModelEntries(member.member, 4n)));
@@ -1005,7 +1007,6 @@ describe(pushEndpoint, () => {
 
 			const reconstructedMember = new Member(
 				member.subspaceId,
-				undefined,
 				await Promise.all(
 					responseEntries
 						.filter((entry) => entry.path.startsWith(member.getPathRoot()))
@@ -1047,7 +1048,7 @@ describe(pushEndpoint, () => {
 
 		test.only("update front", async () => {
 			const { front } = await createFront(env.users.user.id);
-			await front.assign({
+			front.assign({
 				note: "hi",
 				endedAt: new Date(),
 			});
@@ -1058,7 +1059,7 @@ describe(pushEndpoint, () => {
 
 		test.only("delete front", async () => {
 			const { front, entries } = await createFront(env.users.user.id);
-			const deleteEntry = await front.getDeleteEntry();
+			const deleteEntry = await front.makeDeleteEntry();
 			await putEntry(deleteEntry);
 			await checkEntriesAreServed([deleteEntry]);
 			await checkEntriesAreNotServed(entries);

@@ -44,12 +44,12 @@ describe("/sync/pull", () => {
 			createdAt: getDate(),
 		});
 
-		await members1[0].set("name", "a new name");
-		await members1[1].set("description", "a new description");
+		members1[0].set("name", "a new name");
+		members1[1].set("description", "a new description");
 
 		entries1.push(
 			...(await Promise.all(members1.map((member) => member.flushDirtyEntries()))).flat(),
-			await deletedMember1.getPermanentDeleteEntry(),
+			await deletedMember1.makePermanentDeleteEntry(),
 		);
 
 		members2 = [
@@ -61,7 +61,7 @@ describe("/sync/pull", () => {
 			}),
 		];
 
-		await members2[0].set("pronouns", "rad/af");
+		members2[0].set("pronouns", "rad/af");
 
 		entries2.push(
 			...(await Promise.all(members2.map((member) => member.flushDirtyEntries()))).flat(),

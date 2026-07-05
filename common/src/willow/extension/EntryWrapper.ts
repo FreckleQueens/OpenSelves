@@ -74,9 +74,17 @@ export class EntryWrapper implements Entry {
 		return { ...this._entry };
 	}
 
-	public get entryMaybeWithPayload(): Entry | EntryWithPayload {
+	public get entryWithPayload(): EntryWithPayload {
 		if (typeof this.payload === "string") {
 			return { ...this._entry, payload: this.payload };
+		} else {
+			throw new Error("this entry doesn't have a payload");
+		}
+	}
+
+	public get entryMaybeWithPayload(): Entry | EntryWithPayload {
+		if (typeof this.payload === "string") {
+			return this.entryWithPayload;
 		} else {
 			return this.entry;
 		}
@@ -127,12 +135,9 @@ export class EntryWrapper implements Entry {
 		this.payload = payload;
 	}
 
-	public async setPayload(payload: string) {
-		const [timestamp, length, digest] = [
-			j2000Now(),
-			BigInt(payload.length),
-			await hashPayload(payload),
-		];
+	public async setPayload(payload: string, timestamp: bigint = j2000Now()) {
+		const length = BigInt(payload.length);
+		const digest = await hashPayload(payload);
 		this._entry.timestamp = timestamp;
 		this._entry.payloadDigest = digest;
 		this._entry.payloadLength = length;

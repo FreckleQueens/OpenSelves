@@ -10,6 +10,7 @@ import {
 import { confirm } from "@inquirer/prompts";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { type Request } from "express";
 
 import { AppCommand } from "../AppCommand.js";
 import type { ConfigData } from "../config.data.js";
@@ -166,7 +167,7 @@ export class S3Service implements OnApplicationShutdown {
 		}
 	}
 
-	public async getObject(key: string) {
+	public async getObject(key: string, request?: Request) {
 		if (!this.bucketName || !this.s3Client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -175,6 +176,7 @@ export class S3Service implements OnApplicationShutdown {
 			new GetObjectCommand({
 				Bucket: this.bucketName,
 				Key: key,
+				IfNoneMatch: request ? request.headers["if-none-match"] : undefined,
 			}),
 		);
 	}

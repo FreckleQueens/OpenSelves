@@ -40,7 +40,7 @@ export abstract class PersistentStorage {
 	}
 
 	/**
-	 * Sets a path prefix to differentiate offline data and different user's data.
+	 * Sets a key prefix to differentiate offline data and different user's data.
 	 * Set to user id when logging in.
 	 * @param userId
 	 */
@@ -60,25 +60,25 @@ export abstract class PersistentStorage {
 		await this.setUserId(undefined);
 	}
 
-	public async get(path: string, absolute: boolean = false): Promise<string | undefined> {
-		return this.getRaw(absolute ? path : `${this.getUserId()}.${path}`);
+	public async get(key: string, absolute: boolean = false): Promise<string | undefined> {
+		return this.getRaw(absolute ? key : `${this.getUserId()}.${key}`);
 	}
 
-	public async set(path: string, value: string, absolute: boolean = false): Promise<void> {
-		await this.setRaw(absolute ? path : `${this.getUserId()}.${path}`, value);
+	public async set(key: string, value: string, absolute: boolean = false): Promise<void> {
+		await this.setRaw(absolute ? key : `${this.getUserId()}.${key}`, value);
 	}
 
-	public async setForUser(userId: string, path: string, value: string) {
-		return this.set(`${userId}.${path}`, value, true);
+	public async setForUser(userId: string, key: string, value: string) {
+		return this.set(`${userId}.${key}`, value, true);
 	}
 
-	public async delete(path: string, absolute: boolean = false): Promise<void> {
-		await this.setRaw(absolute ? path : `${this.getUserId()}.${path}`, undefined);
+	public async delete(key: string, absolute: boolean = false): Promise<void> {
+		await this.setRaw(absolute ? key : `${this.getUserId()}.${key}`, undefined);
 	}
 
-	protected abstract getRaw(path: string): Promise<string | undefined>;
+	protected abstract getRaw(key: string): Promise<string | undefined>;
 
-	protected abstract setRaw(path: string, value: string | undefined): Promise<void>;
+	protected abstract setRaw(key: string, value: string | undefined): Promise<void>;
 
 	private get userId(): string | undefined {
 		return this._userId;
@@ -93,19 +93,15 @@ export abstract class PersistentStorage {
 export class IDBStorage extends PersistentStorage {
 	private idb: IDB = IDB.getInstance();
 
-	protected async getRaw(path: string): Promise<string | undefined> {
-		const entries = await this.idb.storageEntry.getByField("key", path);
-		const entry = entries[0];
-		return entry ? entry.value : undefined;
+	protected async getRaw(key: string): Promise<string | undefined> {
+		return await this.idb.storageEntry.get(key);
 	}
 
-	protected async setRaw(path: string, value: string | undefined): Promise<void> {
+	protected async setRaw(key: string, value: string | undefined): Promise<void> {
 		if (value === undefined) {
-			await this.idb.storageEntry.delete([path]);
+			await this.idb.storageEntry.delete(key);
 		} else {
-			await this.idb.storageEntry.put(path, {
-				value: value,
-			});
+			await this.idb.storageEntry.put(key, value);
 		}
 	}
 }

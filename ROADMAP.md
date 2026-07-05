@@ -288,7 +288,7 @@ a short-lived one
     - [x] implement ingesting algorithm (Willow "Store")
     - [x] refuse entries with timestamps too far in the future, except empty payload plus timestamp equal to the maximum uint64
   - [ ] Migrate the client to the new format
-    - [ ] Migrate IndexedDB
+    - [x] Migrate IndexedDB
     - [x] use `performance.timeOrigin + performance.now()` to get timestamp
     - [ ] add `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers to increase timestamp precision
 - [ ] encryption (client side)
@@ -304,6 +304,8 @@ a short-lived one
 - [ ] Have the client handle not uploading every entry all at once when it would make the json payload bigger than twice 
 the maximum allowed per-entry payload
 - [ ] obfuscate password recovery request response by always responding with success
+- [ ] client: add a loading screen on loading to wait for initial sync to ingest all entries
+- [ ] client: add staging mode to `/members` ?
 
 ## 0.8.0 - Simply Plural import
 - [ ] drop logs, members and fronts tables

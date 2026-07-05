@@ -7,7 +7,7 @@
 		"dev": "vite dev",
 		"build": "yarn build:src && yarn build:tests",
 		"build:src": "yarn prepare && vite build && yarn cap sync",
-		"build:tests": "cd ../server && yarn build && cd ../client/test && rm -rf dist && yarn tsc && cd ..",
+		"build:tests": "cd ../client/test && rm -rf dist && yarn tsc && cd ..",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo '' && cp --update=none .env.example .env",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

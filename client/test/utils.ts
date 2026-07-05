@@ -345,12 +345,17 @@ export class PuppeteerContext {
 		);
 	}
 
-	public async getLogsCount() {
+	public async getEntriesCount() {
 		return await this.page.evaluate(async () => {
 			const storage = window.openselves.PersistentStorage.getInstance();
 			const userId = storage.getUserId();
 			const idb = window.openselves.IDB.getInstance();
-			return (await idb.log.getByField("userId", userId)).length;
+			return (
+				await idb.entries.getByNamespaceIdSubspaceId(
+					window.openselves.OPENSELVES_NAMESPACE_ID,
+					userId,
+				)
+			).length;
 		});
 	}
 

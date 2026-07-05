@@ -7,7 +7,6 @@ import {
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
-import type { Attachment } from "$lib/idb/IDBAttachment";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { LocalProfileManager } from "$lib/idb/local-profiles";
 import { gotoHomeRoute } from "$lib/routing-utils";
@@ -93,6 +92,11 @@ export function scheduleRefreshUserData(delay: number = 5000) {
 		}
 	}, delay);
 }
+
+export type Attachment = {
+	id: string;
+	file: Blob;
+};
 
 export type CallOptions = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

@@ -9,10 +9,10 @@ describe("Member", () => {
 	test("create member", async () => {
 		await ctx.registerAndLoginUser();
 
-		const pushRequest = ctx.waitForResponse("/sync/push");
+		const pushRequest = ctx.waitForResponse("/sync/push", false);
 		const member = await ctx.createMember();
-
-		assert.strictEqual((await pushRequest).ok(), true);
+		await pushRequest;
+		await ctx.waitForResponse("/sync/push", true);
 
 		assert.strictEqual(
 			(await ctx.page.$$(`#not-fronting-members ${ctx.getMemberEntrySelector(member)}`))
@@ -25,7 +25,7 @@ describe("Member", () => {
 		await ctx.registerAndLoginUser();
 		const member = await ctx.createMember();
 
-		const previousLogsCount = await ctx.getLogsCount();
+		const previousLogsCount = await ctx.getEntriesCount();
 		await ctx
 			.locator(`#not-fronting-members ${ctx.getMemberEntrySelector(member)} .member-card`)
 			.click();
@@ -33,7 +33,7 @@ describe("Member", () => {
 
 		await ctx.waitForNavigation("/members");
 
-		const newLogsCount = await ctx.getLogsCount();
+		const newLogsCount = await ctx.getEntriesCount();
 		assert.strictEqual(newLogsCount, previousLogsCount);
 	});
 });

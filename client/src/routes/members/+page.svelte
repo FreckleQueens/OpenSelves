@@ -4,6 +4,7 @@
 	import { MenuItem } from "$lib";
 	import { PersistentStorage } from "$lib/PersistentStorage";
 	import { appState } from "$lib/appState.svelte";
+	import { sortBy } from "$lib/component-utils.js";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import FabMenu from "$lib/components/FabMenu.svelte";
 	import FrontNote from "$lib/components/FrontNote.svelte";
@@ -18,8 +19,8 @@
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import SearchIcon from "$lib/components/icons/SearchIcon.svelte";
-	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
+	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
@@ -33,49 +34,43 @@
 		Searchbar,
 		Toggle,
 	} from "konsta/svelte";
-	import { type Front, type Member } from "openselves-common/db";
+	import { Front, Member, type MemberStatic } from "openselves-common/client";
+	import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 	import { onMount } from "svelte";
 
 	import MembersTabbar from "./MembersTabbar.svelte";
 	import { MembersTab } from "./tabs.ts";
 
-	let members: SubscriptionState<Member> = $state({
-		records: [],
-	});
-	let fronts: SubscriptionState<Front> = $state({
-		records: [],
-	});
+	let members = $derived.by(subscribeToModel(Member));
+	let fronts = $derived.by(subscribeToModel(Front));
 
 	let showSearchbar: boolean = $state(false);
 	let memberSearch: string = $state("");
 
 	let currentFronts = $derived(
-		fronts.records
-			.filter((front) => members.loaded && !front.endedAt)
+		fronts.staticData
+			.filter((front) => !front.endedAt)
 			.map((front) => {
-				const member = members.records.find((member) => member.id === front.memberId);
-				if (!member) {
-					throw new Error("Member not found for front " + front.id);
-				}
+				const member = members.staticData.find((member) => member.id === front.memberId);
 				return {
 					...front,
-					member: member,
-					frontingFor: Date.now() - front.startedAt.getTime(),
+					member,
+					memberName: member?.name || t("Unknown"),
 				};
 			})
-			.filter((front) => front.member.name.toLowerCase().includes(memberSearch.toLowerCase()))
-			.sort(sortBy((front) => front.member.name)),
+			.filter((front) => front.memberName.toLowerCase().includes(memberSearch.toLowerCase()))
+			.sort(sortBy((front) => front.memberName)),
 	);
 	let showClearFrontDialog = $state(false);
 	let addNoteToFrontId: string | undefined = $state();
 
 	let showArchivedMembers = $state(false);
-	let shownMembers: Member[] = $derived(
-		members.records
+	let shownMembers: MemberStatic[] = $derived(
+		members.staticData
 			.filter(
 				(member) =>
 					(showArchivedMembers || !member.isArchived) &&
-					!currentFronts.find((front) => front.member.id === member.id) &&
+					!currentFronts.find((front) => front.member && front.member.id === member.id) &&
 					member.name.toLowerCase().includes(memberSearch.toLowerCase()),
 			)
 			.sort(sortBy((member) => member.name)),
@@ -85,9 +80,7 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
-	const idb = IDB.getInstance();
-	subscribeToModel(idb.member, members);
-	subscribeToModel(idb.front, fronts);
+	const store = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
 
 	onMount(async () => {
 		if (!appState.isAuthenticated) {
@@ -106,29 +99,20 @@
 		await storage.set("showArchivedMembers", showArchivedMembers ? "on" : "");
 	}
 
-	async function startFront(memberId: string) {
-		const now = new Date();
-		const front: Omit<Front, "userId"> = {
-			id: "",
+	async function startFront(memberId: string | null) {
+		const front = new Front(storage.getUserId(), {
 			memberId: memberId,
-			startedAt: now,
-			endedAt: null,
-			note: null,
-			createdAt: now,
-			updatedAt: now,
-		};
-		await idb.front.saveSynced(storage.getUserId(), front);
+		});
+		await store.saveDataModel(front);
 	}
 
 	async function endFront(frontId: string) {
-		await idb.front.saveSynced(
-			storage.getUserId(),
-			{
-				id: frontId,
-				endedAt: new Date(),
-			},
-			true,
-		);
+		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
+		if (!front) {
+			throw new Error("Front not found for id " + frontId);
+		}
+		front.set("endedAt", new Date());
+		await store.saveDataModel(front);
 	}
 
 	async function endAllFronts() {
@@ -140,22 +124,13 @@
 
 	async function setFrontNote(frontId: string, value: string) {
 		addNoteToFrontId = frontId;
-		await idb.front.saveSynced(
-			storage.getUserId(),
-			{
-				id: frontId,
-				note: value ? value : null,
-			},
-			true,
-		);
+		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
+		if (!front) {
+			throw new Error("Front not found for id " + frontId);
+		}
+		front.set("note", value ? value : undefined);
+		await store.saveDataModel(front);
 	}
-
-	onMount(() => {
-		const interval = window.setInterval(() => {
-			fronts.records = [...fronts.records]; // Re-calculate frontingFor
-		}, 1000);
-		return () => window.clearInterval(interval);
-	});
 </script>
 
 {#snippet searchbar()}
@@ -196,7 +171,9 @@
 		{#each currentFronts as front (front.id)}
 			<MemberCard
 				member={front.member}
-				onClick={() => goto(resolve(`/members/edit/${front.member.id}`))}
+				onClick={() => {
+					if (front.member) return goto(resolve(`/members/edit/${front.member.id}`));
+				}}
 				actions={[
 					{
 						id: "end-front",

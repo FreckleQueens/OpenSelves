@@ -1,11 +1,13 @@
 <script lang="ts">
-	import type { Front } from "openselves-common/db";
+	import type { FrontStatic } from "openselves-common/client";
 
 	let {
 		front,
 		setFrontNote,
-	}: { front: Front; setFrontNote?: (frontId: string, value: string) => Promise<void> | void } =
-		$props();
+	}: {
+		front: FrontStatic;
+		setFrontNote?: (frontId: string, value: string) => Promise<void> | void;
+	} = $props();
 </script>
 
 <div class="m-2 mt-0 mb-8 p-2 rounded-xl bg-md-light-surface-1 dark:bg-md-dark-surface-1">
@@ -17,6 +19,7 @@
 			>{front.note}</textarea
 		>
 	{:else}
+		<!-- TODO: render newline characters -->
 		<div class="w-full p-1 min-h-8 rounded-xs">
 			{front.note}
 		</div>

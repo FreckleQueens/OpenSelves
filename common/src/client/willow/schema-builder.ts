@@ -1,7 +1,12 @@
-import type { ConstructSchemaFieldType, SchemaField, SupportedFieldTypeNames } from "./types.js";
+import type {
+	ConstructSchemaFieldType,
+	SchemaField,
+	SupportedSchemaFieldTypeNames,
+} from "./types.js";
 
+// TODO: make fields optional by default, replace optional() with required()
 export class SchemaBuilder<
-	BaseTypeName extends SupportedFieldTypeNames,
+	BaseTypeName extends SupportedSchemaFieldTypeNames,
 	Optional extends boolean = false,
 	Nullable extends boolean = false,
 	HasDefault extends boolean = false,
@@ -27,6 +32,7 @@ export class SchemaBuilder<
 		private readonly defaultValue?:
 			| ConstructSchemaFieldType<BaseTypeName, Optional, Nullable>
 			| (() => ConstructSchemaFieldType<BaseTypeName, Optional, Nullable>),
+		public readonly isReadonly: boolean = false,
 	) {}
 
 	public optional() {
@@ -36,6 +42,7 @@ export class SchemaBuilder<
 			this.isNullable,
 			this.hasDefault,
 			this.defaultValue,
+			this.isReadonly,
 		);
 	}
 
@@ -46,6 +53,7 @@ export class SchemaBuilder<
 			true,
 			this.hasDefault,
 			this.defaultValue,
+			this.isReadonly,
 		);
 	}
 
@@ -60,6 +68,18 @@ export class SchemaBuilder<
 			this.isNullable,
 			true,
 			defaultValue,
+			this.isReadonly,
+		);
+	}
+
+	public readonly() {
+		return new SchemaBuilder(
+			this.baseTypeName,
+			this.isOptional,
+			this.isNullable,
+			this.hasDefault,
+			this.defaultValue,
+			true,
 		);
 	}
 

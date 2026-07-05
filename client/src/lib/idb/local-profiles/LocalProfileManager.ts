@@ -1,10 +1,14 @@
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { USER_DATA_STORAGE_KEY } from "$lib/api.svelte";
-import type { IDBModel, ModelBase } from "$lib/idb";
 import { IDB } from "$lib/idb";
+import { ENTRY_STORE_NAME } from "$lib/idb/IDBEntry";
+import { STORAGE_ENTRY_STORE_NAME } from "$lib/idb/IDBStorageEntry";
 import { localProfilesState } from "$lib/idb/local-profiles/local-profile.svelte";
 import { GetUser, type GetUserResult, parseApiResult } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+
+import { PAYLOAD_STORE_NAME } from "../IDBPayload";
 
 export type LocalProfileData = {
 	userId: string;
@@ -21,35 +25,45 @@ export class LocalProfileManager {
 	}
 
 	private readonly idb: IDB;
-	private readonly userDataModels: IDBModel<{ userId: string; id: string } & ModelBase, "id">[];
 
 	private constructor() {
 		this.idb = IDB.getInstance();
-		this.userDataModels = [this.idb.log, this.idb.attachment, this.idb.front, this.idb.member];
 	}
 
 	public async wipeUserData(userId: string): Promise<void> {
-		const storeNames = [
-			...this.userDataModels.map((model) => model.storeName),
-			this.idb.storageEntry.storeName,
-		];
-		await this.idb.transaction(storeNames, async (tx) => {
-			for (const model of this.userDataModels) {
-				const userRecords = model.parseModels(
-					await tx.getByIndex(model.storeName, "userId", IDBKeyRange.only(userId)),
+		await this.idb.transaction(
+			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME, STORAGE_ENTRY_STORE_NAME],
+			async (tx) => {
+				// Delete entries
+				const userEntries = await this.idb.entries.getByNamespaceIdSubspaceId(
+					OPENSELVES_NAMESPACE_ID,
+					userId,
+					tx,
 				);
-				for (const id of userRecords.map((record) => record.id)) {
-					await tx.delete(model.storeName, id);
+				for (const entry of userEntries) {
+					await tx.delete(ENTRY_STORE_NAME, [
+						entry.namespaceId,
+						entry.subspaceId,
+						entry.path,
+					]);
 				}
-			}
-			const records = this.idb.storageEntry.parseModels(
-				await tx.getAll(this.idb.storageEntry.storeName),
-			);
-			const userRecords = records.filter((record) => record.key.startsWith(userId + "."));
-			for (const key of userRecords.map((record) => record.key)) {
-				await tx.delete(this.idb.storageEntry.storeName, key);
-			}
-		});
+
+				// Delete non-referenced payloads
+				const digestsToDelete = userEntries.map((entry) => entry.payloadDigest);
+				for (const digest of digestsToDelete) {
+					if ((await this.idb.entries.getByPayloadDigest(digest, tx)).length === 0) {
+						await tx.delete(PAYLOAD_STORE_NAME, digest);
+					}
+				}
+
+				// Delete PermanentStorage
+				const records = await this.idb.storageEntry.getAll(tx);
+				const userRecords = records.filter((record) => record.key.startsWith(userId + "."));
+				for (const key of userRecords.map((record) => record.key)) {
+					await tx.delete(STORAGE_ENTRY_STORE_NAME, key);
+				}
+			},
+		);
 
 		const storage = PersistentStorage.getInstance();
 		if ((await storage.get(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, true)) === userId) {
@@ -58,9 +72,7 @@ export class LocalProfileManager {
 	}
 
 	public async loadProfilesData() {
-		const entries = this.idb.storageEntry.parseModels(
-			await this.idb.getAll(this.idb.storageEntry.storeName),
-		);
+		const entries = await this.idb.storageEntry.getAll();
 		localProfilesState.data = entries
 			.filter((entry) => entry.key.endsWith("." + USER_DATA_STORAGE_KEY))
 			.map((entry) => {

@@ -25,8 +25,8 @@ export function isJsonFriendlyEntry(value: unknown): value is JsonFriendlyEntry 
 export function toJsonFriendly(entry: Entry): JsonFriendlyEntry {
 	return {
 		...entry,
-		timestamp: entry.timestamp.toString(),
-		payloadLength: entry.payloadLength.toString(),
+		timestamp: entry.timestamp.toString().padStart(47, "0"),
+		payloadLength: entry.payloadLength.toString().padStart(47, "0"),
 	};
 }
 

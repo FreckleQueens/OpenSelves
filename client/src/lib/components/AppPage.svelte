@@ -15,6 +15,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { OSIconProps } from "$lib/components/os-icon";
 	import { SyncWorker } from "$lib/idb/SyncWorker.js";
+	import { activeSubscriptions } from "$lib/idb/entry-subscription.svelte";
 	import humanizeDuration from "humanize-duration";
 	import {
 		Block,
@@ -28,7 +29,7 @@
 		Preloader,
 	} from "konsta/svelte";
 	import { type Component, type Snippet } from "svelte";
-	import { fly } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
 
 	let {
 		children,
@@ -60,6 +61,19 @@
 
 	let openMenu = $state(false);
 	let syncWorkerError: unknown = $derived(appState.syncWorkerError);
+	let areSubscriptionsLoading: boolean = $derived(
+		activeSubscriptions.values().some((sub) => !sub().loaded),
+	);
+	let isLoading: boolean = $derived(loading || areSubscriptionsLoading);
+	let showLoadingSpinner: boolean = $state(false);
+
+	let showLoadingSpinnerTimeout: number | undefined;
+	$effect(() => {
+		clearTimeout(showLoadingSpinnerTimeout);
+		if (isLoading) {
+			showLoadingSpinnerTimeout = window.setTimeout(() => (showLoadingSpinner = true), 400);
+		}
+	});
 
 	const menuItems: {
 		[k in MenuItem]: {
@@ -147,7 +161,7 @@
 		subnavbar={subnavbar || ""}
 		transparent={transparentNavbar}
 	>
-		{#if !loading && navbar}
+		{#if !isLoading && navbar}
 			{@render navbar()}
 		{/if}
 
@@ -165,10 +179,20 @@
 {/if}
 
 <div class="app-page-content flex-1 overflow-y-auto" bind:this={pageContent}>
-	{#if loading}
-		<Preloader />
+	{#if isLoading}
+		{#if showLoadingSpinner}
+			<div
+				class="fixed top-1/2 left-1/2"
+				style="transform: translateX(-50%) translateY(-50%)"
+				transition:fade={{ duration: 50 }}
+			>
+				<Preloader />
+			</div>
+		{/if}
 	{:else}
-		{@render children()}
+		<div transition:fade={{ duration: 100 }}>
+			{@render children()}
+		</div>
 	{/if}
 </div>
 

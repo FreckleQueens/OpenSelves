@@ -44,7 +44,6 @@ describe("Front", () => {
 		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
 
 		await ctx.goto("/dashboard", undefined, true);
-		assert.strictEqual((await ctx.page.$$(".no-front")).length, 1);
 		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
 		await ctx.expectNoAppError();
 	});

@@ -1,18 +1,9 @@
-import { IDBAttachment } from "$lib/idb/IDBAttachment";
-import { IDBFront } from "$lib/idb/IDBFront";
-import { IDBLog } from "$lib/idb/IDBLog";
-import { IDBMember } from "$lib/idb/IDBMember";
+import { IDBEntry } from "$lib/idb/IDBEntry";
+import { IDBPayload } from "$lib/idb/IDBPayload";
 import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
+import { IDB_MIGRATIONS } from "$lib/idb/idb-migrations";
 
 const IDB_NAME = "openselves";
-
-export type ModelBase = object;
-export type SyncedModelBase = ModelBase & {
-	userId: string;
-	id: string;
-	createdAt: Date;
-	updatedAt: Date;
-};
 
 export class IDB {
 	private static instance: IDB;
@@ -35,10 +26,8 @@ export class IDB {
 	}
 
 	public readonly storageEntry: IDBStorageEntry = new IDBStorageEntry(this);
-	public readonly log: IDBLog = new IDBLog(this);
-	public readonly attachment: IDBAttachment = new IDBAttachment(this);
-	public readonly member: IDBMember = new IDBMember(this);
-	public readonly front: IDBFront = new IDBFront(this);
+	public readonly entries: IDBEntry = new IDBEntry(this);
+	public readonly payloads: IDBPayload = new IDBPayload(this);
 	private db?: IDBDatabase;
 
 	private async init() {
@@ -46,19 +35,19 @@ export class IDB {
 			version?: number,
 			forUpgrade: boolean = false,
 			forVersion: boolean = false,
-		): Promise<IDBDatabase> {
+		): Promise<{ db: IDBDatabase; tx: IDBTransaction | null }> {
 			return new Promise((resolve, reject) => {
 				const request = window.indexedDB.open(IDB_NAME, version);
 				request.onupgradeneeded = () => {
 					if (forUpgrade) {
-						resolve(request.result);
+						resolve({ db: request.result, tx: request.transaction });
 					} else if (!forVersion) {
 						reject(new Error("Tried to open database that needs an upgrade"));
 					}
 				};
 				request.onsuccess = () => {
 					if (!forUpgrade || forVersion) {
-						resolve(request.result);
+						resolve({ db: request.result, tx: request.transaction });
 					}
 				};
 				request.onblocked = (event) => {
@@ -84,146 +73,146 @@ export class IDB {
 				return 0;
 			}
 
-			const db = await openDb(undefined, false, true);
+			const { db } = await openDb(undefined, false, true);
 			const version = db.version;
 			db.close();
 			return version;
 		}
 
-		function makeMigration(
-			getTransaction: (db: IDBDatabase) => IDBTransaction,
-		): (version: number) => Promise<void> {
-			return async (version: number) => {
-				const db = await openDb(version, true);
-				const transaction = getTransaction(db);
-				return new Promise<void>((resolve, reject) => {
-					transaction.onerror = (event) => {
-						reject(new Error("Error in migration transaction", { cause: event }));
-					};
-					transaction.onabort = (event) => {
-						reject(new Error("Migration transaction aborted", { cause: event }));
-					};
-					transaction.oncomplete = () => {
-						resolve();
-					};
-				}).finally(() => {
-					db.close();
-				});
-			};
-		}
-
 		const currentVersion = await getCurrentIdbVersion();
 		console.log("Current IDB version:", currentVersion);
 
-		const migrations = [
-			makeMigration((db) => {
-				const membersStore = db.createObjectStore("members", { keyPath: "id" });
-				membersStore.createIndex("id", "id", { unique: true });
-				membersStore.createIndex("userId", "userId");
-				return membersStore.transaction;
-			}),
-			makeMigration((db) => {
-				const logsStore = db.createObjectStore("logs", {
-					keyPath: "id",
-				});
-				logsStore.createIndex("id", "id", { unique: true });
-				logsStore.createIndex("memberId", "memberId");
-				return logsStore.transaction;
-			}),
-			makeMigration((db) => {
-				const frontsStore = db.createObjectStore("fronts", {
-					keyPath: "id",
-				});
-				frontsStore.createIndex("id", "id", { unique: true });
-				frontsStore.createIndex("userId", "userId");
-				frontsStore.createIndex("memberId", "memberId");
-
-				const logsStore = frontsStore.transaction.objectStore("logs");
-				logsStore.createIndex("frontId", "frontId");
-
-				return frontsStore.transaction;
-			}),
-			makeMigration((db) => {
-				const storageEntriesStore = db.createObjectStore("storageEntries", {
-					keyPath: "key",
-				});
-				storageEntriesStore.createIndex("key", "key", { unique: true });
-
-				const logsStore = storageEntriesStore.transaction.objectStore("logs");
-				logsStore.createIndex("userId", "userId");
-
-				return storageEntriesStore.transaction;
-			}),
-			makeMigration((db) => {
-				const attachmentsStore = db.createObjectStore("attachments", {
-					keyPath: "id",
-				});
-				attachmentsStore.createIndex("id", "id", { unique: true });
-				attachmentsStore.createIndex("userId", "userId");
-				return attachmentsStore.transaction;
-			}),
-		];
-		const targetVersion = migrations.length;
+		const targetVersion = IDB_MIGRATIONS.length;
 		console.log("Target IDB version:", targetVersion);
 
 		if (currentVersion < targetVersion) {
 			console.log("Running migrations...");
 			for (let i = currentVersion; i < targetVersion; i++) {
-				const migration = migrations[i];
+				const { type, run } = IDB_MIGRATIONS[i];
 				const version = i + 1;
-				console.log("Running migration " + version + "...");
-				await migration(version);
+				console.log("Running migration", version, "of type", type, "...");
+
+				const { db, tx } = await openDb(
+					type === "schema" ? version : version - 1,
+					type === "schema",
+				);
+
+				if (type === "schema" && !tx) {
+					throw new Error("Got no transaction while attempting schema migration");
+				}
+
+				try {
+					await new Promise<void>((resolve, reject) => {
+						let transactionCompleted = false;
+						if (tx) {
+							tx.onerror = (event) => {
+								reject(
+									new Error("Error in migration transaction", { cause: event }),
+								);
+							};
+							tx.onabort = (event) => {
+								reject(
+									new Error("Migration transaction aborted", { cause: event }),
+								);
+							};
+
+							tx.oncomplete = () => {
+								transactionCompleted = true;
+							};
+						}
+
+						(async () => run(db, tx, this))()
+							.then(() => {
+								if (transactionCompleted || !tx) {
+									return resolve();
+								}
+								tx.oncomplete = () => resolve();
+							})
+							.catch(reject);
+					});
+				} catch (e) {
+					console.error(e);
+					if (tx) {
+						tx.abort();
+					}
+					throw e;
+				} finally {
+					db.close();
+				}
+
+				if (type === "data") {
+					const { db } = await openDb(version, true);
+					db.close();
+				}
+
 				console.log("Done!");
 			}
 		} else {
 			console.log("IDB is up-to-date");
 		}
 
-		this.db = await openDb(targetVersion);
+		const { db } = await openDb(targetVersion);
+		this.db = db;
 	}
 
-	public async transaction<Model extends ModelBase, StoreTypes extends string, ReturningType>(
+	public async transaction<StoreTypes extends string, ReturningType>(
 		storeNames: StoreTypes | StoreTypes[],
-		callback: (transaction: IDBTransactionWrapper<Model, StoreTypes>) => Promise<ReturningType>,
+		callback: (transaction: IDBTransactionWrapper<StoreTypes>) => Promise<ReturningType>,
+		tx?: IDBTransactionWrapper<StoreTypes>,
+		db: IDBDatabase | undefined = this.db,
 	): Promise<ReturningType> {
-		if (!this.db) {
-			throw new Error("this.db is undefined");
+		if (!db) {
+			throw new Error("db is undefined");
 		}
 
-		const nativeTransaction = this.db.transaction(storeNames, "readwrite");
-		const transaction = new IDBTransactionWrapper<Model, StoreTypes>(nativeTransaction);
+		if (tx) {
+			return await callback(tx);
+		} else {
+			const nativeTransaction = db.transaction(storeNames, "readwrite");
+			const transaction = new IDBTransactionWrapper<StoreTypes>(nativeTransaction);
 
-		try {
-			const results = await Promise.all([
-				new Promise<void>((resolve, reject) => {
-					nativeTransaction.onerror = () => {
-						reject(nativeTransaction.error);
+			try {
+				return await new Promise<ReturningType>((resolve, reject) => {
+					nativeTransaction.onerror = (event) => {
+						reject(new Error("Error in transaction", { cause: event }));
 					};
-					nativeTransaction.onabort = () => {
-						reject(new Error("Transaction aborted"));
+					nativeTransaction.onabort = (event) => {
+						reject(new Error("Transaction aborted", { cause: event }));
 					};
+
+					let transactionCompleted = false;
 					nativeTransaction.oncomplete = () => {
-						resolve();
+						transactionCompleted = true;
 					};
-				}),
-				callback(transaction),
-			]);
-			return results[1];
-		} catch (e) {
-			nativeTransaction.abort();
-			throw e;
+
+					callback(transaction)
+						.then((result) => {
+							if (transactionCompleted) {
+								return resolve(result);
+							}
+
+							nativeTransaction.oncomplete = () => resolve(result);
+						})
+						.catch(reject);
+				});
+			} catch (e) {
+				console.error(e);
+				nativeTransaction.abort();
+				throw e;
+			}
 		}
 	}
 
 	public async get(
 		storeName: string,
 		query: IDBValidKey | IDBKeyRange,
-	): Promise<ModelBase | undefined> {
-		return this.transaction(storeName, (transaction) => transaction.get(storeName, query));
+		tx?: IDBTransactionWrapper<string>,
+	): Promise<object | undefined> {
+		return this.transaction(storeName, (transaction) => transaction.get(storeName, query), tx);
 	}
 
-	public async getAll(storeName: string): Promise<ModelBase[]> {
-		return this.transaction(storeName, (transaction) => transaction.getAll(storeName));
+	public async getAll(storeName: string, tx?: IDBTransactionWrapper<string>): Promise<object[]> {
+		return this.transaction(storeName, (transaction) => transaction.getAll(storeName), tx);
 	}
 
 	public async getByIndex(
@@ -231,32 +220,47 @@ export class IDB {
 		index: string,
 		query: IDBValidKey | IDBKeyRange | null = null,
 		direction?: IDBCursorDirection,
-	): Promise<ModelBase[]> {
-		return this.transaction(storeName, (transaction) =>
-			transaction.getByIndex(storeName, index, query, direction),
+		tx?: IDBTransactionWrapper<string>,
+	): Promise<object[]> {
+		return this.transaction(
+			storeName,
+			(transaction) => transaction.getByIndex(storeName, index, query, direction),
+			tx,
 		);
 	}
 
-	public async put(storeName: string, data: ModelBase): Promise<IDBValidKey> {
-		return this.transaction(storeName, (transaction) => transaction.put(storeName, data));
+	public async put(
+		storeName: string,
+		data: object,
+		tx?: IDBTransactionWrapper<string>,
+	): Promise<IDBValidKey> {
+		return this.transaction(storeName, (transaction) => transaction.put(storeName, data), tx);
 	}
 
-	public async delete(storeName: string, query: IDBValidKey | IDBKeyRange): Promise<undefined> {
-		return this.transaction(storeName, (transaction) => transaction.delete(storeName, query));
+	public async delete(
+		storeName: string,
+		query: IDBValidKey | IDBKeyRange,
+		tx?: IDBTransactionWrapper<string>,
+	): Promise<undefined> {
+		return this.transaction(
+			storeName,
+			(transaction) => transaction.delete(storeName, query),
+			tx,
+		);
 	}
 }
 
-export class IDBTransactionWrapper<Model extends ModelBase, StoreTypes extends string> {
+export class IDBTransactionWrapper<StoreTypes extends string> {
 	constructor(private readonly nativeTransaction: IDBTransaction) {}
 
 	public async get(
 		storeName: StoreTypes,
 		query: IDBValidKey | IDBKeyRange,
-	): Promise<Model | undefined> {
+	): Promise<object | undefined> {
 		return this.wrapRequest(storeName, (store) => store.get(query));
 	}
 
-	public async getAll(storeName: StoreTypes): Promise<Model[]> {
+	public async getAll(storeName: StoreTypes): Promise<object[]> {
 		return this.wrapRequest(storeName, (store) => store.getAll());
 	}
 
@@ -265,11 +269,11 @@ export class IDBTransactionWrapper<Model extends ModelBase, StoreTypes extends s
 		index: string,
 		query: IDBValidKey | IDBKeyRange | null = null,
 		direction?: IDBCursorDirection,
-	): Promise<Model[]> {
+	): Promise<object[]> {
 		return new Promise((resolve, reject) => {
 			const store = this.nativeTransaction.objectStore(storeName);
 			const request = store.index(index).openCursor(query, direction);
-			const records: Model[] = [];
+			const records: object[] = [];
 			request.onerror = () => {
 				reject(request.error);
 			};
@@ -285,7 +289,7 @@ export class IDBTransactionWrapper<Model extends ModelBase, StoreTypes extends s
 		});
 	}
 
-	public async put(storeName: StoreTypes, data: Model): Promise<IDBValidKey> {
+	public async put(storeName: StoreTypes, data: object): Promise<IDBValidKey> {
 		return this.wrapRequest(storeName, (store) => store.put(data));
 	}
 

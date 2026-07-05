@@ -2,14 +2,14 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
+	import { sortBy } from "$lib/component-utils.js";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import EditIcon from "$lib/components/icons/EditIcon.svelte";
 	import SortAscIcon from "$lib/components/icons/SortAscIcon.svelte";
 	import SortDescIcon from "$lib/components/icons/SortDescIcon.svelte";
 	import { localeState } from "$lib/i18n/i18n";
-	import { IDB } from "$lib/idb";
-	import { type SubscriptionState, sortBy, subscribeToModel } from "$lib/idb/component-utils";
+	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
@@ -22,24 +22,21 @@
 		TableRow,
 	} from "konsta/svelte";
 	import type { ArrayElement } from "openselves-common";
-	import type { Front, Member } from "openselves-common/db";
+	import { Front, Member } from "openselves-common/client";
 
 	import MembersTabbar from "../../MembersTabbar.svelte";
 	import { MembersTab } from "../../tabs.ts";
 
-	let members: SubscriptionState<Member> = $state({
-		records: [],
-	});
-	let fronts: SubscriptionState<Front> = $state({
-		records: [],
-	});
+	let members = $derived.by(subscribeToModel(Member));
+	let fronts = $derived.by(subscribeToModel(Front));
+
 	let sortByField: keyof ArrayElement<typeof sortedFronts> = $state("startedAt");
 	let direction: "asc" | "desc" = $state("desc");
 	let sortedFronts = $derived(
-		fronts.records
+		fronts.staticData
 			.map((front) => ({
 				...front,
-				member: members.records.find((member) => member.id === front.memberId),
+				member: members.staticData.find((member) => member.id === front.memberId),
 			}))
 			.sort(
 				sortBy(
@@ -62,9 +59,6 @@
 	);
 
 	requireAuth();
-	const idb = IDB.getInstance();
-	subscribeToModel(idb.member, members);
-	subscribeToModel(idb.front, fronts);
 
 	function setSortBy(value: typeof sortByField) {
 		direction = sortByField === value && direction === "asc" ? "desc" : "asc";
@@ -72,7 +66,7 @@
 	}
 </script>
 
-<AppPage title="" activeMenuItem={MenuItem.DASHBOARD}>
+<AppPage title="" activeMenuItem={MenuItem.MEMBERS}>
 	<BlockTitle>Front history</BlockTitle>
 	<Block class="overflow-x-auto pl-safe! pr-safe!">
 		<Table>
