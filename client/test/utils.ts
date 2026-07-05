@@ -124,18 +124,22 @@ export class PuppeteerContext {
 			const page = pages[0];
 			await ctx.waitFor(
 				async () => {
-					await page.goto("http://127.0.0.1:4173");
+					await page.goto("http://127.0.0.1:4173", {
+						timeout: 1000,
+					});
 				},
 				{
-					timeout: 5000,
+					timeout: 10000,
 				},
 			);
 			await ctx.waitFor(
 				async () => {
-					await page.goto("http://127.0.0.1:3000");
+					await page.goto("http://127.0.0.1:3000", {
+						timeout: 1000,
+					});
 				},
 				{
-					timeout: 5000,
+					timeout: 10000,
 				},
 			);
 			await page.goto("about:blank");
