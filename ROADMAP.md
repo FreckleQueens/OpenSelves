@@ -306,6 +306,7 @@ the maximum allowed per-entry payload
 - [ ] obfuscate password recovery request response by always responding with success
 - [ ] client: add a loading screen on loading to wait for initial sync to ingest all entries
 - [ ] client: add staging mode to `/members` ?
+- [ ] client: fix toolbar glitching outside of viewport on pull refresh
 
 ## 0.8.0 - Simply Plural import
 - [ ] drop logs, members and fronts tables
