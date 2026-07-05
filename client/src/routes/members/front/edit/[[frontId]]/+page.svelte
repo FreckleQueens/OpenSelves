@@ -23,10 +23,14 @@
 	const { params }: PageProps = $props();
 
 	let members = $derived.by(subscribeToModel(Member));
-	let frontObj: Front | null = $state(null);
-	let front: FrontStatic | null = $derived(frontObj ? proxyEntryDataModel(frontObj) : null);
-	let frontMember: MemberStatic | null = $derived(
-		members.staticData.find((member) => member.id === front?.memberId) || null,
+	let frontObj: Front | undefined = $state(undefined);
+	let initialData: FrontStatic | undefined = undefined;
+	let front: FrontStatic | undefined = $derived(
+		frontObj ? proxyEntryDataModel(frontObj) : undefined,
+	);
+	let isDirty = $derived(JSON.stringify(front) !== JSON.stringify(initialData));
+	let frontMember: MemberStatic | undefined = $derived(
+		members.staticData.find((member) => member.id === front?.memberId) || undefined,
 	);
 
 	let mounted = $state(false);
@@ -47,7 +51,8 @@
 			throw new Error("frontId route param is required");
 		}
 
-		frontObj = (await idbStore.loadDataModel(Front, params.frontId)) || null;
+		frontObj = await idbStore.loadDataModel(Front, params.frontId);
+		initialData = frontObj?.data;
 		mounted = true;
 	});
 
@@ -83,7 +88,7 @@
 			icon: SettingsIcon,
 		},
 	]}
-	isDirty={() => !!frontObj?.isDirty()}
+	{isDirty}
 	onSave={saveFront}
 	onDelete={deleteFront}
 	bind:formState

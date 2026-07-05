@@ -124,11 +124,21 @@ export abstract class EntryDataModel<Schema extends SchemaType & typeof BaseSche
 		}
 
 		// TODO: only set defaults of required fields that have a generated default value
-		//  -> this means providing default values in `get data` and `get()`
 		for (const [key, field] of Object.entries(this.schema)) {
-			if (!isValidSchemaFieldValue(this.schema, key, this._data[key]) && field.hasDefault) {
-				const value = field.getDefault();
-				this.set(key, value);
+			if (!(key in this._data)) {
+				if (field.hasDefault) {
+					if (Array.isArray(from)) {
+						this._data[key] = field.getDefault();
+					} else {
+						this.set(key, field.getDefault());
+					}
+				} else if (field.isOptional) {
+					this._data[key] = undefined;
+				} else if (field.isNullable) {
+					this._data[key] = null;
+				} else if (!Array.isArray(from)) {
+					throw new Error("Missing value for " + key + " in from", { cause: from });
+				}
 			}
 		}
 

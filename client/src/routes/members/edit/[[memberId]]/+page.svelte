@@ -43,6 +43,7 @@
 	// svelte-ignore state_referenced_locally
 	let initialData = memberObj.data;
 	let member: MemberStatic = $derived(proxyEntryDataModel(memberObj));
+	let isDirty = $derived(JSON.stringify(member) !== JSON.stringify(initialData));
 	let formState: FormValidationState = $state({
 		errors: {},
 		generalError: "",
@@ -114,10 +115,6 @@
 		};
 		reader.readAsDataURL(file);
 	});
-
-	function isDirty() {
-		return JSON.stringify(member) !== JSON.stringify(initialData);
-	}
 
 	async function saveMember() {
 		let image = member.image ? member.image : null;

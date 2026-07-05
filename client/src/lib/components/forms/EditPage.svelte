@@ -32,7 +32,7 @@
 			title: string;
 			icon: Component;
 		}[];
-		isDirty: () => Promise<boolean> | boolean;
+		isDirty: boolean;
 		onSave: () => Promise<boolean> | boolean;
 		onDelete: () => Promise<void> | void;
 		onDiscard?: () => Promise<void> | void;
@@ -53,7 +53,7 @@
 
 	async function backLinkOnClick(e: Event) {
 		e.preventDefault();
-		if (await isDirty()) {
+		if (isDirty) {
 			showSaveConfirmDialog = true;
 		} else {
 			await discardChanges();
@@ -68,7 +68,7 @@
 	}
 
 	async function saveChanges() {
-		if (isDirty()) {
+		if (isDirty) {
 			if (await onSave()) {
 				history.back();
 			}
@@ -91,7 +91,7 @@
 <AppPage title={pageTitle} loading={!ready} showMenu={false} nested>
 	{#snippet navbarLeft()}
 		<BackLink onClick={backLinkOnClick} />
-		{#if isDirty()}
+		{#if isDirty}
 			<Link onClick={() => (showDiscardChangesDialog = true)}>
 				<DiscardIcon button />
 			</Link>
