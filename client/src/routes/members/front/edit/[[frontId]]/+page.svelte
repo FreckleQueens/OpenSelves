@@ -168,8 +168,9 @@
 		showSelectMemberSheet = false;
 	}}
 	onSelect={(member) => {
-		if (front) front.memberId = member.id;
+		if (front) front.memberId = member?.id || null;
 		showSelectMemberSheet = false;
 	}}
+	showUnknownOption
 	excludedMembers={frontMember ? [frontMember] : []}
 />

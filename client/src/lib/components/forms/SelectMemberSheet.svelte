@@ -5,18 +5,18 @@
 	import { Block, Navbar, Searchbar, Sheet } from "konsta/svelte";
 	import { Member, type MemberStatic } from "openselves-common/client";
 
-	// TODO: add undefined/null selection option
-
 	let {
 		opened,
 		onCancel,
 		onSelect,
+		showUnknownOption = false,
 		excludedMembers = [],
 		title = t("Select member"),
 	}: {
 		opened: boolean;
 		onCancel: () => Promise<void> | void;
-		onSelect: (member: MemberStatic) => Promise<void> | void;
+		onSelect: (member: MemberStatic | undefined) => Promise<void> | void;
+		showUnknownOption?: boolean;
 		excludedMembers?: MemberStatic[];
 		title?: string;
 	} = $props();
@@ -32,6 +32,9 @@
 					member.name.toLowerCase().includes(memberSearch.toLowerCase()),
 			)
 			.sort(sortBy((member) => member.name)),
+	);
+	let allOptions = $derived(
+		showUnknownOption ? [undefined, ...selectableMembers] : selectableMembers,
 	);
 </script>
 
@@ -53,7 +56,7 @@
 		{/snippet}
 	</Navbar>
 	<Block class="overflow-y-auto">
-		{#each selectableMembers as member (member.id)}
+		{#each allOptions as member (member?.id)}
 			<MemberCard {member} onClick={() => onSelect(member)} small />
 		{/each}
 	</Block>
