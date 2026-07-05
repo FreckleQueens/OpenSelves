@@ -1,5 +1,6 @@
 @import "konsta/svelte/theme.css";
 @import "openselves-common-ui";
+@import "./view-transition.css";
 
 @supports (left: env(safe-area-inset-left)) {
 	.safe-areas {
@@ -13,7 +14,6 @@
 .k-material .material\:bg-md-light-surface-darker {
 	background-color: oklab(from var(--color-md-light-surface) calc(l * 0.8) a b);
 }
-
 @media (prefers-color-scheme: dark) {
 	.k-material .material\:dark\:bg-md-dark-surface-darker {
 		background-color: oklab(from var(--color-md-dark-surface) calc(l * 0.8) a b);

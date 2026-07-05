@@ -13,7 +13,7 @@
 	requireGuest();
 </script>
 
-<AppPage title="" showMenu={false}>
+<AppPage title="" showMenu={false} nested>
 	{#snippet navbarLeft()}
 		<BackLink />
 	{/snippet}

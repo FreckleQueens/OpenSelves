@@ -88,7 +88,7 @@
 	}
 </script>
 
-<AppPage title={pageTitle} loading={!ready} showMenu={false}>
+<AppPage title={pageTitle} loading={!ready} showMenu={false} nested>
 	{#snippet navbarLeft()}
 		<BackLink onClick={backLinkOnClick} />
 		{#if isDirty()}

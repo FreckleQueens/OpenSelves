@@ -36,6 +36,7 @@ describe("Front", () => {
 
 		await ctx.goto("/members");
 		await ctx.locator(`${ctx.getMemberEntrySelector(member)} .member-card`).click();
+		await ctx.waitForNavigation(/^\/members\/edit\/.+$/g);
 		await ctx.locator("#settings-tab-button").click();
 		await ctx.locator("#delete-record-button").click();
 		await ctx.clickOnOpeningDialogButtonWithId("delete-record-confirm-button");

@@ -251,6 +251,16 @@ export class PuppeteerContext {
 		if (waitForSvelteMounted) {
 			await this.waitForSvelteMounted(timeout);
 		}
+
+		await this.page.evaluate(async () => {
+			while (document.activeViewTransition) {
+				try {
+					await document.activeViewTransition.finished;
+				} catch {
+					// ignored
+				}
+			}
+		});
 	}
 
 	public async waitForSvelteMounted(timeout: number = 5000) {

@@ -29,6 +29,7 @@ describe("Member", () => {
 		await ctx
 			.locator(`#not-fronting-members ${ctx.getMemberEntrySelector(member)} .member-card`)
 			.click();
+		await ctx.waitForNavigation(/^\/members\/edit\/.+$/g);
 		await ctx.locator("#save-record-button").click();
 
 		await ctx.waitForNavigation("/members");

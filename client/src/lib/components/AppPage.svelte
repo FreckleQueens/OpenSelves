@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onNavigate } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { transformErrorToReadable } from "$lib";
@@ -44,6 +45,7 @@
 		title = "OpenSelves",
 		loading = false,
 		pageContent = $bindable(),
+		nested = false,
 	}: {
 		children: Snippet;
 		bottomNav?: Snippet;
@@ -57,6 +59,7 @@
 		title?: string | Snippet;
 		loading?: boolean;
 		pageContent?: HTMLDivElement | undefined;
+		nested?: boolean;
 	} = $props();
 
 	let openMenu = $state(false);
@@ -103,6 +106,17 @@
 			iconComponent: SettingsIcon,
 		},
 	};
+
+	onNavigate((navigation) => {
+		if (!document.startViewTransition) return;
+
+		return new Promise((resolve) => {
+			document.startViewTransition(async () => {
+				resolve();
+				await navigation.complete;
+			});
+		});
+	});
 </script>
 
 <ErrorDialog
@@ -178,7 +192,10 @@
 	</Navbar>
 {/if}
 
-<div class="app-page-content flex-1 overflow-y-auto" bind:this={pageContent}>
+<div
+	class={"app-page-content flex-1 overflow-y-auto" + (nested ? " nested" : "")}
+	bind:this={pageContent}
+>
 	{#if isLoading}
 		{#if showLoadingSpinner}
 			<div

@@ -39,7 +39,7 @@
 	});
 </script>
 
-<AppPage title="" showMenu={false} loading={!loaded} transparentNavbar>
+<AppPage title="" showMenu={false} loading={!loaded} transparentNavbar nested>
 	{#snippet navbarLeft()}
 		<BackLink />
 	{/snippet}

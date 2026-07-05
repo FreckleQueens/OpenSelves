@@ -19,13 +19,26 @@ describe("i18n", () => {
 		await ctx.goto("/auth");
 
 		await ctx.locator("#settings-link").click();
+		await ctx.waitForNavigation("/auth/settings");
+
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "fr");
+		await ctx.waitForNavigation("/auth/settings");
+
 		await ctx.locator("#back-link").click();
+		await ctx.waitForNavigation("/auth", undefined, true);
+
 		await ctx.locator("#settings-link").click();
+		await ctx.waitForNavigation("/auth/settings");
+
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "en");
+		await ctx.waitForNavigation("/auth/settings");
+
 		await ctx.locator("#back-link").click();
+		await ctx.waitForNavigation("/auth", undefined, true);
+
 		await ctx.locator("#settings-link").click();
+		await ctx.waitForNavigation("/auth/settings");
 	});
 });
