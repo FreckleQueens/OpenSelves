@@ -5,7 +5,6 @@ import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
 import { Front, Member, serializeValueToPayloadUnsafe } from "openselves-common/client";
 import { EntryWrapper, hashPayload, isEntry, toJsonFriendly } from "openselves-common/willow";
 
-// TODO: make a dev tool to control migration process manually and test it
 export const IDB_MIGRATIONS: {
 	type: "schema" | "data";
 	run: (db: IDBDatabase, tx: IDBTransaction | null, idb: IDB) => Promise<void> | void;
@@ -96,25 +95,7 @@ export const IDB_MIGRATIONS: {
 			payloadStore.createIndex("digest", "digest", { unique: true });
 		},
 	},
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
-	{ type: "schema", run: async () => {} },
+
 	// migrate data from logs, members, fronts and attachments to entries and payloads
 	{
 		type: "data",
@@ -219,4 +200,5 @@ export const IDB_MIGRATIONS: {
 			);
 		},
 	},
+	// TODO: delete members, fronts, logs and attachments object stores
 ];

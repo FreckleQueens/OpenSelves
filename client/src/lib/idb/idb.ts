@@ -134,6 +134,7 @@ export class IDB {
 					console.error(e);
 					if (tx) {
 						tx.abort();
+						console.warn("Schema migration transaction aborted");
 					}
 					throw e;
 				} finally {
@@ -198,6 +199,7 @@ export class IDB {
 			} catch (e) {
 				console.error(e);
 				nativeTransaction.abort();
+				console.warn("Transaction aborted");
 				throw e;
 			}
 		}
