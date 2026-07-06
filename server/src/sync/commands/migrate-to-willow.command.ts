@@ -413,7 +413,7 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 			)) {
 				differingEntries++;
 				console.log(
-					"/!\\ will no save missing entry for data found directly in record:",
+					"/!\\ will not save missing entry for data found directly in record:",
 					notFoundEntry.path,
 					notFoundEntry.payloadLength,
 				);
@@ -499,21 +499,33 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				}
 			}
 
+			if (entry.path.endsWith(`/${id}`)) {
+				store[id] = [];
+				continue;
+			}
+
+			if (store[id] && store[id].length === 0) {
+				continue;
+			}
+
 			if (!store[id]) {
 				store[id] = [];
 			}
 
-			store[id].push(
-				await EntryWrapper.load(
-					{
-						...entry,
-						namespaceId: OPENSELVES_NAMESPACE_ID,
-						timestamp: int64toUint64(entry.timestamp),
-						payloadLength: int64toUint64(entry.payloadLength),
-					},
-					payload?.toString(),
-				),
+			const entryWrapper = await EntryWrapper.load(
+				{
+					...entry,
+					namespaceId: OPENSELVES_NAMESPACE_ID,
+					timestamp: int64toUint64(entry.timestamp),
+					payloadLength: int64toUint64(entry.payloadLength),
+				},
+				payload?.toString(),
 			);
+			store[id].push(entryWrapper);
+
+			if (entryWrapper.payload === "") {
+				console.warn("Entry", entryWrapper.path, "has empty payload");
+			}
 		}
 
 		const models: EntryDataModel<typeof MemberSchema | typeof FrontSchema>[] = [];
@@ -527,6 +539,10 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 			store: Record<string, EntryWrapper[]>,
 		) {
 			for (const [id, entries] of Object.entries(store)) {
+				if (entries.length === 0) {
+					continue;
+				}
+
 				models.push(new type(id, entries));
 			}
 		}
@@ -579,7 +595,19 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				}
 			}
 		}
-		console.log(">", allExpectedEntries.length, "orphan entries remaining");
+
+		console.log(
+			">",
+			allExpectedEntries.length,
+			"orphan entries remaining of which",
+			allExpectedEntries.filter(
+				(entry) =>
+					entry.payload === "" &&
+					entry.timestamp === MAX_UINT64 &&
+					entry.path.split("/").length === 3,
+			).length,
+			"are valid permanent delete entries",
+		);
 		console.log("Done!");
 	});
 }

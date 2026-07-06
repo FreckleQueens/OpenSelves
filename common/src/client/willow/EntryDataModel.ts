@@ -98,7 +98,7 @@ export abstract class EntryDataModel<Schema extends SchemaType & typeof BaseSche
 				if (entry.payload === "") {
 					throw new Error("Got entry with empty payload", {
 						cause: {
-							entry,
+							entry: entry.entryWithPayload,
 						},
 					});
 				}
