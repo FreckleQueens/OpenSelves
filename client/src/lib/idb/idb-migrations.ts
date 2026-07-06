@@ -208,5 +208,15 @@ export const IDB_MIGRATIONS: {
 			);
 		},
 	},
-	// TODO: delete members, fronts, logs and attachments object stores
+
+	// delete members, fronts, logs and attachments object stores
+	{
+		type: "schema",
+		run: async (db) => {
+			db.deleteObjectStore("members");
+			db.deleteObjectStore("fronts");
+			db.deleteObjectStore("attachments");
+			db.deleteObjectStore("logs");
+		},
+	},
 ];
