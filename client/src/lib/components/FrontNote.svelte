@@ -19,8 +19,7 @@
 			>{front.note}</textarea
 		>
 	{:else}
-		<!-- TODO: render newline characters -->
-		<div class="w-full p-1 min-h-8 rounded-xs">
+		<div class="w-full p-1 min-h-8 rounded-xs whitespace-break-spaces">
 			{front.note}
 		</div>
 	{/if}
