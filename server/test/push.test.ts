@@ -1046,7 +1046,7 @@ describe(pushEndpoint, () => {
 			await createFront(env.users.user.id);
 		});
 
-		test.only("update front", async () => {
+		test("update front", async () => {
 			const { front } = await createFront(env.users.user.id);
 			front.assign({
 				note: "hi",
@@ -1057,7 +1057,7 @@ describe(pushEndpoint, () => {
 			await checkEntriesAreServed(entries);
 		});
 
-		test.only("delete front", async () => {
+		test("delete front", async () => {
 			const { front, entries } = await createFront(env.users.user.id);
 			const deleteEntry = await front.makeDeleteEntry();
 			await putEntry(deleteEntry);

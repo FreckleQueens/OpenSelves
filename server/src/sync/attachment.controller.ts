@@ -4,14 +4,10 @@ import { type Request, type Response } from "express";
 import { ReadStream } from "node:fs";
 
 import { S3Service } from "./s3.service.js";
-import { SyncService } from "./sync.service.js";
 
 @Controller("attachment")
 export class AttachmentController {
-	constructor(
-		private readonly s3Service: S3Service,
-		private readonly syncService: SyncService,
-	) {}
+	constructor(private readonly s3Service: S3Service) {}
 
 	@Get(":userId/:logId/:fieldName")
 	@Header("Cache-Control", "max-age=31536000, private")

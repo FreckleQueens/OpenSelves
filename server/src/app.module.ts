@@ -20,6 +20,7 @@ import { AuthModule } from "./auth/auth.module.js";
 import { CaptchaModule } from "./captcha/captcha.module.js";
 import { type ConfigData, validationSchema } from "./config.data.js";
 import { DbModule } from "./db/db.module.js";
+import { RobotsController } from "./robots.controller.js";
 import { StatusController } from "./status.controller.js";
 import { SyncModule } from "./sync/sync.module.js";
 import { VersionMiddleware } from "./version.middleware.js";
@@ -48,7 +49,7 @@ import { VersionMiddleware } from "./version.middleware.js";
 			},
 		]),
 	],
-	controllers: [StatusController],
+	controllers: [RobotsController, StatusController],
 	providers: [
 		{
 			provide: APP_GUARD,
@@ -61,6 +62,7 @@ export class AppModule implements NestModule {
 	configure(consumer: MiddlewareConsumer) {
 		consumer
 			.apply(VersionMiddleware)
+			.exclude("/robots.txt")
 			.exclude("/attachment/*path")
 			.exclude({
 				path: "/captcha/challenge{/*path}",
