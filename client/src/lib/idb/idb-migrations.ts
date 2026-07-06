@@ -3,7 +3,13 @@ import { PAYLOAD_STORE_NAME } from "$lib/idb/IDBPayload";
 import { STORAGE_ENTRY_STORE_NAME } from "$lib/idb/IDBStorageEntry";
 import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
 import { Front, Member, serializeValueToPayloadUnsafe } from "openselves-common/client";
-import { EntryWrapper, hashPayload, isEntry, toJsonFriendly } from "openselves-common/willow";
+import {
+	EntryWrapper,
+	hashPayload,
+	isEntry,
+	j2000Now,
+	toJsonFriendly,
+} from "openselves-common/willow";
 
 export const IDB_MIGRATIONS: {
 	type: "schema" | "data";
@@ -169,8 +175,10 @@ export const IDB_MIGRATIONS: {
 				[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 				async (tx) => {
 					for (const entry of entriesToSave) {
-						console.log(entry.entry);
-						await tx.put(ENTRY_STORE_NAME, toJsonFriendly(entry.entry));
+						await tx.put(ENTRY_STORE_NAME, {
+							...toJsonFriendly(entry.entry),
+							savedAt: j2000Now().toString().padStart(47, "0"),
+						});
 						if (typeof entry.payload === "string") {
 							await tx.put(PAYLOAD_STORE_NAME, {
 								digest: entry.payloadDigest,
