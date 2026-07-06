@@ -80,12 +80,13 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
-	const store = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
+	let store: IDBSubStore | undefined;
 
 	onMount(async () => {
 		if (!appState.isAuthenticated) {
 			return;
 		}
+		store = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
 
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
 	});
@@ -100,6 +101,10 @@
 	}
 
 	async function startFront(memberId: string | null) {
+		if (!store) {
+			return;
+		}
+
 		const front = new Front(storage.getUserId(), {
 			memberId: memberId,
 		});
@@ -107,6 +112,10 @@
 	}
 
 	async function endFront(frontId: string) {
+		if (!store) {
+			return;
+		}
+
 		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
 		if (!front) {
 			throw new Error("Front not found for id " + frontId);
@@ -123,6 +132,10 @@
 	}
 
 	async function setFrontNote(frontId: string, value: string) {
+		if (!store) {
+			return;
+		}
+
 		addNoteToFrontId = frontId;
 		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
 		if (!front) {
