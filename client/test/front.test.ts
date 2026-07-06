@@ -17,7 +17,7 @@ describe("Front", () => {
 		await ctx.locator(frontingMemberEntrySelector).setTimeout(5000).wait();
 		assert.strictEqual((await ctx.page.$$(frontingMemberEntrySelector)).length, 1);
 
-		await ctx.goto("/dashboard", undefined, true);
+		await ctx.goto("/dashboard");
 		assert.strictEqual((await ctx.page.$$(frontingMemberEntrySelector)).length, 1);
 
 		await ctx.goto("/members");
@@ -41,10 +41,10 @@ describe("Front", () => {
 		await ctx.locator("#delete-record-button").click();
 		await ctx.clickOnOpeningDialogButtonWithId("delete-record-confirm-button");
 
-		await ctx.waitForNavigation("/members", undefined, true);
+		await ctx.waitForNavigation("/members");
 		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
 
-		await ctx.goto("/dashboard", undefined, true);
+		await ctx.goto("/dashboard");
 		assert.strictEqual((await ctx.page.$$(ctx.getMemberEntrySelector(member))).length, 0);
 		await ctx.expectNoAppError();
 	});

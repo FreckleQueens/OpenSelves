@@ -6,7 +6,7 @@ describe("i18n", () => {
 	const ctx = setupPuppeteer();
 
 	test("land page", async () => {
-		await ctx.goto("/");
+		await ctx.goto("/", undefined, false);
 		await ctx.waitForNavigation("/land?from_index_page=1");
 
 		await ctx.locator("select[name=language]").wait();
@@ -23,16 +23,16 @@ describe("i18n", () => {
 
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "fr");
-		await ctx.waitForNavigation("/auth/settings", undefined, true);
+		await ctx.waitForNavigation("/auth/settings");
 		await ctx.expectNoAppError();
 
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "en");
-		await ctx.waitForNavigation("/auth/settings", undefined, true);
+		await ctx.waitForNavigation("/auth/settings");
 		await ctx.expectNoAppError();
 
 		await ctx.locator("#back-link").click();
-		await ctx.waitForNavigation("/auth", undefined, true);
+		await ctx.waitForNavigation("/auth");
 
 		await ctx.expectNoAppError();
 	});

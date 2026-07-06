@@ -29,7 +29,7 @@
 		Panel,
 		Preloader,
 	} from "konsta/svelte";
-	import { type Component, type Snippet } from "svelte";
+	import { type Component, type Snippet, onDestroy, onMount } from "svelte";
 	import { fade, fly } from "svelte/transition";
 
 	let {
@@ -67,7 +67,9 @@
 	let areSubscriptionsLoading: boolean = $derived(
 		activeSubscriptions.values().some((sub) => !sub().loaded),
 	);
+	let mounted: boolean = $state(false);
 	let isLoading: boolean = $derived(loading || areSubscriptionsLoading);
+	let isReady: boolean = $derived(mounted && !isLoading);
 	let showLoadingSpinner: boolean = $state(false);
 
 	let showLoadingSpinnerTimeout: number | undefined;
@@ -106,6 +108,13 @@
 			iconComponent: SettingsIcon,
 		},
 	};
+
+	onMount(() => {
+		mounted = true;
+	});
+	onDestroy(() => {
+		mounted = false;
+	});
 
 	onNavigate((navigation) => {
 		if (!document.startViewTransition) return;
@@ -193,7 +202,9 @@
 {/if}
 
 <div
-	class={"app-page-content flex-1 overflow-y-auto" + (nested ? " nested" : "")}
+	class={"app-page-content flex-1 overflow-y-auto" +
+		(nested ? " nested" : "") +
+		(isReady ? " ready" : "")}
 	bind:this={pageContent}
 >
 	{#if isLoading}

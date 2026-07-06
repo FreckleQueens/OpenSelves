@@ -8,7 +8,7 @@ describe("Auth session", () => {
 
 	test("short lived session logs out", async () => {
 		await ctx.registerAndLoginUser();
-		await ctx.goto("about:blank");
+		await ctx.goto("about:blank", undefined, false);
 		// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see package.json)
 		await ctx.waitForTimeout(10000);
 		await ctx.goto("/account");
@@ -18,10 +18,10 @@ describe("Auth session", () => {
 
 	test("long lived session doesn't log out", async () => {
 		await ctx.registerAndLoginUser(true);
-		await ctx.goto("about:blank");
+		await ctx.goto("about:blank", undefined, false);
 		// Wait the configured REFRESH_TOKEN_SHORT_DURATION (see package.json)
 		await ctx.waitForTimeout(10000);
-		await ctx.goto("/account");
+		await ctx.goto("/account", undefined, false);
 
 		await ctx.waitForResponse("/user/", false);
 		await ctx.waitForResponse("/user/", true);

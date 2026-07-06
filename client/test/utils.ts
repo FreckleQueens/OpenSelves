@@ -216,7 +216,7 @@ export class PuppeteerContext {
 	public async goto(
 		url: string,
 		skipIfAlreadyThere: boolean = false,
-		waitForSvelteMounted: boolean = false,
+		waitForPageContent: boolean = true,
 	) {
 		let response: HTTPResponse | null | undefined;
 		if (!skipIfAlreadyThere || this.page.url() !== url) {
@@ -230,17 +230,13 @@ export class PuppeteerContext {
 			});
 			response = await this.page.goto(fullUrl);
 		}
-		if (waitForSvelteMounted && (skipIfAlreadyThere || response)) {
-			await this.waitForSvelteMounted();
+		if (waitForPageContent) {
+			await this.waitForPageContent();
 		}
 		return response;
 	}
 
-	public async waitForNavigation(
-		url: string | RegExp,
-		timeout: number = 5000,
-		waitForSvelteMounted: boolean = false,
-	) {
+	public async waitForNavigation(url: string | RegExp, timeout: number = 5000) {
 		await this.page.waitForNavigation({
 			timeout,
 		});
@@ -252,9 +248,7 @@ export class PuppeteerContext {
 		await this.page.waitForFunction(pageFunction, {
 			timeout,
 		});
-		if (waitForSvelteMounted) {
-			await this.waitForSvelteMounted(timeout);
-		}
+		await this.waitForPageContent(timeout);
 
 		await this.page.evaluate(async () => {
 			while (document.activeViewTransition) {
@@ -267,8 +261,8 @@ export class PuppeteerContext {
 		});
 	}
 
-	public async waitForSvelteMounted(timeout: number = 5000) {
-		await this.locator(".layout-mounted").setTimeout(timeout).wait();
+	public async waitForPageContent(timeout: number = 5000) {
+		await this.locator(".app-page-content.ready").setTimeout(timeout).wait();
 	}
 
 	public async waitForTimeout(delay: number) {
@@ -423,7 +417,7 @@ export class PuppeteerContext {
 
 		const link = await this.getEmailLink(email, expectEmailCount, useEmailIndex);
 		assert(link.indexOf("/verify-email/") >= 0);
-		const gotoResponse = await this.goto(link);
+		const gotoResponse = await this.goto(link, undefined, false);
 		assert(gotoResponse);
 		assert(gotoResponse.ok());
 		await this.clickOnOpeningDialogButtonWithId("success-continue-button");
