@@ -11,7 +11,10 @@
 	import ClearIcon from "$lib/components/icons/ClearIcon.svelte";
 	import ColorInputIcon from "$lib/components/icons/ColorInputIcon.svelte";
 	import DescriptionInputIcon from "$lib/components/icons/DescriptionInputIcon.svelte";
+	import DismissIcon from "$lib/components/icons/DismissIcon.svelte";
+	import DownloadIcon from "$lib/components/icons/DownloadIcon.svelte";
 	import EditIcon from "$lib/components/icons/EditIcon.svelte";
+	import ErrorIcon from "$lib/components/icons/ErrorIcon.svelte";
 	import ImageIcon from "$lib/components/icons/ImageIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import NameInputIcon from "$lib/components/icons/NameInputIcon.svelte";
@@ -25,7 +28,8 @@
 	import { proxyEntryDataModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { filesize } from "filesize";
-	import { Block, Button, List, ListInput, ListItem, Toggle } from "konsta/svelte";
+	import isUrl from "is-url";
+	import { Block, Button, List, ListInput, ListItem, Toast, Toggle } from "konsta/svelte";
 	import { Member, type MemberStatic } from "openselves-common/client";
 	import { MAX_IN_DB_PAYLOAD_LENGTH, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
@@ -53,6 +57,9 @@
 	let imageFiles: FileList | undefined = $state();
 	let imageFileInputEl: HTMLInputElement | undefined = $state();
 	let deleteRecordButton: Snippet | null = $state(null);
+
+	let showRemoteImageErrorToast: boolean = $state(false);
+	let saveRemoteImageError: string | undefined = $state();
 
 	requireAuth();
 	const idbStore = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
@@ -117,6 +124,7 @@
 		reader.onerror = () => {
 			formState.errors["image"] = t("Error while loading file {file.name}", file.name);
 		};
+		// TODO: save as blob, load with URL.createObjectURL()
 		reader.readAsDataURL(file);
 	});
 
@@ -136,6 +144,59 @@
 			[(await memberObj.makePermanentDeleteEntry()).entryWithPayload],
 			undefined,
 		);
+	}
+
+	async function downloadRemoteImage() {
+		const url = member.image;
+		if (!url || !isUrl(url)) {
+			throw new Error("member image is not a url");
+		}
+
+		let result: string;
+		try {
+			const response = await fetch(url, {
+				credentials: url.startsWith(apiState.url) ? "include" : undefined,
+			});
+			if (!response.ok) {
+				throw new Error("Got non-ok response.", {
+					cause: {
+						status: response.status,
+						body: await response.text(),
+					},
+				});
+			}
+			const blob = await response.blob();
+
+			const fileReader = new FileReader();
+			result = await new Promise((resolve, reject) => {
+				fileReader.onload = () => {
+					const result = fileReader.result?.toString() || "";
+					if (result) {
+						resolve(result);
+					}
+				};
+				fileReader.onerror = () => {
+					reject(fileReader.error);
+				};
+				// TODO: save as blob, load with URL.createObjectURL()
+				fileReader.readAsDataURL(blob);
+			});
+			console.log(response.ok, result);
+		} catch (e) {
+			console.log("Error while saving remote image", e);
+			saveRemoteImageError = t("Image failed to download");
+			showRemoteImageErrorToast = true;
+
+			const linkEl = document.createElement("a");
+			linkEl.href = url;
+			linkEl.download = "";
+			linkEl.target = "_blank";
+			linkEl.click();
+
+			return;
+		}
+
+		member.image = result;
 	}
 </script>
 
@@ -185,7 +246,6 @@
 			</div>
 		</MemberImage>
 
-		<!-- TODO: add a button to convert an http(s) url to a data uri -->
 		<!-- TODO: add a warning for users to convert their (api)/attachment.+ urls to data uris -->
 		<List class={editImageUrl ? "" : "hidden"}>
 			{@const disabled = !!(member.image && isDataURI(member.image))}
@@ -222,6 +282,13 @@
 					<ClearIcon button before />
 					Remove image
 				</Button>
+
+				{#if member.image && isUrl(member.image)}
+					<Button inline tonal class="m-2" type="button" onclick={downloadRemoteImage}>
+						<DownloadIcon button before />
+						Make available offline
+					</Button>
+				{/if}
 
 				<Button
 					inline
@@ -350,3 +417,19 @@
 		{/if}
 	</div>
 </EditPage>
+
+<Toast position="center" opened={showRemoteImageErrorToast}>
+	<ErrorIcon before />
+	<span class="flex-1 mr-2">{saveRemoteImageError}</span>
+
+	<Button
+		inline
+		small
+		clear
+		rounded
+		class="p-1"
+		onclick={() => (showRemoteImageErrorToast = false)}
+	>
+		<DismissIcon button />
+	</Button>
+</Toast>
