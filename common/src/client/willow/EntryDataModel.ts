@@ -214,29 +214,34 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		callback?: (entries: EntryWrapper[]) => Promise<void>,
 	): Promise<EntryWrapper[]> {
 		const mutations = [...this.pendingEntryMutations];
-		const dirtyEntries = new Set<EntryWrapper>();
-		for (const [timestamp, key, value] of mutations) {
-			const payload = serializeValueToPayload(this.schema, key, value);
-			let entry = this.entries[key];
-			if (entry) {
-				await entry.setPayload(payload, timestamp);
-			} else {
-				entry = this.entries[key] = await EntryWrapper.create(
-					OPENSELVES_NAMESPACE_ID,
-					this.subspaceId,
-					this.getPathRoot() + "/" + key,
-					timestamp,
-					payload,
-				);
+		this.pendingEntryMutations.splice(0);
+
+		let dirtyEntries: Set<EntryWrapper>;
+		try {
+			dirtyEntries = new Set<EntryWrapper>();
+			for (const [timestamp, key, value] of mutations) {
+				const payload = serializeValueToPayload(this.schema, key, value);
+				let entry = this.entries[key];
+				if (entry) {
+					await entry.setPayload(payload, timestamp);
+				} else {
+					entry = this.entries[key] = await EntryWrapper.create(
+						OPENSELVES_NAMESPACE_ID,
+						this.subspaceId,
+						this.getPathRoot() + "/" + key,
+						timestamp,
+						payload,
+					);
+				}
+				dirtyEntries.add(entry);
 			}
-			dirtyEntries.add(entry);
+
+			await callback?.([...dirtyEntries]);
+		} catch (e) {
+			this.pendingEntryMutations.push(...mutations);
+			throw e;
 		}
 
-		await callback?.([...dirtyEntries]);
-
-		mutations.forEach((mutation) =>
-			this.pendingEntryMutations.splice(this.pendingEntryMutations.indexOf(mutation), 1),
-		);
 		return [...dirtyEntries];
 	}
 

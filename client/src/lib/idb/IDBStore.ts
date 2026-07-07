@@ -32,7 +32,10 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	private readonly subscriptions = new Set<EntrySubscription>();
-	private readonly pendingSubscriptionUpdates: Set<Promise<void>> = new Set();
+	private readonly pendingSubscriptionUpdates: {
+		subscription: EntrySubscription;
+		entryToAdd: EntryWithPayload;
+	}[] = [];
 	private isInitialized: boolean = false;
 
 	private constructor(namespaceId: string) {
@@ -67,9 +70,16 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 			ctx.tx,
 		);
 
-		for (const subscriptionUpdate of this.pendingSubscriptionUpdates) {
-			await subscriptionUpdate;
-		}
+		let subscriptionUpdate:
+			| { subscription: EntrySubscription; entryToAdd: EntryWithPayload }
+			| undefined;
+		do {
+			subscriptionUpdate = this.pendingSubscriptionUpdates.shift();
+			if (subscriptionUpdate) {
+				const { subscription, entryToAdd } = subscriptionUpdate;
+				await subscription.callback({ ...entryToAdd });
+			}
+		} while (subscriptionUpdate);
 
 		return survivingEntries;
 	}
@@ -92,10 +102,10 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 
 		for (const subscription of this.subscriptions.values()) {
 			if (!subscription.area || subscription.area.includesEntry(entryToAdd)) {
-				const promise = subscription.callback({ ...entryToAdd });
-				if (promise) {
-					this.pendingSubscriptionUpdates.add(promise);
-				}
+				this.pendingSubscriptionUpdates.push({
+					subscription,
+					entryToAdd,
+				});
 			}
 		}
 	}
