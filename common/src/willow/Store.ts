@@ -1,12 +1,14 @@
 import { createId } from "@paralleldrive/cuid2";
 
 import { type Entry, isEntryNewerThan } from "./Entry.js";
+import { Area } from "./meadowcap/Area.js";
 
 export abstract class Store<T extends Entry, Context = void> {
 	constructor(public readonly namespaceId: string) {}
-	public abstract getEntries(context?: Context): Promise<T[]>;
 
-	protected abstract updateEntries(
+	public abstract getEntries(context?: Context): T[];
+
+	protected abstract addRemoveEntries(
 		entryToAdd: T,
 		entriesToRemove: T[],
 		context?: Context,
@@ -31,11 +33,11 @@ export abstract class Store<T extends Entry, Context = void> {
 				});
 			}
 
-			const localEntries = await this.getEntries(context);
+			const existingEntries = this.getEntries(context);
 
 			// Drop incoming older path-prefixed entries
 			if (
-				localEntries.find(
+				existingEntries.find(
 					(entry) =>
 						entry.subspaceId === entryToIngest.subspaceId &&
 						entryToIngest.path.startsWith(entry.path) &&
@@ -46,19 +48,28 @@ export abstract class Store<T extends Entry, Context = void> {
 			}
 
 			// Delete in-store older path-prefixed entries
-			const entriesToDelete = localEntries.filter(
+			const entriesToDelete = existingEntries.filter(
 				(entry) =>
 					entry.subspaceId === entryToIngest.subspaceId &&
 					entry.path.startsWith(entryToIngest.path) &&
 					isEntryNewerThan(entryToIngest, entry),
 			);
 
-			await this.updateEntries(entryToIngest, entriesToDelete, context);
+			await this.addRemoveEntries(entryToIngest, entriesToDelete, context);
 			ingestedEntries.push(entryToIngest);
 		}
 
 		performance.mark(mark);
 
 		return ingestedEntries;
+	}
+
+	public area(
+		subspaceId: string | undefined = undefined,
+		path: string = "/",
+		timesStart: bigint = 0n,
+		timesEnd: bigint | "open" = "open",
+	): Area<T, Context> {
+		return new Area(this, subspaceId, path, timesStart, timesEnd);
 	}
 }

@@ -1,7 +1,7 @@
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { call } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
-import { IDBSubStore } from "$lib/idb/IDBSubStore";
+import { IDBStore } from "$lib/idb/IDBStore";
 import { IDB } from "$lib/idb/idb";
 import {
 	EntryWrapper,
@@ -247,9 +247,12 @@ export class SyncWorker {
 				rawEntries.map((entry) => EntryWrapper.load(entry)),
 			);
 			const entriesWithPayload = parsedEntry.map((entry) => entry.entryWithPayload);
-			await new IDBSubStore(OPENSELVES_NAMESPACE_ID, userId, false).ingest(
-				entriesWithPayload,
-			);
+
+			await IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
+				.userArea(userId)
+				.ingest(entriesWithPayload, {
+					dontMarkSavedEntriesForSync: true,
+				});
 
 			const timestamp = result.responseBody["timestamp"];
 			if (typeof timestamp === "string") {

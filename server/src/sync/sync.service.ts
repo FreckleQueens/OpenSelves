@@ -140,7 +140,7 @@ export class SyncService {
 			await this.db.transaction(async (tx) => {
 				const store = new MemoryStore<PushEntryDto>(OPENSELVES_NAMESPACE_ID);
 				await store.ingest(entryDtos);
-				entryDtos = await store.getEntries();
+				entryDtos = store.getEntries();
 
 				const entryCreates = this.toEntryCreate(entryDtos);
 

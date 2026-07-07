@@ -28,7 +28,10 @@ export const BaseSchema = {
 		.readonly(),
 } satisfies SchemaType;
 
-export abstract class EntryDataModel<Schema extends SchemaType & typeof BaseSchema> {
+export type EntryDataModelSchema = SchemaType & typeof BaseSchema;
+export type AnyEntryDataModel = EntryDataModel<EntryDataModelSchema>;
+
+export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	public static getModelKey(): string {
 		throw new Error("Not implemented");
 	}

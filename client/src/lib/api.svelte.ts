@@ -7,6 +7,7 @@ import {
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
+import { IDBStore } from "$lib/idb/IDBStore";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
 import { LocalProfileManager } from "$lib/idb/local-profiles";
 import { gotoHomeRoute } from "$lib/routing-utils";
@@ -20,6 +21,7 @@ import {
 	TOKEN_EXPIRED_ERROR,
 	parseApiResult,
 } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 
 export const apiState: {
 	url: string;
@@ -370,6 +372,7 @@ export async function tryLogout(
 	}
 
 	await storage.setOffline();
+	IDBStore.free(OPENSELVES_NAMESPACE_ID);
 
 	if (apiLogoutNeeded) {
 		await tryApiLogout();

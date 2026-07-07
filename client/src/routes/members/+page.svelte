@@ -19,7 +19,7 @@
 	import LeaveFrontIcon from "$lib/components/icons/LeaveFrontIcon.svelte";
 	import PlusIcon from "$lib/components/icons/PlusIcon.svelte";
 	import SearchIcon from "$lib/components/icons/SearchIcon.svelte";
-	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { IDBStore } from "$lib/idb/IDBStore";
 	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
@@ -80,13 +80,12 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
-	let store: IDBSubStore | undefined;
+	const store = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
 	onMount(async () => {
 		if (!appState.isAuthenticated) {
 			return;
 		}
-		store = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
 
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
 	});
@@ -101,27 +100,19 @@
 	}
 
 	async function startFront(memberId: string | null) {
-		if (!store) {
-			return;
-		}
-
 		const front = new Front(storage.getUserId(), {
 			memberId: memberId,
 		});
-		await store.saveDataModel(front);
+		await store.userArea(storage.getUserId()).saveDataModel(front);
 	}
 
 	async function endFront(frontId: string) {
-		if (!store) {
-			return;
-		}
-
 		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
 		if (!front) {
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("endedAt", new Date());
-		await store.saveDataModel(front);
+		await store.userArea(storage.getUserId()).saveDataModel(front);
 	}
 
 	async function endAllFronts() {
@@ -132,17 +123,13 @@
 	}
 
 	async function setFrontNote(frontId: string, value: string) {
-		if (!store) {
-			return;
-		}
-
 		addNoteToFrontId = frontId;
 		const front = fronts.dataModels.find((front) => front.get("id") === frontId);
 		if (!front) {
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("note", value ? value : undefined);
-		await store.saveDataModel(front);
+		await store.userArea(storage.getUserId()).saveDataModel(front);
 	}
 </script>
 

@@ -267,15 +267,9 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 
 		const computedEntries = await Promise.all(convertedEntries);
 		const store = new MemoryStore<EntryWithPayload>(OPENSELVES_NAMESPACE_ID);
-		await store.ingest(
-			computedEntries.map((entry) => {
-				const entryMaybeWithPayload = entry.entryMaybeWithPayload;
-				assert(isEntryWithPayload(entryMaybeWithPayload));
-				return entryMaybeWithPayload;
-			}),
-		);
+		await store.ingest(computedEntries.map((entry) => entry.entryWithPayload));
 		const entriesToVerify = await Promise.all(
-			(await store.getEntries()).map((dto) => EntryWrapper.load(dto)),
+			store.getEntries().map((dto) => EntryWrapper.load(dto)),
 		);
 		console.log(
 			">",

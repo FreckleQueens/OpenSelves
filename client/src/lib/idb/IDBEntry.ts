@@ -13,34 +13,8 @@ import {
 export type EntryStore = "entries";
 export const ENTRY_STORE_NAME: EntryStore = "entries";
 
-export type EntrySubscription = {
-	namespaceId: string;
-	subspaceId: string;
-	pathPrefix: string;
-	callback: (entry: EntryWithPayload) => Promise<void> | void;
-};
-
 export class IDBEntry {
-	private readonly subscriptions = new Set<EntrySubscription>();
 	public constructor(protected readonly idb: IDB) {}
-
-	public subscribe(
-		namespaceId: string,
-		subspaceId: string,
-		pathPrefix: string,
-		callback: (entry: EntryWithPayload) => Promise<void> | void,
-	) {
-		const subscription = {
-			namespaceId,
-			subspaceId,
-			pathPrefix,
-			callback,
-		};
-		this.subscriptions.add(subscription);
-		return () => {
-			this.subscriptions.delete(subscription);
-		};
-	}
 
 	public async getByNamespaceId(
 		namespaceId: string,
@@ -221,20 +195,6 @@ export class IDBEntry {
 			},
 			tx,
 		);
-
-		if (isEntryWithPayload(entryToPut)) {
-			await Promise.all(
-				this.subscriptions.values().map(async (subscription) => {
-					if (
-						entryToPut.namespaceId === subscription.namespaceId &&
-						entryToPut.subspaceId === subscription.subspaceId &&
-						entryToPut.path.startsWith(subscription.pathPrefix)
-					) {
-						await subscription.callback({ ...entryToPut });
-					}
-				}),
-			);
-		}
 	}
 
 	private async loadPayload(

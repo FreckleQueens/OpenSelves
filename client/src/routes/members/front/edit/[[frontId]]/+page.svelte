@@ -10,7 +10,7 @@
 	import ReplaceMemberIcon from "$lib/components/icons/ReplaceMemberIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
-	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { IDBStore } from "$lib/idb/IDBStore";
 	import { proxyEntryDataModel, subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
@@ -44,14 +44,14 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
-	const idbStore = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
+	const idbStore = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
 	onMount(async () => {
 		if (!params.frontId) {
 			throw new Error("frontId route param is required");
 		}
 
-		frontObj = await idbStore.loadDataModel(Front, params.frontId);
+		frontObj = await idbStore.loadDataModel(Front, storage.getUserId(), params.frontId);
 		initialData = frontObj?.data;
 		mounted = true;
 	});
@@ -60,7 +60,7 @@
 		if (!frontObj) {
 			throw new Error("Front not loaded");
 		}
-		await idbStore.saveDataModel(frontObj);
+		await idbStore.userArea(storage.getUserId()).saveDataModel(frontObj);
 		return true;
 	}
 

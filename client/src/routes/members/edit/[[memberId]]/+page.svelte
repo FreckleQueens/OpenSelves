@@ -21,7 +21,7 @@
 	import UploadIcon from "$lib/components/icons/UploadIcon.svelte";
 	import type { FormValidationState } from "$lib/forms";
 	import { localeState } from "$lib/i18n/i18n";
-	import { IDBSubStore } from "$lib/idb/IDBSubStore";
+	import { IDBStore } from "$lib/idb/IDBStore";
 	import { proxyEntryDataModel } from "$lib/idb/entry-subscription.svelte";
 	import { requireAuth } from "$lib/routing-utils";
 	import { filesize } from "filesize";
@@ -55,11 +55,15 @@
 	let deleteRecordButton: Snippet | null = $state(null);
 
 	requireAuth();
-	const idbStore = new IDBSubStore(OPENSELVES_NAMESPACE_ID, storage.getUserId());
+	const idbStore = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
 	onMount(async () => {
 		if (params.memberId) {
-			const loadedMember = await idbStore.loadDataModel(Member, params.memberId);
+			const loadedMember = await idbStore.loadDataModel(
+				Member,
+				storage.getUserId(),
+				params.memberId,
+			);
 			if (!loadedMember) {
 				return goto(resolve("/members"));
 			}
@@ -123,7 +127,7 @@
 			return false;
 		}
 
-		await idbStore.saveDataModel(memberObj);
+		await idbStore.userArea(storage.getUserId()).saveDataModel(memberObj);
 		return true;
 	}
 

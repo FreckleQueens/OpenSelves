@@ -3,13 +3,7 @@ import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
 import test, { describe } from "node:test";
 import { shuffleArray } from "openselves-common";
-import {
-	BaseSchema,
-	EntryDataModel,
-	Front,
-	Member,
-	type SchemaType,
-} from "openselves-common/client";
+import { type AnyEntryDataModel, Front, Member } from "openselves-common/client";
 import {
 	type Entry,
 	type EntryWithPayload,
@@ -39,10 +33,7 @@ import {
 } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
-async function timeModelEntries(
-	model: EntryDataModel<SchemaType & typeof BaseSchema>,
-	timestamp: bigint,
-): Promise<Entry[]> {
+async function timeModelEntries(model: AnyEntryDataModel, timestamp: bigint): Promise<Entry[]> {
 	return (await model.flushDirtyEntries()).map(
 		(entry): Entry => ({
 			...entry.entryMaybeWithPayload,
