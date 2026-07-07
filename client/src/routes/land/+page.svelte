@@ -17,7 +17,7 @@
 </script>
 
 <AppPage title="" showMenu={false}>
-	<div class="fixed w-full h-full flex flex-col items-center justify-center">
+	<div class="fixed left-0 top-0 w-full h-full flex flex-col items-center justify-center">
 		<BlockTitle large class="inline text-center">What language do you prefer?</BlockTitle>
 
 		<Block class="w-100">
