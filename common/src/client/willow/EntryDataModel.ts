@@ -205,9 +205,20 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 			throw new Error(key + " is readonly");
 		}
 
-		// TODO: if previous mutations of same key exist, splice them from pendingEntryMutations
-		// TODO: then, if value is equal to deserialize(this.entries[key].payload), drop mutation
-		this.pendingEntryMutations.push([timestamp, key, value]);
+		for (const mutation of this.pendingEntryMutations.filter(
+			(mutation) => mutation[1] === key,
+		)) {
+			this.pendingEntryMutations.splice(this.pendingEntryMutations.indexOf(mutation), 1);
+		}
+
+		if (
+			!this.entries[key] ||
+			typeof this.entries[key].payload !== "string" ||
+			value !== deserializeValueFromPayload(this.schema, key, this.entries[key].payload)
+		) {
+			this.pendingEntryMutations.push([timestamp, key, value]);
+		}
+
 		this._data[key as string] = value;
 	}
 
