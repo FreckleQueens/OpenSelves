@@ -7,6 +7,7 @@ import {
 	isEntryWithPayload,
 	isJsonFriendlyEntry,
 	j2000Now,
+	padUint64,
 	toJsonFriendly,
 } from "openselves-common/willow";
 
@@ -134,11 +135,7 @@ export class IDBEntry {
 				const records = await this.idb.getByIndex(
 					ENTRY_STORE_NAME,
 					"namespaceIdSubspaceIdSavedAt",
-					IDBKeyRange.lowerBound([
-						namespaceId,
-						subspaceId,
-						savedAtTimestamp.toString().padStart(47, "0"),
-					]),
+					IDBKeyRange.lowerBound([namespaceId, subspaceId, padUint64(savedAtTimestamp)]),
 					undefined,
 					tx,
 				);
@@ -181,7 +178,7 @@ export class IDBEntry {
 					...toJsonFriendly(entryToPutWithoutPayload),
 				};
 				if (markForSync) {
-					dataToPut.savedAt = j2000Now().toString().padStart(47, "0");
+					dataToPut.savedAt = padUint64(j2000Now());
 				}
 				await tx.put(ENTRY_STORE_NAME, dataToPut);
 

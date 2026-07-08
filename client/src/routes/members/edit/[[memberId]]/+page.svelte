@@ -246,7 +246,6 @@
 			</div>
 		</MemberImage>
 
-		<!-- TODO: add a warning for users to convert their (api)/attachment.+ urls to data uris -->
 		<List class={editImageUrl ? "" : "hidden"}>
 			{@const disabled = !!(member.image && isDataURI(member.image))}
 			<ListInput

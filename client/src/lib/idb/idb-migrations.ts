@@ -8,6 +8,7 @@ import {
 	hashPayload,
 	isEntry,
 	j2000Now,
+	padUint64,
 	toJsonFriendly,
 } from "openselves-common/willow";
 
@@ -177,7 +178,7 @@ export const IDB_MIGRATIONS: {
 					for (const entry of entriesToSave) {
 						await tx.put(ENTRY_STORE_NAME, {
 							...toJsonFriendly(entry.entry),
-							savedAt: j2000Now().toString().padStart(47, "0"),
+							savedAt: padUint64(j2000Now()),
 						});
 						if (typeof entry.payload === "string") {
 							await tx.put(PAYLOAD_STORE_NAME, {

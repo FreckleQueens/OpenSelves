@@ -1,4 +1,5 @@
 import type { Entry } from "../Entry.js";
+import { padUint64 } from "../uint64.js";
 
 export interface JsonFriendlyEntry extends Omit<Entry, "timestamp" | "payloadLength"> {
 	namespaceId: string;
@@ -25,8 +26,8 @@ export function isJsonFriendlyEntry(value: unknown): value is JsonFriendlyEntry 
 export function toJsonFriendly(entry: Entry): JsonFriendlyEntry {
 	return {
 		...entry,
-		timestamp: entry.timestamp.toString().padStart(47, "0"),
-		payloadLength: entry.payloadLength.toString().padStart(47, "0"),
+		timestamp: padUint64(entry.timestamp),
+		payloadLength: padUint64(entry.payloadLength),
 	};
 }
 
