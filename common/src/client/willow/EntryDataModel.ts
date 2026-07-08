@@ -21,9 +21,11 @@ import type {
 
 export const BaseSchema = {
 	id: SchemaBuilder.string()
+		.required()
 		.default(() => createId())
 		.readonly(),
 	createdAt: SchemaBuilder.date()
+		.required()
 		.default(() => new Date())
 		.readonly(),
 } satisfies SchemaType;

@@ -5,10 +5,12 @@ import type { SchemaCreate, SchemaStatic, SchemaType } from "../types.js";
 
 export const FrontSchema = {
 	...BaseSchema,
-	memberId: SchemaBuilder.string().nullable().default(null),
-	startedAt: SchemaBuilder.date().default(() => new Date()),
-	endedAt: SchemaBuilder.date().nullable().default(null),
-	note: SchemaBuilder.string().optional(),
+	memberId: SchemaBuilder.string().required().nullable().default(null),
+	startedAt: SchemaBuilder.date()
+		.required()
+		.default(() => new Date()),
+	endedAt: SchemaBuilder.date().required().nullable().default(null),
+	note: SchemaBuilder.string(),
 } satisfies SchemaType;
 export type FrontStatic = SchemaStatic<typeof FrontSchema>;
 export type FrontCreate = SchemaCreate<typeof FrontSchema>;

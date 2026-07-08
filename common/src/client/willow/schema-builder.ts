@@ -4,24 +4,23 @@ import type {
 	SupportedSchemaFieldTypeNames,
 } from "./types.js";
 
-// TODO: make fields optional by default, replace optional() with required()
 export class SchemaBuilder<
 	BaseTypeName extends SupportedSchemaFieldTypeNames,
-	Optional extends boolean = false,
-	Nullable extends boolean = false,
-	HasDefault extends boolean = false,
+	Optional extends boolean,
+	Nullable extends boolean,
+	HasDefault extends boolean,
 > implements SchemaField<BaseTypeName, Optional, Nullable, HasDefault> {
 	public static string() {
-		return new SchemaBuilder("string", false, false, false);
+		return new SchemaBuilder("string", true, false, false);
 	}
 	public static boolean() {
-		return new SchemaBuilder("boolean", false, false, false);
+		return new SchemaBuilder("boolean", true, false, false);
 	}
 	public static number() {
-		return new SchemaBuilder("number", false, false, false);
+		return new SchemaBuilder("number", true, false, false);
 	}
 	public static date() {
-		return new SchemaBuilder("Date", false, false, false);
+		return new SchemaBuilder("Date", true, false, false);
 	}
 
 	constructor(
@@ -35,10 +34,14 @@ export class SchemaBuilder<
 		public readonly isReadonly: boolean = false,
 	) {}
 
-	public optional() {
+	public required() {
+		if (this.defaultValue) {
+			throw new Error("Must define required() before default value");
+		}
+
 		return new SchemaBuilder(
 			this.baseTypeName,
-			true,
+			false,
 			this.isNullable,
 			this.hasDefault,
 			this.defaultValue,

@@ -5,13 +5,13 @@ import type { SchemaCreate, SchemaStatic, SchemaType } from "../types.js";
 
 export const MemberSchema = {
 	...BaseSchema,
-	name: SchemaBuilder.string().default(""),
-	pronouns: SchemaBuilder.string().optional(),
-	description: SchemaBuilder.string().optional(),
-	color: SchemaBuilder.string().optional(),
-	image: SchemaBuilder.string().optional(),
-	isArchived: SchemaBuilder.boolean().default(false),
-	archivedReason: SchemaBuilder.string().optional(),
+	name: SchemaBuilder.string().required().default(""),
+	pronouns: SchemaBuilder.string(),
+	description: SchemaBuilder.string(),
+	color: SchemaBuilder.string(),
+	image: SchemaBuilder.string(),
+	isArchived: SchemaBuilder.boolean().required().default(false),
+	archivedReason: SchemaBuilder.string(),
 } satisfies SchemaType;
 export type MemberStatic = SchemaStatic<typeof MemberSchema>;
 export type MemberCreate = SchemaCreate<typeof MemberSchema>;
