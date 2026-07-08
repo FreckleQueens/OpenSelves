@@ -83,6 +83,10 @@ export class SchemaBuilder<
 		);
 	}
 
+	public get isDefaultGenerated(): boolean {
+		return this.hasDefault && typeof this.defaultValue === "function";
+	}
+
 	public getDefault() {
 		return typeof this.defaultValue === "function" ? this.defaultValue() : this.defaultValue;
 	}

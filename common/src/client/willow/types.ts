@@ -23,6 +23,7 @@ export type SchemaField<
 	isOptional: Optional;
 	isNullable: Nullable;
 	hasDefault: HasDefault;
+	isDefaultGenerated: boolean;
 	isReadonly: boolean;
 	getDefault: () => ConstructSchemaFieldType<BaseTypeName, Optional, Nullable> | undefined;
 };

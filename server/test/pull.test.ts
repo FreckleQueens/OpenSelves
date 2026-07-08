@@ -78,9 +78,9 @@ describe("/sync/pull", () => {
 			}),
 		);
 
-		assert.strictEqual(valuesToInsert.length, 3 * 6 + 1);
+		assert.strictEqual(valuesToInsert.length, 3 * 5 + 1);
 		const inserted = await env.db.insert(entries).values(valuesToInsert).returning();
-		assert.strictEqual(inserted.length, 3 * 6 + 1);
+		assert.strictEqual(inserted.length, 3 * 5 + 1);
 	});
 
 	test("GET 404", async () => {
@@ -150,7 +150,7 @@ describe("/sync/pull", () => {
 			const entries = await callPullAndGetEntries("", 200, env.users.cookies);
 
 			assert.strictEqual(entries.length, entries1.length);
-			assert.strictEqual(entries.length, 13);
+			assert.strictEqual(entries.length, 2 * 5 + 1);
 			for (const actualEntry of entries) {
 				assert.strictEqual(
 					entries.filter((entry) => entry.path === actualEntry.path).length,
@@ -167,7 +167,7 @@ describe("/sync/pull", () => {
 			const entries = await callPullAndGetEntries(date.toISOString(), 200, env.users.cookies);
 
 			assert.strictEqual(entries.length, entries1.length);
-			assert.strictEqual(entries.length, 13);
+			assert.strictEqual(entries.length, 2 * 5 + 1);
 			for (const actualEntry of entries) {
 				const expectedEntry = entries1.findLast((entry) => entry.path === actualEntry.path);
 				assert(expectedEntry);

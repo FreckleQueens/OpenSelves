@@ -113,34 +113,21 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 			}
 		} else {
 			const now = j2000Now();
-			for (const [key, field] of Object.entries(this.schema)) {
-				let value: SchemaValueTypes = from[key];
-				if (value === undefined) {
-					if (field.hasDefault) {
-						value = field.getDefault();
-					} else {
-						continue;
-					}
+			for (const key of Object.keys(this.schema)) {
+				if (key in from) {
+					this.set(key, from[key], now);
 				}
-				this.set(key, value, now);
 			}
 		}
 
-		// TODO: only set defaults of required fields that have a generated default value
 		for (const [key, field] of Object.entries(this.schema)) {
 			if (!(key in this._data)) {
-				if (field.hasDefault) {
+				if (field.hasDefault && field.isDefaultGenerated) {
 					if (Array.isArray(from)) {
 						this._data[key] = field.getDefault();
 					} else {
 						this.set(key, field.getDefault());
 					}
-				} else if (field.isOptional) {
-					this._data[key] = undefined;
-				} else if (field.isNullable) {
-					this._data[key] = null;
-				} else if (!Array.isArray(from)) {
-					throw new Error("Missing value for " + key + " in from", { cause: from });
 				}
 			}
 		}
@@ -154,6 +141,13 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 
 	public get data(): SchemaStatic<Schema> {
 		const output = { ...this._data };
+
+		for (const key of Object.keys(this.schema)) {
+			if (!(key in output)) {
+				output[key] = this.get(key);
+			}
+		}
+
 		if (!isValidSchemaStatic(this.schema, output)) {
 			throw new Error("Couldn't produce a complete dataset.", {
 				cause: validateSchemaStatic(this.schema, output),
@@ -163,10 +157,27 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	}
 
 	public get<K extends KeyOfSchema<Schema>>(key: K): SchemaStatic<Schema>[K] {
-		const existingValue = this._data[key];
-		if (isValidSchemaFieldValue(this.schema, key, existingValue)) {
-			return existingValue;
+		let value: SchemaValueTypes;
+
+		if (key in this._data) {
+			value = this._data[key];
+		} else {
+			const field = this.schema[key];
+			if (field) {
+				if (field.hasDefault) {
+					value = field.getDefault();
+				} else if (field.isOptional) {
+					value = undefined;
+				} else if (field.isNullable) {
+					value = null;
+				}
+			}
 		}
+
+		if (isValidSchemaFieldValue(this.schema, key, value)) {
+			return value;
+		}
+
 		throw new Error("Missing or invalid value for key " + key, { cause: this._data });
 	}
 

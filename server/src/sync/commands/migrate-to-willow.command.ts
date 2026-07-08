@@ -351,14 +351,14 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				return {
 					entries: pair.entries
 						.getEntries()
-						.map((entry) => entry.entryMaybeWithPayload)
+						.map((entry) => entry.entryWithPayload)
 						.map((entry) => {
 							const { timestamp, ...rest } = entry;
 							return rest;
 						}),
 					data: pair.data
 						.getEntries()
-						.map((entry) => entry.entryMaybeWithPayload)
+						.map((entry) => entry.entryWithPayload)
 						.map((entry) => {
 							const { timestamp, ...rest } = entry;
 							return rest;
@@ -405,13 +405,32 @@ async function migrateToWillowCommand(db: DB, syncService: SyncService, s3Servic
 				(inDbDatum) =>
 					!providedEntries.find((providedEntry) => providedEntry.path === inDbDatum.path),
 			)) {
+				entriesToVisit.delete(notFoundEntry);
+
+				// Skip fields with default value
+				const [model, , key] = notFoundEntry.path.substring(1).split("/");
+				if (model === "front") {
+					if (key === "endedAt" && notFoundEntry.payload === "null") {
+						continue;
+					}
+					if (key === "note" && notFoundEntry.payload === "undefined") {
+						continue;
+					}
+				} else if (model === "member") {
+					if (
+						["archivedReason", "color", "image"].includes(key) &&
+						notFoundEntry.payload === "undefined"
+					) {
+						continue;
+					}
+				}
+
 				differingEntries++;
 				console.log(
 					"/!\\ will not save missing entry for data found directly in record:",
 					notFoundEntry.path,
 					notFoundEntry.payloadLength,
 				);
-				entriesToVisit.delete(notFoundEntry);
 			}
 
 			assert.strictEqual(entriesToVisit.size, 0);
