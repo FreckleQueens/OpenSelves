@@ -47,13 +47,13 @@ describe(pushEndpoint, () => {
 	const putEntry = (
 		entry: Entry | EntryWrapper | Record<string, unknown>,
 		expectCode: number = 200,
-		cookies: string = env.users.cookies,
+		cookies: string = env.users.user1.cookies,
 		processEntryObjects: boolean = true,
 	) => originalPutEntry(env, entry, expectCode, cookies, processEntryObjects);
 	const putEntries = (
 		entries: (Entry | EntryWrapper | Record<string, unknown>)[],
 		expectCode: number = 200,
-		cookies: string = env.users.cookies,
+		cookies: string = env.users.user1.cookies,
 		processEntryObjects: boolean = true,
 	) => originalPutEntries(env, entries, expectCode, cookies, processEntryObjects);
 
@@ -72,11 +72,11 @@ describe(pushEndpoint, () => {
 		const { member } = makeMember(userId, date, image);
 		const entries = await member.flushDirtyEntries();
 		const response = await putEntries(entries);
-		assert.strictEqual(response.body.entries, undefined);
+		assert.strictEqual(response.body["entries"], undefined);
 		await checkEntriesAreServed(entries);
 		return { member, entries, response };
 	}
-	async function createAndDeleteMember(userId: string = env.users.user.id) {
+	async function createAndDeleteMember(userId: string = env.users.user1.api.id) {
 		const { member, entries } = await createMember(userId);
 		const deleteEntry = await member.makePermanentDeleteEntry();
 		const response = await putEntry(deleteEntry);
@@ -88,12 +88,12 @@ describe(pushEndpoint, () => {
 		const { front } = makeFront(member, new Date());
 		const entries = await front.flushDirtyEntries();
 		const response = await putEntries(entries);
-		assert.strictEqual(response.body.entries, undefined);
+		assert.strictEqual(response.body["entries"], undefined);
 		await checkEntriesAreServed(entries);
 		return { front, entries, member, memberEntries, response };
 	}
 
-	async function getSyncFrom(timestamp: string, cookies: string = env.users.cookies) {
+	async function getSyncFrom(timestamp: string, cookies: string = env.users.user1.cookies) {
 		const response = await env.request
 			.post(pullEndpoint)
 			.send({
@@ -101,19 +101,19 @@ describe(pushEndpoint, () => {
 			})
 			.set("Cookie", cookies)
 			.expect(200)
-			.expect("Content-Type", /json/);
-		assert(Array.isArray(response.body.entries));
+			.json();
+		assert(Array.isArray(response.body["entries"]));
 		return response;
 	}
 
 	async function checkEntriesAreServed(
 		entries: (EntryWrapper | Entry | EntryWithPayload)[],
-		cookies: string = env.users.cookies,
+		cookies: string = env.users.user1.cookies,
 	) {
 		assert(entries.length > 0);
 
 		const response = await getSyncFrom("", cookies);
-		const responseEntries = response.body.entries;
+		const responseEntries = response.body["entries"];
 		assert(Array.isArray(responseEntries));
 		assert(responseEntries.length > 0);
 
@@ -133,7 +133,7 @@ describe(pushEndpoint, () => {
 
 	async function checkEntriesAreNotServed(entries: (EntryWrapper | Entry | EntryWithPayload)[]) {
 		const response = await getSyncFrom("");
-		const responseEntries = response.body.entries;
+		const responseEntries = response.body["entries"];
 		assert(Array.isArray(responseEntries));
 		const actualEntries = await Promise.all(
 			responseEntries.map((entry: unknown) => EntryWrapper.load(entry)),
@@ -240,35 +240,37 @@ describe(pushEndpoint, () => {
 	);
 
 	test("GET 404", async () => {
-		await env.request.get(pushEndpoint).expect(404);
+		await env.request.get(pushEndpoint).expect(404).execute();
 	});
 
 	test("POST 404", async () => {
-		await env.request.post(pushEndpoint).send({}).expect(404);
+		await env.request.post(pushEndpoint).send({}).expect(404).execute();
 	});
 
 	test("PATCH 404", async () => {
-		await env.request.patch(pushEndpoint).send({}).expect(404);
+		await env.request.patch(pushEndpoint).send({}).expect(404).execute();
 	});
 
 	test("DELETE 404", async () => {
-		await env.request.delete(pushEndpoint).send({}).expect(404);
+		await env.request.delete(pushEndpoint).send({}).expect(404).execute();
 	});
 
 	describe("PUT", () => {
 		test("empty request body 400", async () => {
 			await env.request
 				.put(pushEndpoint)
-				.set("Cookie", env.users.cookies)
+				.authenticated(env.users.user1)
 				.send({})
-				.expect(400);
+				.expect(400)
+				.execute();
 		});
 		test("empty entries array 400", async () => {
 			await env.request
 				.put(pushEndpoint)
-				.set("Cookie", env.users.cookies)
+				.authenticated(env.users.user1)
 				.send({ entries: [] })
-				.expect(400);
+				.expect(400)
+				.execute();
 		});
 
 		describe("forged and invalid entries", () => {
@@ -306,7 +308,7 @@ describe(pushEndpoint, () => {
 				{
 					name: "correct subspaceId 200",
 					forgeEntry: (entry) => {
-						entry.subspaceId = env.users.user.id;
+						entry.subspaceId = env.users.user1.api.id;
 						assert(isEntryWithPayload(entry));
 					},
 					expectCode: 200,
@@ -330,7 +332,7 @@ describe(pushEndpoint, () => {
 				{
 					name: "other user's subspaceId 403",
 					forgeEntry: (entry) => {
-						entry.subspaceId = env.users.user2.id;
+						entry.subspaceId = env.users.user2.api.id;
 						assert(isEntryWithPayload(entry));
 					},
 					expectCode: 403,
@@ -595,7 +597,7 @@ describe(pushEndpoint, () => {
 
 			for (const testCase of testCases) {
 				test(testCase.name, async () => {
-					const { member } = makeMember(env.users.user.id);
+					const { member } = makeMember(env.users.user1.api.id);
 					const entry = (await member.flushDirtyEntries())[0].entryMaybeWithPayload;
 					assert(isEntryWithPayload(entry));
 
@@ -625,11 +627,11 @@ describe(pushEndpoint, () => {
 		});
 
 		test("Putting an entry twice only has an effect the first time", async () => {
-			const { member } = makeMember(env.users.user.id);
+			const { member } = makeMember(env.users.user1.api.id);
 			const entries = await member.flushDirtyEntries();
 			const unrelatedEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + createId(),
 				j2000Now(),
 				"hi",
@@ -652,14 +654,14 @@ describe(pushEndpoint, () => {
 			const root = createId();
 			const entry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root + "/a",
 				1n,
 				"hi",
 			);
 			const supersedingEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root + "/a",
 				2n,
 				"bye",
@@ -677,14 +679,14 @@ describe(pushEndpoint, () => {
 			const root = createId();
 			const entry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root + "/child",
 				1n,
 				"hi",
 			);
 			const supersedingEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root,
 				2n,
 				"bye",
@@ -702,14 +704,14 @@ describe(pushEndpoint, () => {
 			const root = createId();
 			const parentEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root,
 				1n,
 				"hi",
 			);
 			const childEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				env.users.user.id,
+				env.users.user1.api.id,
 				"/test/" + root + "/child",
 				2n,
 				"bye",
@@ -724,7 +726,7 @@ describe(pushEndpoint, () => {
 
 		describe("PUT create Member", () => {
 			test("200", async () => {
-				const { member } = makeMember(env.users.user.id);
+				const { member } = makeMember(env.users.user1.api.id);
 
 				const entries = await member.flushDirtyEntries();
 				await putEntries(entries);
@@ -732,7 +734,7 @@ describe(pushEndpoint, () => {
 			});
 
 			test("minimal create data 200", async () => {
-				const { member } = makeMember(env.users.user.id, undefined, undefined, true);
+				const { member } = makeMember(env.users.user1.api.id, undefined, undefined, true);
 
 				const entries = await member.flushDirtyEntries();
 				await putEntries(entries);
@@ -740,7 +742,7 @@ describe(pushEndpoint, () => {
 			});
 
 			testImage(async (image) => {
-				const { member } = makeMember(env.users.user.id);
+				const { member } = makeMember(env.users.user1.api.id);
 
 				if (image && typeof image !== "string") {
 					member.set("image", readFile(image.filePath));
@@ -770,11 +772,11 @@ describe(pushEndpoint, () => {
 			});
 
 			test("delete member of another user fails 404", async () => {
-				const { member, entries } = await createMember(env.users.user.id);
+				const { member, entries } = await createMember(env.users.user1.api.id);
 
 				const deleteEntry = await member.makeDeleteEntry();
-				const response = await putEntry(deleteEntry, 403, env.users.cookies2);
-				assert.strictEqual(response.body.entries, undefined);
+				const response = await putEntry(deleteEntry, 403, env.users.user2.cookies);
+				assert.strictEqual(response.body["entries"], undefined);
 
 				// Check member was not deleted
 				await checkEntriesAreServed(entries);
@@ -782,7 +784,7 @@ describe(pushEndpoint, () => {
 
 			test("Delete member with image deletes image from s3", async () => {
 				const { member, entries } = await createMember(
-					env.users.user.id,
+					env.users.user1.api.id,
 					undefined,
 					readFile(LARGE_IMAGE_FILE_PATH) +
 						crypto.getRandomValues(Buffer.alloc(32)).toString(),
@@ -798,7 +800,7 @@ describe(pushEndpoint, () => {
 
 			test("Delete member's image deletes image from s3", async () => {
 				const { entries } = await createMember(
-					env.users.user.id,
+					env.users.user1.api.id,
 					undefined,
 					readFile(LARGE_IMAGE_FILE_PATH) +
 						crypto.getRandomValues(Buffer.alloc(32)).toString(),
@@ -817,7 +819,7 @@ describe(pushEndpoint, () => {
 
 		describe("PUT update Member", () => {
 			test("200", async () => {
-				const { member } = await createMember(env.users.user.id);
+				const { member } = await createMember(env.users.user1.api.id);
 
 				member.assign({
 					pronouns: "she/they",
@@ -832,14 +834,14 @@ describe(pushEndpoint, () => {
 			});
 
 			test("update member of another user fails 403", async () => {
-				const { member, entries } = await createMember(env.users.user.id);
+				const { member, entries } = await createMember(env.users.user1.api.id);
 				const expectedEntries = entries.map((entry) => entry.entryMaybeWithPayload);
 
 				member.set("name", "a new name");
 				const updateEntries = await member.flushDirtyEntries();
-				const response2 = await putEntries(updateEntries, 403, env.users.cookies2);
+				const response2 = await putEntries(updateEntries, 403, env.users.user2.cookies);
 
-				assert.strictEqual(response2.body.entries, undefined);
+				assert.strictEqual(response2.body["entries"], undefined);
 				await checkEntriesAreServed(expectedEntries);
 				await checkEntriesAreNotServed(updateEntries);
 			});
@@ -854,7 +856,7 @@ describe(pushEndpoint, () => {
 			});
 
 			testImage(async (image) => {
-				const { member } = await createMember(env.users.user.id);
+				const { member } = await createMember(env.users.user1.api.id);
 
 				if (image && typeof image !== "string") {
 					member.set("image", readFile(image.filePath));
@@ -870,7 +872,7 @@ describe(pushEndpoint, () => {
 			const randomValues = crypto.getRandomValues(Buffer.alloc(5000));
 			const bigData = randomValues.toString("hex");
 			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
-			const { member, entries } = await createMember(env.users.user.id, undefined, bigData);
+			const { member, entries } = await createMember(env.users.user1.api.id, undefined, bigData);
 
 			const originalImageEntry = entries.find((entry) =>
 				entry.path.endsWith("/image"),
@@ -895,8 +897,8 @@ describe(pushEndpoint, () => {
 				entries: Entry[];
 			}) => Promise<void>,
 		) {
-			const user = env.users.user;
-			const cookies = env.users.cookies;
+			const user = env.users.user1.api;
+			const cookies = env.users.user1.cookies;
 			const { member: memberToDelete } = makeMember(user.id);
 
 			await putEntries(await timeModelEntries(memberToDelete, 0n), undefined, cookies);
@@ -933,7 +935,7 @@ describe(pushEndpoint, () => {
 			await callback({ cookies, entries });
 
 			const response = await getSyncFrom("", cookies);
-			const responseEntries = response.body.entries;
+			const responseEntries = response.body["entries"];
 			assert(responseEntries);
 			assert(Array.isArray(responseEntries));
 			// 3 members times 8 fields plus one deleted member
@@ -956,7 +958,7 @@ describe(pushEndpoint, () => {
 		});
 
 		async function setupEntryMatrix() {
-			const member = makeMember(env.users.user.id);
+			const member = makeMember(env.users.user1.api.id);
 			await putEntries(await timeModelEntries(member.member, 0n));
 
 			const client1Entries: Entry[] = [];
@@ -991,7 +993,7 @@ describe(pushEndpoint, () => {
 
 		async function verifyEntryMatrixResult(member: Member) {
 			const response = await getSyncFrom("");
-			const responseEntries = response.body.entries;
+			const responseEntries = response.body["entries"];
 			assert(responseEntries);
 			assert(Array.isArray(responseEntries));
 			assert(responseEntries.every((entry) => isJsonFriendlyEntryWithPayload(entry)));
@@ -1034,11 +1036,11 @@ describe(pushEndpoint, () => {
 		});
 
 		test("create front", async () => {
-			await createFront(env.users.user.id);
+			await createFront(env.users.user1.api.id);
 		});
 
 		test("update front", async () => {
-			const { front } = await createFront(env.users.user.id);
+			const { front } = await createFront(env.users.user1.api.id);
 			front.assign({
 				note: "hi",
 				endedAt: new Date(),
@@ -1049,7 +1051,7 @@ describe(pushEndpoint, () => {
 		});
 
 		test("delete front", async () => {
-			const { front, entries } = await createFront(env.users.user.id);
+			const { front, entries } = await createFront(env.users.user1.api.id);
 			const deleteEntry = await front.makeDeleteEntry();
 			await putEntry(deleteEntry);
 			await checkEntriesAreServed([deleteEntry]);

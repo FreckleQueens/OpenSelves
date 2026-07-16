@@ -4,6 +4,7 @@ import { Member } from "openselves-common/client";
 import { type EntryCreate, entries } from "openselves-common/db";
 import { EntryWrapper, J2000_TO_UNIX_DIFFERENCE, uint64ToInt64 } from "openselves-common/willow";
 
+import type { UserAuthData } from "./TestQueryBuilder.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pullEndpoint = "/sync/pull";
@@ -23,13 +24,13 @@ describe("/sync/pull", () => {
 		let timestamp: number = Date.now() - 1000;
 		const getDate = () => new Date(timestamp++);
 		members1 = [
-			new Member(env.users.user.id, {
+			new Member(env.users.user1.api.id, {
 				name: "Alice",
 				pronouns: "she/her",
 				description: "a member of our& system",
 				createdAt: getDate(),
 			}),
-			new Member(env.users.user.id, {
+			new Member(env.users.user1.api.id, {
 				name: "Bob",
 				pronouns: "he/him",
 				description: "another member of our& system",
@@ -37,7 +38,7 @@ describe("/sync/pull", () => {
 			}),
 		];
 
-		deletedMember1 = new Member(env.users.user.id, {
+		deletedMember1 = new Member(env.users.user1.api.id, {
 			name: "Dex",
 			pronouns: "they/them",
 			description: "a deleted member of our& system",
@@ -53,7 +54,7 @@ describe("/sync/pull", () => {
 		);
 
 		members2 = [
-			new Member(env.users.user2.id, {
+			new Member(env.users.user2.api.id, {
 				name: "Claire",
 				pronouns: "they/them",
 				description: "someone else somewhere else",
@@ -84,19 +85,19 @@ describe("/sync/pull", () => {
 	});
 
 	test("GET 404", async () => {
-		await env.request.get(pullEndpoint).expect(404);
+		await env.request.get(pullEndpoint).expect(404).execute();
 	});
 
 	test("PUT 404", async () => {
-		await env.request.put(pullEndpoint).send({}).expect(404);
+		await env.request.put(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	test("PATCH 404", async () => {
-		await env.request.patch(pullEndpoint).send({}).expect(404);
+		await env.request.patch(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	test("DELETE 404", async () => {
-		await env.request.delete(pullEndpoint).send({}).expect(404);
+		await env.request.delete(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	describe("POST", () => {
@@ -104,39 +105,35 @@ describe("/sync/pull", () => {
 			const response = await env.request
 				.post(pullEndpoint)
 				.send({})
-				.set("Cookie", env.users.cookies)
+				.authenticated(env.users.user1)
 				.expect(400)
-				.expect("Content-type", /json/);
-			assert.strictEqual(response.body.entries, undefined);
+				.json();
+			assert.strictEqual(response.body["entries"], undefined);
 		});
 
-		async function callPull(timestamp: string, expectCode: number, cookies: string) {
-			const response = await env.request
+		async function callPull(timestamp: string, expectCode: number, user: UserAuthData) {
+			return await env.request
 				.post(pullEndpoint)
+				.authenticated(user)
 				.send({
 					timestamp: timestamp,
 				})
-				.set("Cookie", cookies)
-				.expect("Content-type", /json/);
-			if (response.status !== expectCode) {
-				console.log(response.body);
-			}
-			assert.strictEqual(response.status, expectCode);
-			return response;
+				.expect(expectCode)
+				.json();
 		}
 
 		async function callPullAndGetEntries(
 			timestamp: string,
 			expectCode: number,
-			cookies: string,
+			user: UserAuthData,
 		) {
 			const date = new Date();
-			const response = await callPull(timestamp, expectCode, cookies);
-			const responseTimestamp = new Date(response.body.timestamp).getTime();
+			const response = await callPull(timestamp, expectCode, user);
+			const responseTimestamp = new Date(response.body["timestamp"]).getTime();
 			assert.strictEqual(Number.isFinite(responseTimestamp), true);
 			assert(Math.abs((responseTimestamp - date.getTime()) / 1000) < 0.5);
 
-			const entries: unknown[] = response.body.entries;
+			const entries: unknown[] = response.body["entries"];
 			assert.notStrictEqual(entries, undefined);
 			assert(Array.isArray(entries));
 			return await Promise.all(
@@ -147,7 +144,7 @@ describe("/sync/pull", () => {
 		}
 
 		test("initial sync 200", async () => {
-			const entries = await callPullAndGetEntries("", 200, env.users.cookies);
+			const entries = await callPullAndGetEntries("", 200, env.users.user1);
 
 			assert.strictEqual(entries.length, entries1.length);
 			assert.strictEqual(entries.length, 2 * 5 + 1);
@@ -164,7 +161,7 @@ describe("/sync/pull", () => {
 		test("serves all entries after timestamp 200", async () => {
 			const date = new Date(Date.now() - 10 * 60 * 60 * 1000); // 10 hours ago
 
-			const entries = await callPullAndGetEntries(date.toISOString(), 200, env.users.cookies);
+			const entries = await callPullAndGetEntries(date.toISOString(), 200, env.users.user1);
 
 			assert.strictEqual(entries.length, entries1.length);
 			assert.strictEqual(entries.length, 2 * 5 + 1);
@@ -179,7 +176,7 @@ describe("/sync/pull", () => {
 			await callPull(
 				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n)).toISOString(),
 				200,
-				env.users.cookies,
+				env.users.user1,
 			);
 		});
 
@@ -187,30 +184,26 @@ describe("/sync/pull", () => {
 			const response = await callPull(
 				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n - 1n)).toISOString(),
 				400,
-				env.users.cookies,
+				env.users.user1,
 			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
+			assert.strictEqual(response.body["timestamp"], undefined);
+			assert.strictEqual(response.body["entries"], undefined);
 		});
 
 		test("refuses timestamp in the future 400", async () => {
 			const response = await callPull(
 				new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now
 				400,
-				env.users.cookies,
+				env.users.user1,
 			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
+			assert.strictEqual(response.body["timestamp"], undefined);
+			assert.strictEqual(response.body["entries"], undefined);
 		});
 
 		test("refuses invalid timestamp 400", async () => {
-			const response = await callPull(
-				"this is not a valid timestamp",
-				400,
-				env.users.cookies,
-			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
+			const response = await callPull("this is not a valid timestamp", 400, env.users.user1);
+			assert.strictEqual(response.body["timestamp"], undefined);
+			assert.strictEqual(response.body["entries"], undefined);
 		});
 	});
 });

@@ -25,7 +25,7 @@ describe("Password recovery", () => {
 		test("POST sends password recovery email 200", async () => {
 			let dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
@@ -35,14 +35,15 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
@@ -55,9 +56,10 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(400);
+				.expect(400)
+				.execute();
 		});
 
 		test("POST not a valid email 400", async () => {
@@ -68,7 +70,8 @@ describe("Password recovery", () => {
 					captcha: await solveCaptcha(env, "sendEmail", email, 400),
 					email: email,
 				})
-				.expect(400);
+				.expect(400)
+				.execute();
 		});
 
 		test("POST wrong email 404", async () => {
@@ -79,7 +82,8 @@ describe("Password recovery", () => {
 					captcha: await solveCaptcha(env, "sendEmail", email),
 					email: email,
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 
 		test("POST twice the same email 429", async () => {
@@ -90,49 +94,55 @@ describe("Password recovery", () => {
 					captcha: await solveCaptcha(env, "sendEmail", email),
 					email: email,
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 			await env.request
 				.post("/user/recover-password")
 				.send({
 					captcha: await solveCaptcha(env, "sendEmail", email),
 					email: email,
 				})
-				.expect(429);
+				.expect(429)
+				.execute();
 		});
 
 		test("POST once, flush, once 429", async () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 			await env.app.get(QueueService).flushJobs();
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(429);
+				.expect(429)
+				.execute();
 		});
 
 		test("POST twice with different users 200", async () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
-					email: env.users.user2.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.api.email),
+					email: env.users.user2.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 		});
 
 		testCaptcha(
@@ -141,13 +151,13 @@ describe("Password recovery", () => {
 			(testName, testCallback) => {
 				test(testName, testCallback);
 			},
-			async (captcha) => {
+			(captcha) => {
 				return env.request
 					.post("/user/recover-password")
-					.send({ captcha, email: env.users.user.email });
+					.send({ captcha, email: env.users.user1.api.email });
 			},
 			"sendEmail",
-			() => env.users.user.email,
+			() => env.users.user1.api.email,
 			undefined,
 			true,
 		);
@@ -158,31 +168,33 @@ describe("Password recovery", () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			let dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
 
 			const newPassword = "anewpassword1234";
 			await env.request
-				.post(`/user/${env.users.user.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					token: dbUser["passwordRecoveryToken"],
 					newPassword,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
@@ -192,115 +204,125 @@ describe("Password recovery", () => {
 				.post("/auth/login")
 				.send({
 					captcha: await solveCaptcha(env),
-					email: env.users.user.email,
-					password: env.users.userPassword,
+					email: env.users.user1.api.email,
+					password: env.users.user1.password,
 				})
-				.expect(401);
+				.expect(401)
+				.execute();
 
 			await env.request
 				.post("/auth/login")
 				.send({
 					captcha: await solveCaptcha(env),
-					email: env.users.user.email,
+					email: env.users.user1.api.email,
 					password: newPassword,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 		});
 
 		test("POST wrong user 404", async () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
 
 			await env.request
-				.post(`/user/${env.users.user2.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user2.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					captcha: await solveCaptcha(env),
 					token: dbUser["passwordRecoveryToken"],
 					newPassword: "anewpassword1234",
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 
 		test("POST wrong token 404", async () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			await env.request
-				.post(`/user/${env.users.user.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					captcha: await solveCaptcha(env),
 					token: generateDummyToken(),
 					newPassword: "anewpassword1234",
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 
 		test("POST no prior password recovery request 404", async () => {
 			await env.request
-				.post(`/user/${env.users.user.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					captcha: await solveCaptcha(env),
 					token: generateDummyToken(),
 					newPassword: "anewpassword1234",
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 
 		test("POST already used token 404", async () => {
 			await env.request
 				.post("/user/recover-password")
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
-					email: env.users.user.email,
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
+					email: env.users.user1.api.email,
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
 
 			await env.request
-				.post(`/user/${env.users.user.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					captcha: await solveCaptcha(env),
 					token: dbUser["passwordRecoveryToken"],
 					newPassword: "anewpassword1234",
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			await env.request
-				.post(`/user/${env.users.user.id}/recover-password`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/recover-password`)
+				.authenticated(env.users.user1)
 				.send({
 					captcha: await solveCaptcha(env),
 					token: dbUser["passwordRecoveryToken"],
 					newPassword: "anothernewpassword12345",
 				})
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 	});
 });

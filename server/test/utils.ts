@@ -1,4 +1,3 @@
-import type { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
@@ -6,21 +5,18 @@ import { createId } from "@paralleldrive/cuid2";
 import { type Challenge, type Solution, solveChallenge } from "altcha-lib";
 import { deriveKey } from "altcha-lib/algorithms/argon2id";
 import { inArray } from "drizzle-orm";
-import methods from "methods";
 import assert from "node:assert";
 import { after, afterEach, before, beforeEach } from "node:test";
-import { API_VERSION } from "openselves-common";
-import { type User, users } from "openselves-common/db";
-import type { ValueFromArray } from "rxjs";
-import request, { type Response } from "supertest";
-import type TestAgent from "supertest/lib/agent.js";
-import type { App } from "supertest/types.js";
+import { API_VERSION, GetUser, type GetUserResult, parseApiResult } from "openselves-common";
+import { users } from "openselves-common/db";
+import { isValidSchemaStatic } from "openselves-common/schema";
 
+import { challengeSchema } from "../src/captcha/captcha-type-helpers.js";
 import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
-import { DbService } from "../src/db/db.service.js";
 import { DB } from "../src/db/drizzle.js";
 import { QueueService } from "../src/queue/queue.service.js";
+import { TestQueryBuilder } from "./TestQueryBuilder.js";
 
 export type Captcha = {
 	challenge: Challenge;
@@ -30,67 +26,98 @@ export type Captcha = {
 type CreateUsersEnv = {
 	db: DB;
 	registrationPassword: string;
-	request: TestAgent;
+	get request(): TestQueryBuilder;
+	get rawRequest(): TestQueryBuilder;
+};
+type TestEnvUser = {
+	api: GetUserResult;
+	cookies: string;
+	password: string;
 };
 export type TestEnvUsers = {
-	userPassword: string;
-	user: User;
-	cookies: string;
-	user2: User;
-	cookies2: string;
+	user1: TestEnvUser;
+	user2: TestEnvUser;
 };
 export type TestEnv = {
-	app: INestApplication<App>;
+	app: NestExpressApplication;
+	urlBase: string;
 	configService: ConfigService<ConfigData>;
 } & CreateUsersEnv;
 export type TestEnvWithUsers = TestEnv & {
 	users: TestEnvUsers;
 };
 
-export async function createAndLoginUser(env: CreateUsersEnv) {
-	const userPassword = "12345678";
-
-	const email = createId() + "@example.com";
-	const user = (
-		await env.request
-			.post("/user")
-			.send({
-				email: email,
-				password: userPassword,
-				registrationPassword: env.registrationPassword,
-				captcha: await solveCaptcha(env, "sendEmail", email),
-			})
-			.expect(201)
-	).body;
-	const response = await env.request.post("/auth/login").send({
-		email: user.email,
-		password: userPassword,
-		captcha: await solveCaptcha(env),
-	});
-	if (response.status !== 200) {
-		console.error(response.body);
+async function waitForServerToComeOnline(urlBase: string) {
+	let checkInterval: NodeJS.Timeout | undefined;
+	let rejectTimeout: NodeJS.Timeout | undefined;
+	try {
+		await Promise.race([
+			new Promise<void>((resolve, reject) => {
+				checkInterval = setInterval(() => {
+					(async () => {
+						const response = await fetch(urlBase + "/");
+						if (response.status === 406) {
+							resolve();
+						}
+					})().catch(reject);
+				}, 1000);
+			}),
+			new Promise(
+				(resolve, reject) =>
+					(rejectTimeout = setTimeout(
+						() => reject(new Error("Server didn't start after 30s")),
+						30000,
+					)),
+			),
+		]);
+	} finally {
+		clearInterval(checkInterval);
+		clearTimeout(rejectTimeout);
 	}
-	assert.strictEqual(response.status, 200);
-	const cookies = convertResponseCookiesToRequestCookies(response);
-	return { user, cookies, userPassword };
 }
 
-async function createUsers(env: CreateUsersEnv, existingUsers?: TestEnvUsers) {
+export async function createAndLoginUser(env: CreateUsersEnv): Promise<TestEnvUser> {
+	const password = "12345678";
+
+	const email = createId() + "@" + createId() + ".com";
+	const getUserResponse = await env.request
+		.post("/user")
+		.send({
+			email: email,
+			password: password,
+			registrationPassword: env.registrationPassword,
+			captcha: await solveCaptcha(env, "sendEmail", email),
+		})
+		.expect(201)
+		.json();
+	const user = parseApiResult(GetUser, getUserResponse.body);
+	const response = await env.request
+		.post("/auth/login")
+		.send({
+			email: user.email,
+			password: password,
+			captcha: await solveCaptcha(env),
+		})
+		.expect(200)
+		.execute();
+	const cookies = convertResponseCookiesToRequestCookies(response);
+	return { api: user, cookies, password };
+}
+
+async function createUsers(
+	env: CreateUsersEnv,
+	existingUsers?: TestEnvUsers,
+): Promise<TestEnvUsers> {
 	if (existingUsers) {
 		await env.db
 			.delete(users)
-			.where(inArray(users.id, [existingUsers.user.id, existingUsers.user2.id]));
+			.where(inArray(users.id, [existingUsers.user1.api.id, existingUsers.user2.api.id]));
 	}
 
-	const { user, cookies, userPassword } = await createAndLoginUser(env);
-	const {
-		user: user2,
-		cookies: cookies2,
-		userPassword: userPassword2,
-	} = await createAndLoginUser(env);
-	assert.strictEqual(userPassword, userPassword2);
+	const user1 = await createAndLoginUser(env);
+	const user2 = await createAndLoginUser(env);
 
-	return { userPassword, user, cookies, user2, cookies2 };
+	return { user1, user2 };
 }
 export function setupTestSuite(
 	envCallback: (env: TestEnv) => Promise<void> | void,
@@ -99,7 +126,8 @@ export function setupTestSuite(
 	let env: TestEnv;
 
 	before(async () => {
-		DbService.dbUrlConfigKey = "TEST_DB_URL";
+		const urlBase = setCaptchaToEasyMode ? "http://127.0.0.1:3000" : "http://127.0.0.1:3002";
+		await waitForServerToComeOnline(urlBase);
 
 		const { AppModule, configureApp } = await import("../src/app.module.js");
 		const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -109,41 +137,37 @@ export function setupTestSuite(
 		const app = moduleFixture.createNestApplication<NestExpressApplication>();
 		configureApp(app);
 		const configService: ConfigService<ConfigData> = app.get(ConfigService);
-		configService.set("INSECURE_EASY_CAPTCHA_FOR_TESTS", true);
 		const registrationPassword = configService.getOrThrow("REGISTRATION_PASSWORD", {
 			infer: true,
 		});
 		await app.init();
-		const server: App = app.getHttpServer();
-
-		function isMethod(val: string): val is ValueFromArray<typeof methods> {
-			return !!methods.find((method) => method === val);
-		}
 
 		const createUsersEnv: CreateUsersEnv = {
 			db: app.get(DB),
 			registrationPassword,
 			get request() {
-				const testAgent = request(server);
-				return new Proxy(testAgent, {
-					get(target, name, receiver) {
-						if (typeof name === "string" && isMethod(name)) {
-							return (url: string) =>
-								target[name](url).set("X-OpenSelves-Version", API_VERSION);
-						} else {
-							return Reflect.get(target, name, receiver) as unknown;
-						}
-					},
-				});
+				return new TestQueryBuilder(urlBase)
+					.randomXForwardedFor()
+					.set("X-OpenSelves-Version", API_VERSION)
+					.expectHeader("X-OpenSelves-Version", API_VERSION);
+			},
+			get rawRequest() {
+				return new TestQueryBuilder(urlBase);
 			},
 		};
 
 		env = {
 			...createUsersEnv,
+			get request() {
+				return createUsersEnv.request;
+			},
+			get rawRequest() {
+				return createUsersEnv.rawRequest;
+			},
 			app,
 			configService,
+			urlBase,
 		};
-		configService.set("INSECURE_EASY_CAPTCHA_FOR_TESTS", setCaptchaToEasyMode);
 		await envCallback(env);
 	});
 
@@ -160,7 +184,16 @@ export function setupTestSuiteWithUsers(
 	let env: TestEnvWithUsers;
 
 	setupTestSuite(async (sourceEnv) => {
-		env = { ...sourceEnv, users: await createUsers(sourceEnv) };
+		env = {
+			...sourceEnv,
+			get request() {
+				return sourceEnv.request;
+			},
+			get rawRequest() {
+				return sourceEnv.rawRequest;
+			},
+			users: await createUsers(sourceEnv),
+		};
 		await envCallback(env);
 	}, setCaptchaToEasyMode);
 
@@ -186,8 +219,13 @@ export async function waitFor(timeInMs: number) {
 	return new Promise((resolve) => setTimeout(resolve, timeInMs));
 }
 
-export function convertResponseCookiesToRequestCookies(response: Response): string {
-	const responseCookies: string[] = response.get("Set-Cookie") || [];
+export function convertResponseCookiesToRequestCookies(response: {
+	headers: Response["headers"];
+}): string {
+	if (!response.headers) {
+		throw new Error("Response has no headers", { cause: response });
+	}
+	const responseCookies: string[] = response.headers.getSetCookie();
 	return responseCookies.map((str) => str.split(";")[0]).join("; ");
 }
 export function extractCookie(cookieName: string, cookies: string) {
@@ -214,18 +252,25 @@ export async function solveCaptcha(
 	expectedCode: number = 200,
 ): Promise<Captcha | null> {
 	const actionPathSuffix = action ? `/${action}/${actionValue}` : "";
-	const response = await env.request.get("/captcha/challenge" + actionPathSuffix);
 
-	if (response.status !== expectedCode) {
-		console.error(response.body);
+	let response: { headers: Response["headers"]; body: object };
+	try {
+		response = await env.rawRequest
+			.get("/captcha/challenge" + actionPathSuffix)
+			.randomXForwardedFor()
+			.expect(expectedCode)
+			.json();
+	} catch (e) {
+		// eslint-disable-next-line @typescript-eslint/only-throw-error
+		throw { ...(typeof e === "object" ? e : { e }), action, actionValue };
 	}
-	assert.strictEqual(response.status, expectedCode);
 
 	if (expectedCode !== 200) {
 		return null;
 	}
 
 	const challenge = response.body;
+	assert(isValidSchemaStatic(challengeSchema, challenge));
 	const solution = await solveChallenge({
 		challenge,
 		deriveKey,
@@ -248,7 +293,7 @@ export function testCaptcha(
 	callback: (
 		captcha: Captcha | object | string | null | undefined,
 		actionValue?: string,
-	) => Promise<request.Response>,
+	) => TestQueryBuilder,
 	action?: string,
 	getActionValue?: () => string,
 	invalidActionValue?: string,
@@ -396,12 +441,7 @@ export function testCaptcha(
 			} else {
 				captcha = getCaptcha;
 			}
-			const response = await callback(captcha, actionValue);
-
-			if (response.status !== status) {
-				console.error(response.body);
-			}
-			assert.strictEqual(response.status, status);
+			await callback(captcha, actionValue).expect(status).execute();
 		});
 	}
 }
@@ -410,4 +450,17 @@ export function generateDummyToken() {
 	const token = crypto.randomUUID().replaceAll("-", "").repeat(2);
 	assert.strictEqual(token.length, 64);
 	return token;
+}
+
+export async function verifyUser1Email(env: TestEnvWithUsers) {
+	const dbUser = await env.db.query.users.findFirst({
+		where: {
+			id: env.users.user1.api.id,
+		},
+	});
+	assert(dbUser);
+	await env.request
+		.post("/user/" + env.users.user1.api.id + "/verify-email/" + dbUser.emailVerificationToken)
+		.expect(200)
+		.execute();
 }

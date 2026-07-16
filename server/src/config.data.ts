@@ -8,6 +8,7 @@ export interface ConfigData {
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
 	TEST_DB_URL: string;
+	USE_TEST_DB: boolean;
 
 	ALLOWED_ORIGINS: string[];
 
@@ -34,6 +35,7 @@ export interface ConfigData {
 	S3_SECRET_KEY?: string;
 
 	INSECURE_EASY_CAPTCHA_FOR_TESTS: boolean;
+	INSECURE_VERBOSE_THROTTLER_ERROR_MESSAGE: boolean;
 
 	_APP_VERSION: string;
 }
@@ -70,6 +72,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	TEST_DB_URL: Joi.string().uri().not(Joi.ref("DATABASE_URL")).messages({
 		"any.invalid": "TEST_DB_URL cannot be the same as DATABASE_URL",
 	}),
+	USE_TEST_DB: Joi.boolean().default(false),
 
 	ALLOWED_ORIGINS: extendedJoi
 		.strCommaList()
@@ -129,6 +132,8 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 	S3_ACCESS_KEY: Joi.string(),
 	S3_SECRET_KEY: Joi.string(),
 
-	INSECURE_EASY_CAPTCHA_FOR_TESTS: Joi.boolean(),
+	INSECURE_EASY_CAPTCHA_FOR_TESTS: Joi.boolean().default(false),
+	INSECURE_VERBOSE_THROTTLER_ERROR_MESSAGE: Joi.boolean().default(false),
+
 	_APP_VERSION: Joi.forbidden(),
 });

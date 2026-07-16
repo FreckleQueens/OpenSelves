@@ -26,7 +26,7 @@ export async function putEntry(
 	env: TestEnvWithUsers,
 	entry: Entry | EntryWrapper | Record<string, unknown>,
 	expectCode: number = 200,
-	cookies: string = env.users.cookies,
+	cookies: string = env.users.user1.cookies,
 	processEntryObjects: boolean = true,
 ) {
 	return putEntries(env, [entry], expectCode, cookies, processEntryObjects);
@@ -36,7 +36,7 @@ export async function putEntries(
 	env: TestEnvWithUsers,
 	entries: (Entry | EntryWrapper | Record<string, unknown>)[],
 	expectCode: number = 200,
-	cookies: string = env.users.cookies,
+	cookies: string = env.users.user1.cookies,
 	processEntryObjects: boolean = true,
 ) {
 	let entriesToSend: Record<string, unknown>[];
@@ -58,15 +58,13 @@ export async function putEntries(
 		];
 	}
 
-	const request = env.request.put(pushEndpoint).set("Cookie", cookies).send({
-		entries: entriesToSend,
-	});
-	const response = await request.expect("Content-Type", /json/);
-	if (response.statusCode !== expectCode) {
-		console.error(response.body);
-	}
-	assert.strictEqual(response.statusCode, expectCode);
-	return response;
+	return env.request
+		.put(pushEndpoint)
+		.set("Cookie", cookies).send({
+			entries: entriesToSend,
+		})
+		.expect(expectCode)
+		.json();
 }
 
 export function readFile(filePath: string) {
