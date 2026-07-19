@@ -8,7 +8,7 @@ if (typeof process.env.DATABASE_URL !== "string") {
 
 export const baseServerConfig: Config = defineConfig({
 	out: "./drizzle",
-	schema: "../node_modules/openselves-common/src/db/index.ts",
+	schema: "./src/db/index.ts",
 	dialect: "postgresql",
 	dbCredentials: {
 		url: process.env.DATABASE_URL,

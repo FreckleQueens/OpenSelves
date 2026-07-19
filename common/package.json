@@ -12,10 +12,8 @@
 	"exports": {
 		".": "./dist/index.js",
 		"./client": "./dist/client/index.js",
-		"./db": "./dist/db/index.js",
 		"./schema": "./dist/schema/index.js",
 		"./willow": "./dist/willow/index.js",
-		"./drizzle.config": "./drizzle.config.ts",
 		"./eslint.config.mjs": "./eslint.config.mjs",
 		"./tsconfig.json": "./tsconfig.json"
 	},
@@ -32,7 +30,6 @@
 		"typescript-eslint": "^8.62.0"
 	},
 	"dependencies": {
-		"@paralleldrive/cuid2": "^3.3.0",
-		"drizzle-orm": "1.0.0-rc.3"
+		"@paralleldrive/cuid2": "^3.3.0"
 	}
 }
