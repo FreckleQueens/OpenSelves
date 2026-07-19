@@ -357,11 +357,12 @@ export class PuppeteerContext {
 		return await this.page.evaluate(async () => {
 			const storage = window.openselves.PersistentStorage.getInstance();
 			const userId = storage.getUserId();
+			const profile = window.openselves.UserProfile.of(userId);
 			const idb = window.openselves.IDB.getInstance();
 			return (
 				await idb.entries.getByNamespaceIdSubspaceId(
 					window.openselves.OPENSELVES_NAMESPACE_ID,
-					userId,
+					profile.ownSubspace.subspaceId,
 				)
 			).length;
 		});

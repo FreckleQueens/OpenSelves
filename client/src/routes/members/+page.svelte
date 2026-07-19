@@ -21,6 +21,7 @@
 	import SearchIcon from "$lib/components/icons/SearchIcon.svelte";
 	import { IDBStore } from "$lib/idb/IDBStore";
 	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
+	import { UserProfile } from "$lib/idb/local-profiles/UserProfile.js";
 	import { requireAuth } from "$lib/routing-utils";
 	import {
 		Block,
@@ -81,11 +82,14 @@
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
 	const store = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
+	let userProfile: UserProfile;
 
 	onMount(async () => {
 		if (!appState.isAuthenticated) {
 			return;
 		}
+
+		userProfile = UserProfile.of(storage.getUserId());
 
 		showArchivedMembers = !!(await storage.get("showArchivedMembers"));
 	});
@@ -100,10 +104,10 @@
 	}
 
 	async function startFront(memberId: string | null) {
-		const front = new Front(storage.getUserId(), {
+		const front = new Front(userProfile.ownSubspace.subspaceId, {
 			memberId: memberId,
 		});
-		await store.userArea(storage.getUserId()).saveDataModel(front);
+		await store.area(userProfile.ownSubspace.subspaceId).saveDataModel(front);
 	}
 
 	async function endFront(frontId: string) {
@@ -112,7 +116,7 @@
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("endedAt", new Date());
-		await store.userArea(storage.getUserId()).saveDataModel(front);
+		await store.area(userProfile.ownSubspace.subspaceId).saveDataModel(front);
 	}
 
 	async function endAllFronts() {
@@ -129,7 +133,7 @@
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("note", value ? value : undefined);
-		await store.userArea(storage.getUserId()).saveDataModel(front);
+		await store.area(userProfile.ownSubspace.subspaceId).saveDataModel(front);
 	}
 </script>
 

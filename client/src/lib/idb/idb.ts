@@ -1,4 +1,5 @@
 import { IDBEntry } from "$lib/idb/IDBEntry";
+import { IDBKnownSubspace } from "$lib/idb/IDBKnownSubspace";
 import { IDBPayload } from "$lib/idb/IDBPayload";
 import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
 import { IDB_MIGRATIONS } from "$lib/idb/idb-migrations";
@@ -26,6 +27,7 @@ export class IDB {
 	}
 
 	public readonly storageEntry: IDBStorageEntry = new IDBStorageEntry(this);
+	public readonly knownSubspaces: IDBKnownSubspace = new IDBKnownSubspace(this);
 	public readonly entries: IDBEntry = new IDBEntry(this);
 	public readonly payloads: IDBPayload = new IDBPayload(this);
 	private db?: IDBDatabase;

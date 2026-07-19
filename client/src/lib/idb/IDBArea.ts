@@ -5,17 +5,23 @@ import type {
 	EntryDataModel,
 	EntryDataModelSchema,
 } from "openselves-common/client";
-import { Area, type EntryWithPayload, EntryWrapper } from "openselves-common/willow";
+import {
+	Area,
+	type EntryWithPayload,
+	EntryWrapper,
+	type Path,
+	type SubspaceId,
+} from "openselves-common/willow";
 
-export class IDBUserArea extends Area<EntryWithPayload, IDBStoreContext, IDBStore> {
+export class IDBArea extends Area<EntryWithPayload, IDBStoreContext, IDBStore> {
 	public constructor(
 		store: IDBStore,
-		public readonly userId: string,
-		path: string,
+		public readonly subspaceId: SubspaceId,
+		path: Path,
 		timesStart: bigint,
 		timesEnd: bigint | "open",
 	) {
-		super(store, userId, path, timesStart, timesEnd);
+		super(store, subspaceId, path, timesStart, timesEnd);
 	}
 
 	public async saveDataModel(model: AnyEntryDataModel, ctx?: IDBStoreContext) {
@@ -27,9 +33,12 @@ export class IDBUserArea extends Area<EntryWithPayload, IDBStoreContext, IDBStor
 		});
 	}
 
-	public async loadDataModel<Schema extends EntryDataModelSchema>(
+	public async loadDataModel<
+		Model extends EntryDataModel<Schema>,
+		Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+	>(
 		model: {
-			new (subspaceId: string, from: EntryWrapper[]): EntryDataModel<Schema>;
+			new (subspaceId: SubspaceId, from: EntryWrapper[]): Model;
 		},
 		ctx?: IDBStoreContext,
 	) {
@@ -37,13 +46,13 @@ export class IDBUserArea extends Area<EntryWithPayload, IDBStoreContext, IDBStor
 			(
 				await IDB.getInstance().entries.getByPathPrefix(
 					this.store.namespaceId,
-					this.userId,
+					this.subspaceId,
 					this.path,
 					ctx?.tx,
 				)
 			).map((entry) => EntryWrapper.load(entry)),
 		);
-		return entries.length > 0 ? new model(this.userId, entries) : undefined;
+		return entries.length > 0 ? new model(this.subspaceId, entries) : undefined;
 	}
 
 	public subscribe(callback: (entry: EntryWithPayload) => Promise<void> | void) {

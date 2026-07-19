@@ -1,15 +1,16 @@
-import { ENTRY_STORE_NAME } from "$lib/idb/IDBEntry";
+import { ENTRY_STORE_NAME, IDBEntry } from "$lib/idb/IDBEntry";
+import { KNOWN_SUBSPACE_STORE_NAME } from "$lib/idb/IDBKnownSubspace";
 import { PAYLOAD_STORE_NAME } from "$lib/idb/IDBPayload";
 import { STORAGE_ENTRY_STORE_NAME } from "$lib/idb/IDBStorageEntry";
 import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
+import type { OwnSubspace } from "$lib/idb/local-profiles/UserProfile";
 import { Front, Member, serializeValueToPayloadUnsafe } from "openselves-common/client";
 import {
+	type ByteString,
+	Ed25519,
+	Entry,
 	EntryWrapper,
-	hashPayload,
-	isEntry,
-	j2000Now,
-	padUint64,
-	toJsonFriendly,
+	PayloadDigest,
 } from "openselves-common/willow";
 
 export const IDB_MIGRATIONS: {
@@ -103,6 +104,20 @@ export const IDB_MIGRATIONS: {
 		},
 	},
 
+	// create knownSubspaces store
+	{
+		type: "schema",
+		run: (db) => {
+			const knownSubspacesStore = db.createObjectStore(KNOWN_SUBSPACE_STORE_NAME, {
+				keyPath: ["userId", "subspaceId"],
+			});
+			knownSubspacesStore.createIndex("primaryKey", ["userId", "subspaceId"], {
+				unique: true,
+			});
+			knownSubspacesStore.createIndex("userId", "userId");
+		},
+	},
+
 	// migrate data from logs, members, fronts and attachments to entries and payloads
 	{
 		type: "data",
@@ -113,7 +128,28 @@ export const IDB_MIGRATIONS: {
 			const fronts: object[] = await tx.getAll("fronts");
 			const attachments: object[] = await tx.getAll("attachments");
 
-			const payloadsToSave: { digest: string; contents: string }[] = [];
+			const userIds: string[] = [
+				...new Set([
+					...members.map((member) => member["userId"]),
+					...fronts.map((front) => front["userId"]),
+					...attachments.map((attachment) => attachment["userId"]),
+				]),
+			];
+			const knownSubspaces = Object.fromEntries(
+				await Promise.all(
+					userIds.map(async (userId): Promise<[string, OwnSubspace]> => {
+						const keys = await Ed25519.generateKey();
+						const ownSubspace: OwnSubspace = {
+							userId: userId,
+							subspaceId: keys.publicKey,
+							secretKey: keys.secretKey,
+						};
+						return [userId, ownSubspace];
+					}),
+				),
+			);
+
+			const payloadsToSave: { digest: PayloadDigest; contents: ByteString }[] = [];
 			for (const attachment of attachments) {
 				if (
 					attachment &&
@@ -121,7 +157,7 @@ export const IDB_MIGRATIONS: {
 					typeof attachment.dataUri === "string"
 				) {
 					const contents = serializeValueToPayloadUnsafe(attachment.dataUri);
-					const digest = await hashPayload(contents);
+					const digest = await PayloadDigest.hash(contents);
 					payloadsToSave.push({
 						digest,
 						contents,
@@ -138,7 +174,11 @@ export const IDB_MIGRATIONS: {
 				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { userId, color, image, archivedReason, updatedAt, ...rest } =
 					memberData as Record<string, unknown>;
-				const member = new Member(userId as string, {
+				const subspace = knownSubspaces[userId as string];
+				if (!subspace) {
+					throw new Error("No subspace for userId " + userId);
+				}
+				const member = new Member(subspace.subspaceId, {
 					...rest,
 					color: color === null || typeof color !== "string" ? undefined : color,
 					image: image === null || typeof image !== "string" ? undefined : image,
@@ -160,8 +200,11 @@ export const IDB_MIGRATIONS: {
 					string,
 					unknown
 				>;
-				console.log("endedAt", typeof endedAt, endedAt);
-				const front = new Front(userId as string, {
+				const subspace = knownSubspaces[userId as string];
+				if (!subspace) {
+					throw new Error("No subspace for userId " + userId);
+				}
+				const front = new Front(subspace.subspaceId, {
 					...rest,
 					note: note === null || typeof note !== "string" ? undefined : note,
 					endedAt:
@@ -173,14 +216,15 @@ export const IDB_MIGRATIONS: {
 			}
 
 			await idb.transaction(
-				[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
+				[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME, KNOWN_SUBSPACE_STORE_NAME],
 				async (tx) => {
+					for (const knownSubspace of Object.values(knownSubspaces)) {
+						await tx.put(KNOWN_SUBSPACE_STORE_NAME, knownSubspace);
+					}
+
 					for (const entry of entriesToSave) {
-						await tx.put(ENTRY_STORE_NAME, {
-							...toJsonFriendly(entry.entry),
-							savedAt: padUint64(j2000Now()),
-						});
-						if (typeof entry.payload === "string") {
+						await tx.put(ENTRY_STORE_NAME, IDBEntry.toIDBFriendlyEntry(entry.entry));
+						if (entry.payload !== undefined) {
 							await tx.put(PAYLOAD_STORE_NAME, {
 								digest: entry.payloadDigest,
 								contents: entry.payload,
@@ -188,17 +232,20 @@ export const IDB_MIGRATIONS: {
 						}
 					}
 
-					const savedPayloadDigests: string[] = [];
+					const savedPayloadDigests: PayloadDigest[] = [];
 					for (const payload of payloadsToSave) {
 						await tx.put(PAYLOAD_STORE_NAME, payload);
 						savedPayloadDigests.push(payload.digest);
 					}
 
 					const entries = (await tx.getAll(ENTRY_STORE_NAME)).filter((entry) =>
-						isEntry(entry),
+						Entry.is(entry),
 					);
 					const payloadsToDelete = savedPayloadDigests.filter(
-						(digest) => !entries.find((entry) => entry.payloadDigest === digest),
+						(digest) =>
+							!entries.find((entry) =>
+								PayloadDigest.equals(entry.payloadDigest, digest),
+							),
 					);
 					for (const digest of payloadsToDelete) {
 						await tx.delete(PAYLOAD_STORE_NAME, digest);

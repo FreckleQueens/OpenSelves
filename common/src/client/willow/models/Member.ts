@@ -1,7 +1,7 @@
-import { type EntryWrapper } from "../../../willow/index.js";
+import { SchemaBuilder } from "../../../schema/index.js";
+import type { SchemaCreate, SchemaStatic, SchemaType } from "../../../schema/types.js";
+import { type EntryWrapper, SubspaceId } from "../../../willow/index.js";
 import { BaseSchema, EntryDataModel } from "../EntryDataModel.js";
-import { SchemaBuilder } from "../schema-builder.js";
-import type { SchemaCreate, SchemaStatic, SchemaType } from "../types.js";
 
 export const MemberSchema = {
 	...BaseSchema,
@@ -21,7 +21,7 @@ export class Member extends EntryDataModel<typeof MemberSchema> {
 		return "member";
 	}
 
-	constructor(subspaceId: string, from: MemberCreate | EntryWrapper[]) {
+	constructor(subspaceId: SubspaceId, from: MemberCreate | EntryWrapper[]) {
 		super(MemberSchema, subspaceId, from);
 	}
 }

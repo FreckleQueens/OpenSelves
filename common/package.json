@@ -2,10 +2,13 @@
 	"name": "openselves-common",
 	"scripts": {
 		"clean": "rm -rf dist",
-		"build": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
-		"dev": "yarn build --watch",
-		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+		"build": "yarn build:src && yarn build:tests",
+		"build:src": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
+		"build:tests": "cd ../common/test && rm -rf dist && yarn tsc && cd ..",
+		"test": "yarn build && node --enable-source-maps --experimental-test-module-mocks --test test/dist/test/**/*.test.js",
+		"dev": "yarn build:src --watch",
+		"lint": "eslint src/**/*.ts test/*.ts",
+		"format": "eslint src/**/*.ts test/*.ts --fix"
 	},
 	"main": "./dist/index.js",
 	"type": "module",

@@ -25,6 +25,23 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: true
       - run: yarn lint
 
+  test-common:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26.x
+      - run: corepack enable
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          key: yarn
+          path: ~/.yarn
+
+      - run: yarn install --immutable
+      - run: yarn workspace openselves-common test
+
   test-client:
     runs-on: ubuntu-latest
 

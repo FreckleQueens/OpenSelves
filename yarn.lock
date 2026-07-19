@@ -6843,7 +6843,6 @@ __metadata:
     "@paralleldrive/cuid2": "npm:^3.3.0"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@types/node": "npm:^26.1.1"
-    drizzle-orm: "npm:1.0.0-rc.3"
     eslint: "npm:^10.5.0"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-prettier: "npm:^5.5.6"

@@ -18,7 +18,7 @@ export class TestQueryBuilder {
 	private urlOrPath: string = "/";
 	private method: Method = "GET";
 	private readonly headers: Headers = new Headers();
-	private body: string | null = null;
+	private body: string | ReadableStream<Uint8Array<ArrayBuffer>> | null = null;
 
 	private expectStatus: number | undefined;
 	private readonly expectHeaders: Headers = new Headers();
@@ -72,13 +72,17 @@ export class TestQueryBuilder {
 		return this.cookies(user.cookies);
 	}
 
-	public setBody(body: string | null): this {
+	public setBody(body: string | ReadableStream<Uint8Array<ArrayBuffer>> | null): this {
 		this.body = body;
 		return this;
 	}
 
 	public send(body: object): this {
 		return this.set("Content-Type", "application/json").setBody(JSON.stringify(body));
+	}
+
+	public uploadStream(readable: ReadableStream<Uint8Array<ArrayBuffer>>): this {
+		return this.set("Content-Type", "application/octet-stream").setBody(readable);
 	}
 
 	public expectHeader(name: string, value: string): this {
@@ -126,12 +130,18 @@ export class TestQueryBuilder {
 		}
 
 		const url = this.urlOrPath.startsWith("/") ? this.urlBase + this.urlOrPath : this.urlOrPath;
-		const request = new Request(url, {
+
+		const requestInit: RequestInit = {
 			method: this.method,
 			headers: this.headers,
 			body: this.body,
-		});
-		const response = await fetch(request);
+		};
+
+		if (requestInit.body instanceof ReadableStream) {
+			requestInit["duplex"] = "half";
+		}
+
+		const response = await fetch(url, requestInit);
 
 		try {
 			if (this.expectStatus !== undefined) {

@@ -12,6 +12,7 @@
 	import type { FormValidationState } from "$lib/forms";
 	import { IDBStore } from "$lib/idb/IDBStore";
 	import { proxyEntryDataModel, subscribeToModel } from "$lib/idb/entry-subscription.svelte";
+	import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 	import { requireAuth } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
 	import { Front, type FrontStatic, Member, type MemberStatic } from "openselves-common/client";
@@ -26,7 +27,7 @@
 	let frontObj: Front | undefined = $state(undefined);
 	let initialData: FrontStatic | undefined = undefined;
 	let front: FrontStatic | undefined = $derived(
-		frontObj ? proxyEntryDataModel(frontObj) : undefined,
+		frontObj ? proxyEntryDataModel<Front>(frontObj) : undefined,
 	);
 	let isDirty = $derived(JSON.stringify(front) !== JSON.stringify(initialData));
 	let frontMember: MemberStatic | undefined = $derived(
@@ -44,6 +45,7 @@
 
 	requireAuth();
 	const storage = PersistentStorage.getInstance();
+	let userProfile: UserProfile;
 	const idbStore = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
 	onMount(async () => {
@@ -51,7 +53,13 @@
 			throw new Error("frontId route param is required");
 		}
 
-		frontObj = await idbStore.loadDataModel(Front, storage.getUserId(), params.frontId);
+		userProfile = UserProfile.of(storage.getUserId());
+
+		frontObj = await idbStore.loadDataModel(
+			Front,
+			userProfile.ownSubspace.subspaceId,
+			params.frontId,
+		);
 		initialData = frontObj?.data;
 		mounted = true;
 	});
@@ -60,7 +68,7 @@
 		if (!frontObj) {
 			throw new Error("Front not loaded");
 		}
-		await idbStore.userArea(storage.getUserId()).saveDataModel(frontObj);
+		await idbStore.area(userProfile.ownSubspace.subspaceId).saveDataModel(frontObj);
 		return true;
 	}
 
