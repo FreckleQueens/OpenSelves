@@ -1,5 +1,8 @@
-import type { Entry } from "../Entry.js";
-import { Store } from "../Store.js";
+import type { Entry } from "./Entry.js";
+import { Path } from "./Path.js";
+import { Store } from "./Store.js";
+import { SubspaceId } from "./SubspaceId.js";
+import type { Timestamp } from "./Timestamp.js";
 
 export class Area<
 	T extends Entry,
@@ -8,10 +11,10 @@ export class Area<
 > {
 	constructor(
 		public readonly store: S,
-		public readonly subspaceId: string | undefined,
-		public readonly path: string,
-		public readonly timesStart: bigint,
-		public readonly timesEnd: bigint | "open",
+		public readonly subspaceId: SubspaceId | undefined,
+		public readonly path: Path,
+		public readonly timesStart: Timestamp,
+		public readonly timesEnd: Timestamp | "open",
 	) {}
 
 	public getEntries(context?: Context): T[] {
@@ -29,8 +32,9 @@ export class Area<
 
 	public includesEntry(entry: T): boolean {
 		return (
-			(this.subspaceId === undefined || entry.subspaceId === this.subspaceId) &&
-			entry.path.startsWith(this.path) &&
+			(this.subspaceId === undefined ||
+				SubspaceId.equals(entry.subspaceId, this.subspaceId)) &&
+			Path.extends(entry.path, this.path) &&
 			entry.timestamp >= this.timesStart &&
 			(this.timesEnd === "open" || entry.timestamp < this.timesEnd)
 		);

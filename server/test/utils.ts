@@ -9,6 +9,7 @@ import assert from "node:assert";
 import { after, afterEach, before, beforeEach } from "node:test";
 import { API_VERSION, GetUser, type GetUserResult, parseApiResult } from "openselves-common";
 import { isValidSchemaStatic } from "openselves-common/schema";
+import { Ed25519, type Ed25519KeyPair } from "openselves-common/willow";
 
 import { challengeSchema } from "../src/captcha/captcha-type-helpers.js";
 import { CaptchaService } from "../src/captcha/captcha.service.js";
@@ -32,6 +33,7 @@ type CreateUsersEnv = {
 type TestEnvUser = {
 	api: GetUserResult;
 	cookies: string;
+	keys: Ed25519KeyPair;
 	password: string;
 };
 export type TestEnvUsers = {
@@ -101,7 +103,7 @@ export async function createAndLoginUser(env: CreateUsersEnv): Promise<TestEnvUs
 		.expect(200)
 		.execute();
 	const cookies = convertResponseCookiesToRequestCookies(response);
-	return { api: user, cookies, password };
+	return { api: user, cookies, password, keys: await Ed25519.generateKey() };
 }
 
 async function createUsers(
@@ -239,8 +241,7 @@ export function extractCookie(cookieName: string, cookies: string) {
 		.find((entry) => entry[0] === cookieName)?.[1];
 
 	if (!value) {
-		console.log(cookies);
-		throw new Error(`${cookieName} not found in cookies`);
+		throw new Error(`${cookieName} not found in cookies`, { cause: cookies });
 	}
 	return value;
 }

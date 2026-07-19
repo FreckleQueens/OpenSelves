@@ -1,5 +1,8 @@
-export const OPENSELVES_NAMESPACE_ID = "org.openselves";
-
-export const MAX_COMPONENT_LENGTH = 4096;
-export const MAX_COMPONENT_COUNT = 4096;
-export const MAX_PATH_LENGTH = 4096;
+export const OPENSELVES_NAMESPACE_ID = new Uint8Array([
+	167, 92, 15, 126, 160, 81, 185, 207, 196, 222, 32, 196, 123, 101, 118, 234, 81, 89, 243, 62,
+	197, 22, 89, 114, 1, 23, 136, 21, 222, 133, 56, 204,
+]);
+export const OPENSELVES_NAMESPACE_SECRET_KEY = new Uint8Array([
+	26, 251, 138, 26, 182, 149, 145, 143, 138, 231, 221, 183, 102, 97, 162, 21, 125, 115, 245, 21,
+	205, 75, 147, 180, 163, 94, 47, 173, 221, 165, 232, 150,
+]);

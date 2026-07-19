@@ -9,7 +9,8 @@ import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte.js";
 import { IDBStore } from "$lib/idb/IDBStore";
 import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { LocalProfileManager } from "$lib/idb/local-profiles";
+import { UserProfileManager, getUserProfiles } from "$lib/idb/local-profiles";
+import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 import { gotoHomeRoute } from "$lib/routing-utils";
 import {
 	API_VERSION,
@@ -21,7 +22,7 @@ import {
 	TOKEN_EXPIRED_ERROR,
 	parseApiResult,
 } from "openselves-common";
-import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { ByteString, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 
 export const apiState: {
 	url: string;
@@ -54,7 +55,7 @@ export async function setApiStatus(status: GetStatusResult) {
 	);
 }
 
-async function refreshUserData() {
+export async function refreshUserData() {
 	if (!appState.isAuthenticated) {
 		throw new Error("Cannot use while not authenticated.");
 	}
@@ -102,7 +103,7 @@ export type Attachment = {
 
 export type CallOptions = {
 	method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-	data?: Record<string, unknown>;
+	data?: Record<string, unknown> | ReadableStream<ByteString>;
 	attachments?: Attachment[];
 	returnUnhandledResponses?: boolean;
 	isUnauthenticated?: boolean;
@@ -123,13 +124,10 @@ const baseApiRequestHeaders = {
 export async function callRaw(
 	path: string,
 	options?: CallOptions,
-): Promise<CallResult | { response: Response; responseBody: Record<string, unknown> }> {
+): Promise<CallResult | { response: Response; responseBody?: Record<string, unknown> }> {
 	const isFileUpload = (options?.attachments?.length || 0) > 0;
 
-	const headers: Record<string, string> = { ...baseApiRequestHeaders };
-	if (options?.data && !isFileUpload) {
-		headers["Content-Type"] = "application/json";
-	}
+	const headers = new Headers(baseApiRequestHeaders);
 
 	let body: BodyInit | null;
 	if (isFileUpload) {
@@ -143,7 +141,46 @@ export async function callRaw(
 			body.append("attachments[]", attachment.file, attachment.id);
 		}
 	} else {
-		body = options?.data ? JSON.stringify(options?.data) : null;
+		if (options?.data) {
+			if (options.data instanceof ReadableStream) {
+				headers.set("Content-Type", "application/octet-stream");
+				console.log(options.data.locked);
+
+				let isSupported = false;
+				try {
+					new Request("", { method: "POST", body: new ReadableStream() });
+				} catch {
+					isSupported = true;
+				}
+
+				// TODO: neither work
+				if (isSupported) {
+					console.info("Request body streaming is supported");
+					body = options.data;
+				} else {
+					console.warn("Pre-load request body stream, not compatible in this browser");
+					let newBody = new Uint8Array(0);
+					const reader = (options.data as ReadableStream<ByteString>).getReader();
+					while (true) {
+						const result = await reader.read();
+
+						if (result.value) {
+							newBody = ByteString.concat(newBody, result.value);
+						}
+
+						if (result.done) {
+							break;
+						}
+					}
+					body = newBody;
+				}
+			} else {
+				headers.set("Content-Type", "application/json");
+				body = JSON.stringify(options?.data);
+			}
+		} else {
+			body = null;
+		}
 	}
 
 	const fetchInit: RequestInit = {
@@ -153,10 +190,15 @@ export async function callRaw(
 		body,
 	};
 
+	if (body instanceof ReadableStream) {
+		fetchInit["duplex"] = "half";
+	}
+
 	const tryFetch = async () => await fetch(`${apiState.url}${path}`, fetchInit);
 	let response: Response | undefined = undefined;
 	let responseBody: Record<string, unknown> | undefined = undefined;
 
+	let responseType: undefined | "json" | "raw" = undefined;
 	for (let attempt = 0; attempt < 3; attempt++) {
 		if (attempt !== 0) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -164,7 +206,16 @@ export async function callRaw(
 
 		try {
 			response = await tryFetch();
-			responseBody = await response.json();
+			const contentType = response.headers.get("Content-Type");
+			if (contentType?.startsWith("application/json")) {
+				responseType = "json";
+			} else if (contentType === "application/octet-stream") {
+				responseType = "raw";
+			}
+
+			if (responseType === "json") {
+				responseBody = await response.json();
+			}
 		} catch (error) {
 			console.debug(
 				"attempt",
@@ -177,7 +228,7 @@ export async function callRaw(
 			);
 		}
 
-		if (responseBody && typeof responseBody?.expectedVersion === "string") {
+		if (responseBody && typeof responseBody.expectedVersion === "string") {
 			apiState.mismatchedRemoteVersion = responseBody.expectedVersion;
 		}
 
@@ -186,7 +237,12 @@ export async function callRaw(
 			return CallResult.WRONG_VERSION;
 		}
 
-		if (!response || !(response instanceof Response) || !responseBody) {
+		if (
+			!response ||
+			!(response instanceof Response) ||
+			!responseType ||
+			(responseType === "json" && !responseBody)
+		) {
 			if (!(await isApiReachable())) {
 				return CallResult.API_UNREACHABLE;
 			}
@@ -200,6 +256,7 @@ export async function callRaw(
 		if (
 			!options?.isUnauthenticated &&
 			response.status === 401 &&
+			responseBody &&
 			responseBody.name === TOKEN_EXPIRED_ERROR
 		) {
 			const result = await refreshAuth();
@@ -217,7 +274,11 @@ export async function callRaw(
 			continue;
 		}
 
-		if (response.status === 406 && typeof responseBody.expectedVersion === "string") {
+		if (
+			response.status === 406 &&
+			responseBody &&
+			typeof responseBody.expectedVersion === "string"
+		) {
 			return CallResult.WRONG_VERSION;
 		}
 
@@ -234,7 +295,7 @@ export async function callRaw(
 		);
 	}
 
-	if (!response || !responseBody) {
+	if (!response || (responseType === "json" && !responseBody)) {
 		return CallResult.API_UNREACHABLE;
 	}
 
@@ -247,7 +308,7 @@ export async function callRaw(
 export async function call(
 	path: string,
 	options?: CallOptions,
-): Promise<{ response: Response; responseBody: Record<string, unknown> } | undefined> {
+): Promise<{ response: Response; responseBody?: Record<string, unknown> } | undefined> {
 	const result = await callRaw(path, options);
 
 	switch (result) {
@@ -356,6 +417,7 @@ export async function tryLogout(
 	await SyncWorker.getInstance().shutdown();
 	const storage = PersistentStorage.getInstance();
 	const userId = storage.getUserId();
+	const userProfile = UserProfile.of(userId);
 
 	if (wipeData) {
 		if (!forceWipe && SyncWorker.getInstance().hasPushBacklog()) {
@@ -365,7 +427,7 @@ export async function tryLogout(
 			scheduleOnlineCheck();
 			return false;
 		} else {
-			await LocalProfileManager.getInstance().wipeUserData(userId);
+			await UserProfileManager.getInstance().wipeUserData(userProfile, getUserProfiles());
 		}
 	} else {
 		await storage.set(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, userId, true);

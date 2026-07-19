@@ -5,6 +5,7 @@ import "../auto-imports";
 import type { PersistentStorage } from "$lib/PersistentStorage.ts";
 import { IDB } from "$lib/idb";
 import type { SyncWorker } from "$lib/idb/SyncWorker.js";
+import type { UserProfile } from "$lib/idb/local-profiles/UserProfile.ts";
 import type { tick } from "svelte";
 
 declare global {
@@ -25,6 +26,7 @@ declare global {
 			SyncWorker: typeof SyncWorker;
 			tick: typeof tick;
 			OPENSELVES_NAMESPACE_ID: typeof OPENSELVES_NAMESPACE_ID;
+			UserProfile: typeof UserProfile;
 		};
 	}
 }

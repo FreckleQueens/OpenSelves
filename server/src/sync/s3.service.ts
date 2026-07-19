@@ -11,6 +11,7 @@ import { confirm } from "@inquirer/prompts";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { type Request } from "express";
+import type { ByteString } from "openselves-common/willow";
 
 import { AppCommand } from "../AppCommand.js";
 import type { ConfigData } from "../config.data.js";
@@ -26,7 +27,7 @@ class S3Transaction {
 
 	private readonly queuedUploads: {
 		key: string;
-		content: Buffer<ArrayBufferLike>;
+		content: ByteString;
 		unique: boolean;
 	}[] = [];
 	private readonly queuedDeletes: string[] = [];
@@ -38,7 +39,7 @@ class S3Transaction {
 		private readonly client?: S3Client,
 	) {}
 
-	public queuePut(key: string, content: Buffer<ArrayBufferLike>, unique: boolean) {
+	public queuePut(key: string, content: ByteString, unique: boolean) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}
@@ -54,7 +55,7 @@ class S3Transaction {
 		this.queuedDeletes.push(key);
 	}
 
-	public async put(key: string, content: Buffer<ArrayBufferLike>, unique: boolean) {
+	public async put(key: string, content: ByteString, unique: boolean) {
 		if (!this.bucketName || !this.client) {
 			throw new Error("S3 service is not available.");
 		}

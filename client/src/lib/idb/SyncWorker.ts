@@ -3,11 +3,13 @@ import { call } from "$lib/api.svelte";
 import { appState } from "$lib/appState.svelte.js";
 import { IDBStore } from "$lib/idb/IDBStore";
 import { IDB } from "$lib/idb/idb";
+import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 import {
-	EntryWrapper,
+	Drop,
+	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
-	j2000Now,
-	toJsonFriendly,
+	SubspaceId,
+	Timestamp,
 } from "openselves-common/willow";
 
 const PUSH_TIMESTAMP_STORAGE_KEY = "pushTimestamp";
@@ -160,6 +162,8 @@ export class SyncWorker {
 			return false;
 		}
 
+		const userProfile = UserProfile.of(userId);
+
 		let lastPushTimestamp: bigint = 0n;
 		const rawLastPushTimestamp = await storage.get(PUSH_TIMESTAMP_STORAGE_KEY);
 		if (rawLastPushTimestamp) {
@@ -170,24 +174,38 @@ export class SyncWorker {
 			}
 		}
 
-		const thisPushAttemptTimestamp = j2000Now();
+		const thisPushAttemptTimestamp = Timestamp.now();
 		const pendingEntries = await idb.entries.getAfterSavedAt(
 			OPENSELVES_NAMESPACE_ID,
-			userId,
+			userProfile.ownSubspace.subspaceId,
 			lastPushTimestamp,
 		);
-		const formattedEntries = pendingEntries.map(toJsonFriendly);
 
 		if (pendingEntries.length > 0) {
 			console.debug("Entries to push:", pendingEntries);
-			const result = await call("/sync/push", {
-				method: "PUT",
-				data: {
-					entries: formattedEntries,
-				},
-			});
 
-			if (!result) {
+			const encoder = Drop.encoder();
+			let result: { response: Response; responseBody?: Record<string, unknown> } | undefined;
+			try {
+				[, result] = await Promise.all([
+					(async () => {
+						const writer = encoder.writable.getWriter();
+						for (const entry of pendingEntries) {
+							await writer.write(entry);
+						}
+						await writer.close();
+					})(),
+					call("/sync/push", {
+						method: "PUT",
+						data: encoder.readable,
+					}),
+				]);
+			} catch (e) {
+				console.debug("push failed with error", e, result);
+				return false;
+			}
+
+			if (!result || !result.response.ok) {
 				console.debug("push failed with response", result);
 				return false;
 			}
@@ -203,8 +221,8 @@ export class SyncWorker {
 			(
 				await idb.entries.getAfterSavedAt(
 					OPENSELVES_NAMESPACE_ID,
-					userId,
-					thisPushAttemptTimestamp,
+					userProfile.ownSubspace.subspaceId,
+					thisPushAttemptTimestamp.valueOf(),
 				)
 			).length === 0
 		) {
@@ -222,39 +240,59 @@ export class SyncWorker {
 			return;
 		}
 
+		const userProfile = UserProfile.of(userId);
+
 		const lastPullTimestamp = (await storage.get(PULL_TIMESTAMP_STORAGE_KEY)) || "";
 		const result = await call("/sync/pull", {
 			method: "POST",
 			data: {
 				timestamp: lastPullTimestamp,
+				subspaceId: userProfile.ownSubspace.subspaceId,
 			},
 		});
 
-		if (!result) {
+		if (!result || result.responseBody || !result.response.body) {
 			console.debug("pull failed with response", result);
 			return;
 		}
 
-		const rawEntries = result.responseBody["entries"];
-		if (!Array.isArray(rawEntries)) {
-			console.warn("Server reply with a non-array", { cause: rawEntries });
+		const decoder = Drop.decoder();
+		const readable = result.response.body.pipeThrough(decoder);
+
+		const entries: EntryWithPayload[] = [];
+		try {
+			const reader = readable.getReader();
+			while (true) {
+				const result = await reader.read();
+
+				if (result.value) {
+					entries.push(result.value);
+				}
+
+				if (result.done) {
+					break;
+				}
+			}
+		} catch (e) {
+			console.debug("pull failed while decoding drop", e);
 			return;
 		}
 
-		if (rawEntries.length > 0) {
-			console.debug("Entries to ingest:", rawEntries);
-			const parsedEntry = await Promise.all(
-				rawEntries.map((entry) => EntryWrapper.load(entry)),
-			);
-			const entriesWithPayload = parsedEntry.map((entry) => entry.entryWithPayload);
+		if (entries.length > 0) {
+			console.debug("Entries to ingest:", entries);
+			for (const entry of entries) {
+				if (!SubspaceId.equals(entry.subspaceId, userProfile.ownSubspace.subspaceId)) {
+					throw new Error("Got entry with wrong subspaceId", { cause: entry });
+				}
+			}
 
 			await IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
-				.userArea(userId)
-				.ingest(entriesWithPayload, {
+				.area(userProfile.ownSubspace.subspaceId)
+				.ingest(entries, {
 					dontMarkSavedEntriesForSync: true,
 				});
 
-			const timestamp = result.responseBody["timestamp"];
+			const timestamp = result.response.headers.get("X-OpenSelves-Pull-Timestamp");
 			if (typeof timestamp === "string") {
 				await storage.setForUser(userId, PULL_TIMESTAMP_STORAGE_KEY, timestamp);
 			}

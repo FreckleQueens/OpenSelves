@@ -1,34 +1,33 @@
 <script lang="ts">
 	import DatumCard from "$lib/components/DatumCard.svelte";
-	import AppErrorIcon from "$lib/components/icons/AppErrorIcon.svelte";
 	import CopyIcon from "$lib/components/icons/CopyIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
 	import EmailIcon from "$lib/components/icons/EmailIcon.svelte";
 	import SuccessIcon from "$lib/components/icons/SuccessIcon.svelte";
+	import SyncOffIcon from "$lib/components/icons/SyncOffIcon.svelte";
 	import VerifiedIcon from "$lib/components/icons/VerifiedIcon.svelte";
 	import type { OSIconProps } from "$lib/components/os-icon";
 	import {
-		type LocalProfile,
-		type LocalProfileData,
-		LocalProfileManager,
-		getLocalProfiles,
-		localProfilesState,
+		type UserProfileData,
+		UserProfileManager,
+		getUserProfiles,
+		userProfilesState,
 	} from "$lib/idb/local-profiles";
+	import type { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 	import { Button, Dialog, DialogButton, List, ListItem, Preloader } from "konsta/svelte";
 	import type { Component } from "svelte";
 
-	const localProfileManager = LocalProfileManager.getInstance();
-	localProfileManager.loadProfilesData();
+	const userProfileManager = UserProfileManager.getInstance();
 
-	let localProfiles = $derived.by(getLocalProfiles);
+	let userProfiles = $derived.by(getUserProfiles);
 	let showTechnicalData: string | undefined = $state();
 	let copiedData: string | undefined = $state();
 	let confirmWipeProfileDialogOpen: boolean = $state(false);
-	let confirmWipeProfile: LocalProfile | undefined = $state();
+	let confirmWipeProfile: UserProfile | undefined = $state();
 
 	const profileDataToDisplay: {
-		key: keyof LocalProfile;
+		key: keyof UserProfile;
 		name: string;
 		Icon: Component<OSIconProps>;
 	}[] = [
@@ -44,7 +43,7 @@
 		},
 	];
 
-	async function copyData(profile: LocalProfileData, key: keyof LocalProfile, value: string) {
+	async function copyData(profile: UserProfileData, key: keyof UserProfile, value: string) {
 		await navigator.clipboard.writeText(value);
 		copiedData = profile.userId + "." + key;
 	}
@@ -54,22 +53,25 @@
 			throw new Error("No profile selected for wiping");
 		}
 
-		await localProfileManager.wipeUserData(confirmWipeProfile.userId);
-		await localProfileManager.loadProfilesData();
+		await userProfileManager.wipeUserData(confirmWipeProfile, userProfiles);
+		await userProfileManager.loadProfilesData();
 
 		confirmWipeProfileDialogOpen = false;
 	}
 </script>
 
-{#if localProfilesState.loaded}
+{#if userProfilesState.loaded}
 	<List>
-		{#each localProfiles as profile (profile.handle)}
+		{#each userProfiles as profile (profile.handle)}
 			<ListItem>
-				<DatumCard title={profile.email || t("Local profile")} indentContent={false}>
+				<DatumCard
+					title={profile.onlineData.email || t("User profile")}
+					indentContent={false}
+				>
 					{#snippet status()}
-						{#if profile.invalid}
-							<AppErrorIcon class="text-xl text-brand-red" />
-							Invalid data
+						{#if profile.offline}
+							<SyncOffIcon class="text-xl text-gray-500" />
+							Offline
 						{/if}
 					{/snippet}
 
@@ -171,7 +173,7 @@
 	<p>
 		{t(
 			"This will delete the profile for {email} and all associated data.",
-			confirmWipeProfile?.email || "undefined",
+			confirmWipeProfile?.onlineData.email || "undefined",
 		)}
 	</p>
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -->

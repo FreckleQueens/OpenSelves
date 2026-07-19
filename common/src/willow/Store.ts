@@ -1,10 +1,14 @@
 import { createId } from "@paralleldrive/cuid2";
 
-import { type Entry, isEntryNewerThan } from "./Entry.js";
-import { Area } from "./meadowcap/Area.js";
+import { Area } from "./Area.js";
+import { Entry } from "./Entry.js";
+import { NamespaceId } from "./NamespaceId.js";
+import { Path } from "./Path.js";
+import { SubspaceId } from "./SubspaceId.js";
+import type { Timestamp } from "./Timestamp.js";
 
 export abstract class Store<T extends Entry, Context = void> {
-	constructor(public readonly namespaceId: string) {}
+	constructor(public readonly namespaceId: NamespaceId) {}
 
 	public abstract getEntries(context?: Context): T[];
 
@@ -24,7 +28,7 @@ export abstract class Store<T extends Entry, Context = void> {
 		const ingestedEntries: T[] = [];
 
 		for (const entryToIngest of entries) {
-			if (entryToIngest.namespaceId !== this.namespaceId) {
+			if (!NamespaceId.equals(entryToIngest.namespaceId, this.namespaceId)) {
 				throw new Error("Tried to ingest entry with wrong namespaceId", {
 					cause: {
 						actual: entryToIngest.namespaceId,
@@ -39,9 +43,9 @@ export abstract class Store<T extends Entry, Context = void> {
 			if (
 				existingEntries.find(
 					(entry) =>
-						entry.subspaceId === entryToIngest.subspaceId &&
-						entryToIngest.path.startsWith(entry.path) &&
-						!isEntryNewerThan(entryToIngest, entry),
+						SubspaceId.equals(entry.subspaceId, entryToIngest.subspaceId) &&
+						Path.extends(entryToIngest.path, entry.path) &&
+						!Entry.isNewer(entryToIngest, entry),
 				)
 			) {
 				continue;
@@ -50,9 +54,9 @@ export abstract class Store<T extends Entry, Context = void> {
 			// Delete in-store older path-prefixed entries
 			const entriesToDelete = existingEntries.filter(
 				(entry) =>
-					entry.subspaceId === entryToIngest.subspaceId &&
-					entry.path.startsWith(entryToIngest.path) &&
-					isEntryNewerThan(entryToIngest, entry),
+					SubspaceId.equals(entry.subspaceId, entryToIngest.subspaceId) &&
+					Path.extends(entry.path, entryToIngest.path) &&
+					Entry.isNewer(entryToIngest, entry),
 			);
 
 			await this.addRemoveEntries(entryToIngest, entriesToDelete, context);
@@ -65,10 +69,10 @@ export abstract class Store<T extends Entry, Context = void> {
 	}
 
 	public area(
-		subspaceId: string | undefined = undefined,
-		path: string = "/",
-		timesStart: bigint = 0n,
-		timesEnd: bigint | "open" = "open",
+		subspaceId: SubspaceId | undefined = undefined,
+		path: Path = [],
+		timesStart: Timestamp = 0n,
+		timesEnd: Timestamp | "open" = "open",
 	): Area<T, Context> {
 		return new Area(this, subspaceId, path, timesStart, timesEnd);
 	}

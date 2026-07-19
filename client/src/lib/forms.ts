@@ -74,7 +74,7 @@ export async function submitOSForm(form: OSFormData) {
 
 		form.workingStatus = form.submitWorkingStatus;
 
-		let result: { response: Response; responseBody: Record<string, unknown> } | undefined;
+		let result: { response: Response; responseBody?: Record<string, unknown> } | undefined;
 		try {
 			result = await call(form.endpoint, {
 				method: form.method || "POST",
@@ -83,7 +83,7 @@ export async function submitOSForm(form: OSFormData) {
 				isUnauthenticated: form.isUnauthenticated,
 			});
 
-			if (!result) {
+			if (!result || !result.responseBody) {
 				appState.isApiReachable = false;
 				scheduleOnlineCheck();
 				return;

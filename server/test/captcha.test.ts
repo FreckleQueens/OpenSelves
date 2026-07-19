@@ -16,13 +16,6 @@ async function verifySolutionCounter(rawExpectedFactor: number, response: { body
 		counterStart: expectedFactor * 40,
 	});
 	assert(solution);
-	// console.log(
-	// 	i,
-	// 	expectedFactor,
-	// 	expectedFactor * 40,
-	// 	expectedFactor * 80,
-	// 	solution.counter,
-	// );
 	assert(solution.counter >= expectedFactor * 40);
 	assert(solution.counter <= expectedFactor * 80);
 }

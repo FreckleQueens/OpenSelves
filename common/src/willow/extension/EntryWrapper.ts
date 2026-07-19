@@ -1,22 +1,22 @@
+import { ByteString } from "../ByteString.js";
+import { Path } from "../Path.js";
 import {
-	type Entry,
-	type EntryWithPayload,
-	fromJsonFriendlyMaybeWithPayload,
-	hashPayload,
-	isEntry,
-	isEntryWithPayload,
-	isJsonFriendlyEntry,
-	j2000Now,
-	verifyPayload,
+	Entry,
+	EntryWithPayload,
+	NamespaceId,
+	PayloadDigest,
+	SubspaceId,
+	Timestamp,
+	UInt64,
 } from "../index.js";
 
 export class EntryWrapper implements Entry {
 	public static async create(
-		namespaceId: string,
-		subspaceId: string,
-		path: string,
-		timestamp: bigint,
-		payload: string,
+		namespaceId: ByteString,
+		subspaceId: ByteString,
+		path: Path,
+		timestamp: Timestamp,
+		payload: ByteString,
 	): Promise<EntryWrapper> {
 		return new EntryWrapper(
 			{
@@ -25,29 +25,26 @@ export class EntryWrapper implements Entry {
 				path,
 				timestamp,
 				payloadLength: BigInt(payload.length),
-				payloadDigest: await hashPayload(payload),
+				payloadDigest: await PayloadDigest.hash(payload),
 			},
 			payload,
 		);
 	}
 
-	public static async load(entry: unknown, payload?: string): Promise<EntryWrapper> {
-		let parsedEntry: Entry | EntryWithPayload;
-		if (isJsonFriendlyEntry(entry)) {
-			parsedEntry = fromJsonFriendlyMaybeWithPayload(entry);
-		} else if (!isEntry(entry)) {
-			throw new Error("entry is invalid", { cause: entry });
-		} else {
-			parsedEntry = entry;
+	public static async load(entry: unknown, payload?: ByteString): Promise<EntryWrapper> {
+		if (!Entry.is(entry) || !Entry.isValid(entry)) {
+			throw new Error("Tried to load an invalid entry", {
+				cause: entry,
+			});
 		}
 
-		const entryObject = new EntryWrapper(parsedEntry);
+		const entryObject = new EntryWrapper(entry);
 
-		if (typeof payload !== "string" && isEntryWithPayload(parsedEntry)) {
-			payload = parsedEntry.payload;
+		if (payload === undefined && EntryWithPayload.is(entry)) {
+			payload = entry.payload;
 		}
 
-		if (typeof payload === "string") {
+		if (payload) {
 			await entryObject.loadPayload(payload);
 		}
 
@@ -55,76 +52,75 @@ export class EntryWrapper implements Entry {
 	}
 
 	private readonly _entry: Entry;
+	private _payload: ByteString | undefined;
 
-	private constructor(
-		entry: Entry,
-		public payload?: string,
-	) {
-		this._entry = {
-			namespaceId: entry.namespaceId,
-			subspaceId: entry.subspaceId,
-			path: entry.path,
-			timestamp: entry.timestamp,
-			payloadLength: entry.payloadLength,
-			payloadDigest: entry.payloadDigest,
-		};
+	private constructor(entry: Entry, payload?: ByteString) {
+		this._entry = Entry.copy(entry);
+
+		if (payload) {
+			this._payload = ByteString.copy(payload);
+		}
 	}
 
 	public get entry(): Entry {
-		return { ...this._entry };
+		return Entry.copy(this._entry);
 	}
 
 	public get entryWithPayload(): EntryWithPayload {
-		if (typeof this.payload === "string") {
-			return { ...this._entry, payload: this.payload };
+		if (this._payload) {
+			return { ...Entry.copy(this._entry), payload: ByteString.copy(this._payload) };
 		} else {
 			throw new Error("this entry doesn't have a payload");
 		}
 	}
 
 	public get entryMaybeWithPayload(): Entry | EntryWithPayload {
-		if (typeof this.payload === "string") {
+		if (this._payload) {
 			return this.entryWithPayload;
 		} else {
 			return this.entry;
 		}
 	}
 
-	public get namespaceId(): string {
-		return this._entry.namespaceId;
+	public get namespaceId(): ByteString {
+		return NamespaceId.copy(this._entry.namespaceId);
 	}
 
-	public get subspaceId(): string {
-		return this._entry.subspaceId;
+	public get subspaceId(): ByteString {
+		return SubspaceId.copy(this._entry.subspaceId);
 	}
 
-	public get path(): string {
-		return this._entry.path;
+	public get path(): Path {
+		return Path.copy(this._entry.path);
 	}
 
-	public get timestamp(): bigint {
+	public get timestamp(): Timestamp {
 		return this._entry.timestamp;
 	}
 
-	public get payloadLength(): bigint {
+	public get payloadLength(): UInt64 {
 		return this._entry.payloadLength;
 	}
 
-	public get payloadDigest(): string {
-		return this._entry.payloadDigest;
+	public get payloadDigest(): PayloadDigest {
+		return PayloadDigest.copy(this._entry.payloadDigest);
 	}
 
-	public async loadPayload(payload: string) {
-		if (typeof this.payload === "string") {
+	public get payload(): ByteString | undefined {
+		return this._payload ? ByteString.copy(this._payload) : undefined;
+	}
+
+	public async loadPayload(payload: ByteString) {
+		if (this._payload) {
 			throw new Error("Payload already loaded");
 		}
 
-		const entry = this.entry;
-		const verifyResult = await verifyPayload(payload, entry.payloadLength, entry.payloadDigest);
-		if (!verifyResult.isSuccess) {
+		if (
+			BigInt(payload.length) !== this._entry.payloadLength ||
+			!(await PayloadDigest.verify(this._entry.payloadDigest, payload))
+		) {
 			throw new Error("Tried to load invalid payload", {
 				cause: {
-					verifyResult,
 					entry: this.entry,
 					entryWrapper: this,
 					payload,
@@ -132,15 +128,15 @@ export class EntryWrapper implements Entry {
 			});
 		}
 
-		this.payload = payload;
+		this._payload = ByteString.copy(payload);
 	}
 
-	public async setPayload(payload: string, timestamp: bigint = j2000Now()) {
-		const length = BigInt(payload.length);
-		const digest = await hashPayload(payload);
+	public async setPayload(payload: ByteString, timestamp: Timestamp = Timestamp.now()) {
+		const length: UInt64 = BigInt(payload.length);
+		const digest: PayloadDigest = await PayloadDigest.hash(payload);
 		this._entry.timestamp = timestamp;
 		this._entry.payloadDigest = digest;
 		this._entry.payloadLength = length;
-		this.payload = payload;
+		this._payload = ByteString.copy(payload);
 	}
 }

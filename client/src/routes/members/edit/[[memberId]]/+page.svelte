@@ -26,12 +26,17 @@
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDBStore } from "$lib/idb/IDBStore";
 	import { proxyEntryDataModel } from "$lib/idb/entry-subscription.svelte";
+	import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 	import { requireAuth } from "$lib/routing-utils";
 	import { filesize } from "filesize";
 	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toast, Toggle } from "konsta/svelte";
 	import { Member, type MemberStatic } from "openselves-common/client";
-	import { MAX_IN_DB_PAYLOAD_LENGTH, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+	import {
+		ByteString,
+		MAX_IN_DB_PAYLOAD_LENGTH,
+		OPENSELVES_NAMESPACE_ID,
+	} from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
 	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";
@@ -41,9 +46,10 @@
 	const { params }: PageProps = $props();
 
 	const storage = PersistentStorage.getInstance();
+	const userProfile = UserProfile.of(storage.getUserId());
 
 	let mounted = $state(false);
-	let memberObj: Member = $state(new Member(storage.getUserId(), {}));
+	let memberObj: Member = $state(new Member(userProfile.ownSubspace.subspaceId, {}));
 	// svelte-ignore state_referenced_locally
 	let initialData = memberObj.data;
 	let member: MemberStatic = $derived(proxyEntryDataModel(memberObj));
@@ -68,7 +74,7 @@
 		if (params.memberId) {
 			const loadedMember = await idbStore.loadDataModel(
 				Member,
-				storage.getUserId(),
+				userProfile.ownSubspace.subspaceId,
 				params.memberId,
 			);
 			if (!loadedMember) {
@@ -102,30 +108,14 @@
 			return;
 		}
 
-		const reader = new FileReader();
-		reader.onload = () => {
-			const result = reader.result?.toString() || "";
-			if (result) {
-				formState.errors["image"] = "";
-				if (result.length <= maxFileSize) {
-					member.image = result;
-				} else {
-					formState.errors["image"] = t(
-						"This file is too big! (max {file.size})",
-						filesize(maxFileSize, {
-							locale: localeState.locale || true,
-						}),
-					);
-				}
-			} else {
+		file.bytes()
+			.then((bytes) => {
+				member.image = ByteString.toUtf8(bytes);
+			})
+			.catch((err) => {
+				console.error(err);
 				formState.errors["image"] = t("Error while loading file {file.name}", file.name);
-			}
-		};
-		reader.onerror = () => {
-			formState.errors["image"] = t("Error while loading file {file.name}", file.name);
-		};
-		// TODO: save as blob, load with URL.createObjectURL()
-		reader.readAsDataURL(file);
+			});
 	});
 
 	async function saveMember() {
@@ -135,7 +125,7 @@
 			return false;
 		}
 
-		await idbStore.userArea(storage.getUserId()).saveDataModel(memberObj);
+		await idbStore.area(userProfile.ownSubspace.subspaceId).saveDataModel(memberObj);
 		return true;
 	}
 
