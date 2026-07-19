@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import assert from "node:assert";
 import test, { describe } from "node:test";
 import { GetUser, TOKEN_EXPIRED_ERROR, parseApiResult } from "openselves-common";
-import { sessions } from "openselves-common/db";
 
+import { sessions } from "../src/db/index.js";
 import type { UserAuthData } from "./TestQueryBuilder.js";
 import {
 	type TestEnvWithUsers,

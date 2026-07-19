@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import type { Job as DbJob } from "openselves-common/db";
 
+import type { Job as DbJob } from "../../db/index.js";
 import { Job } from "../../queue/job.js";
 import type { IMail } from "./mail.js";
 

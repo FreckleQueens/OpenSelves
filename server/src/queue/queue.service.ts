@@ -1,8 +1,8 @@
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { and, asc, eq, isNull, lt } from "drizzle-orm";
-import { jobs } from "openselves-common/db";
 
 import { DB } from "../db/drizzle.js";
+import { jobs } from "../db/index.js";
 import { type IJob, Job, MAX_JOB_ATTEMPTS } from "./job.js";
 
 @Injectable()

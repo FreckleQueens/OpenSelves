@@ -20,10 +20,10 @@ import { Throttle } from "@nestjs/throttler";
 import { DrizzleQueryError } from "drizzle-orm";
 import type { Request } from "express";
 import type { GetUserResult, PartialBy } from "openselves-common";
-import type { User, UserEmailChangeRequest } from "openselves-common/db";
 
 import { Captcha } from "../../captcha/decorators/captcha.decorator.js";
 import type { ConfigData } from "../../config.data.js";
+import type { User, UserEmailChangeRequest } from "../../db/index.js";
 import { Public } from "../decorators/public.decorator.js";
 import { CreateUserDto } from "./data/create-user.dto.js";
 import { FindOneParams } from "./data/find-one.params.js";

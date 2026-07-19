@@ -300,7 +300,7 @@ a short-lived one
   - [ ] put the public key in a "/public.key"
   - [ ] encrypt path components
   - [ ] encrypt payloads
-- [ ] Move common/db to server
+- [x] Move common/db to server
 - [ ] Have the client handle not uploading every entry all at once when it would make the json payload bigger than twice 
 the maximum allowed per-entry payload
 - [ ] obfuscate password recovery request response by always responding with success

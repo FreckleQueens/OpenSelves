@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 import {
 	bigint,
 	bytea,
@@ -6,31 +6,25 @@ import {
 	index,
 	pgEnum,
 	primaryKey,
-	text,
 	timestamp,
 } from "drizzle-orm/pg-core";
-
-import { users } from "./users.js";
+import type { ByteString, Path } from "openselves-common/willow";
 
 const payloadStorageEnum = pgEnum("entryPayloadStorage", ["s3"]);
 export const entries = camelCase.table(
 	"entries",
 	{
-		subspaceId: text()
-			.notNull()
-			.references(() => users.id, {
-				onDelete: "cascade",
-			}),
-		path: text().notNull(),
+		subspaceId: bytea().notNull().$type<ByteString>(),
+		path: bytea().array().notNull().$type<ByteString>(),
 		timestamp: bigint({
 			mode: "bigint",
 		}).notNull(),
 		payloadLength: bigint({
 			mode: "bigint",
 		}).notNull(),
-		payloadDigest: text().notNull(),
+		payloadDigest: bytea().notNull().$type<ByteString>(),
 
-		payload: bytea(),
+		payload: bytea().$type<ByteString>(),
 		payloadStorage: payloadStorageEnum(),
 
 		updatedAt: timestamp({
@@ -50,3 +44,9 @@ export const entries = camelCase.table(
 export type Entry = typeof entries.$inferSelect;
 export type EntryCreate = typeof entries.$inferInsert;
 export type EntryUpdate = Partial<EntryCreate>;
+
+export function pathToPostgresByteaLiteral(path: Path): SQL {
+	return sql.raw(
+		`(array[${path.map((comp) => `'\\x${comp.toHex()}'::bytea`).join(",")}]::bytea[])`,
+	);
+}

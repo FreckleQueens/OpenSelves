@@ -6,6 +6,9 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { randomBytes } from "crypto";
 import { type BuildQueryResult, type RelationsFilterColumns, and, eq, lt } from "drizzle-orm";
 import { type DBQueryConfigWith } from "drizzle-orm/relations";
+
+import type { ConfigData } from "../../config.data.js";
+import { DB } from "../../db/drizzle.js";
 import {
 	type User,
 	type UserCreate,
@@ -14,10 +17,7 @@ import {
 	type relations,
 	userEmailChangeRequest,
 	users,
-} from "openselves-common/db";
-
-import type { ConfigData } from "../../config.data.js";
-import { DB } from "../../db/drizzle.js";
+} from "../../db/index.js";
 import { MailService } from "../mail/mail.service.js";
 
 @Injectable()

@@ -1,4 +1,4 @@
-import { type User } from "openselves-common/db";
+import type { User } from "../../../db/index.js";
 
 export class AccessTokenPayload {
 	constructor(

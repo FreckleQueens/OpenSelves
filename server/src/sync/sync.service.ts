@@ -14,7 +14,7 @@ import {
 	type Transaction,
 	type User,
 	entries,
-} from "openselves-common/db";
+} from "../db/index.js";
 import {
 	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,

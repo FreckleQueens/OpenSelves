@@ -11,7 +11,7 @@ import {
 	isValidSchemaFieldValue,
 	serializeValueToPayload,
 } from "openselves-common/client";
-import { entries, fronts, logs, members } from "openselves-common/db";
+import { entries, fronts, logs, members } from "../../db/index.js";
 import {
 	type EntryWithPayload,
 	EntryWrapper,
