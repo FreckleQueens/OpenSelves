@@ -3,6 +3,8 @@ name: Build
 on:
   workflow_call:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -22,6 +24,23 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
       - run: yarn lint
+
+  test-common:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26.x
+      - run: corepack enable
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          key: yarn
+          path: ~/.yarn
+
+      - run: yarn install --immutable
+      - run: yarn workspace openselves-common test
 
   test-client:
     runs-on: ubuntu-latest
@@ -78,11 +97,11 @@ jobs:
       - run: mkdir server/tmp_upload
       - run: yarn workspace openselves-client test
         env:
-          PUBLIC_URL: http://127.0.0.1:3000
-          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
+          PUBLIC_URL: https://localhost:3000
+          CLIENT_PUBLIC_URL: https://localhost:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          ALLOWED_ORIGINS: http://127.0.0.1:4173
+          ALLOWED_ORIGINS: https://localhost:4173
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
@@ -150,12 +169,12 @@ jobs:
       - run: mkdir server/tmp_upload
       - run: yarn workspace openselves-server test
         env:
-          PUBLIC_URL: http://127.0.0.1:3000
-          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
+          PUBLIC_URL: https://localhost:3000
+          CLIENT_PUBLIC_URL: https://localhost:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
           TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          ALLOWED_ORIGINS: http://localhost
+          ALLOWED_ORIGINS: https://localhost
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000

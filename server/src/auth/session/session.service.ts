@@ -5,10 +5,10 @@ import { createId } from "@paralleldrive/cuid2";
 import { randomBytes } from "crypto";
 import { type RelationsFilterColumns, and, eq, gte, or } from "drizzle-orm";
 import { type PartialBy } from "openselves-common";
-import { type Session, type User, sessions } from "openselves-common/db";
 
 import { type ConfigData } from "../../config.data.js";
 import { DB } from "../../db/drizzle.js";
+import { type Session, type User, sessions } from "../../db/index.js";
 import { AccessTokenPayload } from "./data/access-token-payload.data.js";
 
 @Injectable()

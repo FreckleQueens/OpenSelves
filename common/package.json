@@ -1,28 +1,29 @@
 {
 	"name": "openselves-common",
-	"packageManager": "yarn@4.13.0",
 	"scripts": {
 		"clean": "rm -rf dist",
-		"build": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
-		"dev": "yarn build --watch",
-		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-		"format": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+		"build": "yarn build:src && yarn build:tests",
+		"build:src": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
+		"build:tests": "cd ../common/test && rm -rf dist && yarn tsc && cd ..",
+		"test": "yarn build && node --enable-source-maps --experimental-test-module-mocks --test test/dist/test/**/*.test.js",
+		"dev": "yarn build:src --watch",
+		"lint": "eslint src/**/*.ts test/*.ts",
+		"format": "eslint src/**/*.ts test/*.ts --fix"
 	},
 	"main": "./dist/index.js",
 	"type": "module",
 	"exports": {
 		".": "./dist/index.js",
 		"./client": "./dist/client/index.js",
-		"./db": "./dist/db/index.js",
+		"./schema": "./dist/schema/index.js",
 		"./willow": "./dist/willow/index.js",
-		"./drizzle.config": "./drizzle.config.ts",
 		"./eslint.config.mjs": "./eslint.config.mjs",
 		"./tsconfig.json": "./tsconfig.json"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
-		"@types/node": "^26.0.1",
+		"@types/node": "^26.1.1",
 		"eslint": "^10.5.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-prettier": "^5.5.6",
@@ -32,7 +33,6 @@
 		"typescript-eslint": "^8.62.0"
 	},
 	"dependencies": {
-		"@paralleldrive/cuid2": "^3.3.0",
-		"drizzle-orm": "1.0.0-rc.3"
+		"@paralleldrive/cuid2": "^3.3.0"
 	}
 }

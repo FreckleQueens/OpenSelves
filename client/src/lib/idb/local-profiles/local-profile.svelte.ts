@@ -1,20 +1,15 @@
-import type { LocalProfileData } from "./LocalProfileManager";
+import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
 
-export const localProfilesState: {
+import type { UserProfileData } from "./UserProfileManager.ts";
+
+export const userProfilesState: {
 	loaded: boolean;
-	data: LocalProfileData[];
+	data: UserProfileData[];
 } = $state({
 	loaded: false,
 	data: [],
 });
 
-export type LocalProfile = LocalProfileData & {
-	handle: string;
-};
-
-export function getLocalProfiles(): LocalProfile[] {
-	return localProfilesState.data.map((profile) => ({
-		...profile,
-		handle: profile.userId + "@" + profile.domain,
-	}));
+export function getUserProfiles(): UserProfile[] {
+	return userProfilesState.data.map((profile) => UserProfile.of(profile.userId));
 }

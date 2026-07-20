@@ -1,13 +1,9 @@
 import * as fs from "node:fs";
 import assert from "node:assert";
 import { Member } from "openselves-common/client";
-import {
-	type Entry,
-	EntryWrapper,
-	isEntry,
-	toJsonFriendlyMaybeWithPayload,
-} from "openselves-common/willow";
+import { ByteString, Drop, type EntryWithPayload, SubspaceId } from "openselves-common/willow";
 
+import type { UserAuthData } from "./TestQueryBuilder.js";
 import type { TestEnvWithUsers } from "./utils.js";
 
 export const pushEndpoint = "/sync/push";
@@ -24,49 +20,35 @@ export type FileRef = { filePath: string };
 
 export async function putEntry(
 	env: TestEnvWithUsers,
-	entry: Entry | EntryWrapper | Record<string, unknown>,
+	entry: EntryWithPayload,
 	expectCode: number = 200,
-	cookies: string = env.users.cookies,
-	processEntryObjects: boolean = true,
+	user: UserAuthData = env.users.user1,
 ) {
-	return putEntries(env, [entry], expectCode, cookies, processEntryObjects);
+	return putEntries(env, [entry], expectCode, user);
 }
 
 export async function putEntries(
 	env: TestEnvWithUsers,
-	entries: (Entry | EntryWrapper | Record<string, unknown>)[],
+	entries: EntryWithPayload[],
 	expectCode: number = 200,
-	cookies: string = env.users.cookies,
-	processEntryObjects: boolean = true,
+	user: UserAuthData = env.users.user1,
 ) {
-	let entriesToSend: Record<string, unknown>[];
-	if (processEntryObjects) {
-		entriesToSend = entries.map((entry) => {
-			const entryToProcess =
-				entry instanceof EntryWrapper ? entry.entryMaybeWithPayload : entry;
-			assert(isEntry(entryToProcess));
-			return {
-				...toJsonFriendlyMaybeWithPayload(entryToProcess),
-			};
-		});
-	} else {
-		entriesToSend = [
-			...entries.map((entry) => {
-				assert(!(entry instanceof EntryWrapper));
-				return { ...entry };
-			}),
-		];
-	}
+	const encoder = Drop.encoder();
 
-	const request = env.request.put(pushEndpoint).set("Cookie", cookies).send({
-		entries: entriesToSend,
-	});
-	const response = await request.expect("Content-Type", /json/);
-	if (response.statusCode !== expectCode) {
-		console.error(response.body);
+	const requestPromise = env.request
+		.put(pushEndpoint)
+		.authenticated(user)
+		.uploadStream(encoder.readable)
+		.expect(expectCode)
+		.json();
+
+	const writer = encoder.writable.getWriter();
+	for (const entry of entries) {
+		await writer.write(entry);
 	}
-	assert.strictEqual(response.statusCode, expectCode);
-	return response;
+	await writer.close();
+
+	return requestPromise;
 }
 
 export function readFile(filePath: string) {
@@ -74,12 +56,12 @@ export function readFile(filePath: string) {
 }
 
 export function makeMember(
-	userId: string,
+	subspaceId: SubspaceId,
 	date: Date = new Date(),
 	image: string | FileRef | null = null,
 	minimal: boolean = false,
 ) {
-	const member: Member = new Member(userId, {
+	const member: Member = new Member(subspaceId, {
 		name: "Alice",
 		pronouns: "she/her",
 		description: "a member of our& system",
@@ -98,4 +80,58 @@ export function makeMember(
 	}
 
 	return { member, date };
+}
+
+export async function getSyncFrom(
+	env: TestEnvWithUsers,
+	timestamp: string,
+	subspaceId: ByteString = env.users.user1.keys.publicKey,
+	user: UserAuthData = env.users.user1,
+	expectStatus: number = 200,
+): Promise<{
+	response: Response;
+	timestamp?: string;
+	entries?: EntryWithPayload[];
+}> {
+	const response = await env.request
+		.post(pullEndpoint)
+		.authenticated(user)
+		.accept("application/octet-stream", expectStatus === 200)
+		.send({
+			timestamp: timestamp,
+			subspaceId: subspaceId.toBase64(),
+		})
+		.expect(expectStatus)
+		.execute();
+
+	if (expectStatus !== 200) {
+		return {
+			response,
+		};
+	}
+
+	const responseTimestamp = response.headers.get("X-OpenSelves-Pull-Timestamp");
+
+	assert(typeof responseTimestamp === "string");
+
+	assert(response.body);
+	const readable = response.body.pipeThrough(Drop.decoder());
+	const entries: EntryWithPayload[] = [];
+
+	const reader = readable.getReader();
+	while (true) {
+		const result = await reader.read();
+		if (result.value) {
+			entries.push(result.value);
+		}
+		if (result.done) {
+			break;
+		}
+	}
+
+	return {
+		response,
+		timestamp: responseTimestamp,
+		entries,
+	};
 }

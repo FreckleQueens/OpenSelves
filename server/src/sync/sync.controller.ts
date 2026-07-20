@@ -2,56 +2,41 @@ import {
 	BadRequestException,
 	Body,
 	Controller,
-	HttpCode,
-	HttpStatus,
-	PayloadTooLargeException,
 	Post,
 	Put,
 	Req,
+	Res,
 	UnauthorizedException,
+	UseInterceptors,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { type Request } from "express";
+import type { Request, Response } from "express";
+import { Writable } from "node:stream";
 import {
-	J2000_TO_UNIX_DIFFERENCE,
-	type JsonFriendlyEntry,
-	type JsonFriendlyEntryWithPayload,
+	type ByteString,
+	Drop,
+	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
+	Timestamp,
 } from "openselves-common/willow";
 
-import type { ConfigData } from "../config.data.js";
 import { PullDto } from "./data/pull.dto.js";
-import { PushDto } from "./data/push.dto.js";
+import { PushInterceptor } from "./push.interceptor.js";
 import { SyncService } from "./sync.service.js";
 
 @Controller("sync")
 export class SyncController {
-	constructor(
-		private readonly configService: ConfigService<ConfigData>,
-		private readonly syncService: SyncService,
-	) {}
+	constructor(private readonly syncService: SyncService) {}
 
+	@UseInterceptors(PushInterceptor)
 	@Put("push")
-	public async push(@Body() pushDto: PushDto, @Req() request: Request) {
-		if (!request.accessTokenPayload) {
-			throw new UnauthorizedException();
-		}
-
-		const maxUploadSize = this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true });
-		if (pushDto.entries.some((entry) => entry.payload.length > maxUploadSize)) {
-			throw new PayloadTooLargeException(
-				`One or more of the uploaded entries's payload is too large (max=${maxUploadSize})`,
-			);
-		}
-
-		const userId = request.accessTokenPayload.user.id;
-		await this.syncService.ingestEntries(userId, pushDto.entries);
-		return {};
-	}
+	public push() {}
 
 	@Post("pull")
-	@HttpCode(HttpStatus.OK)
-	public async pull(@Body() pullDto: PullDto, @Req() request: Request) {
+	public async pull(
+		@Body() pullDto: PullDto,
+		@Req() request: Request,
+		@Res() response: Response,
+	) {
 		if (!request.accessTokenPayload) {
 			throw new UnauthorizedException();
 		}
@@ -77,7 +62,7 @@ export class SyncController {
 			}
 
 			// Refuse timestamps before j2000 epoch
-			if (date.getTime() < J2000_TO_UNIX_DIFFERENCE / 1000n) {
+			if (date.getTime() < Timestamp.J2000_TO_UNIX_DIFFERENCE / 1000n) {
 				throw new BadRequestException("Timestamp is too far in the past");
 			}
 		}
@@ -86,32 +71,38 @@ export class SyncController {
 
 		const { entries, timestamp } = await this.syncService.getEntriesFrom(
 			userId,
+			pullDto.subspaceId,
 			pullDto.timestamp,
 		);
 
-		const sanitizedEntries = entries.map(
-			(entry): JsonFriendlyEntry | JsonFriendlyEntryWithPayload => {
-				const jsonFriendlyEntry = {
-					namespaceId: OPENSELVES_NAMESPACE_ID,
-					subspaceId: entry.subspaceId,
-					path: entry.path,
-					timestamp: entry.timestamp.toString(),
-					payloadLength: entry.payloadLength.toString(),
-					payloadDigest: entry.payloadDigest,
-				};
-				if (entry.payload) {
-					return {
-						...jsonFriendlyEntry,
-						payload: entry.payload.toString(),
-					};
-				}
-				return jsonFriendlyEntry;
-			},
-		);
+		const sanitizedEntries: EntryWithPayload[] = entries.map((entry) => {
+			return {
+				namespaceId: OPENSELVES_NAMESPACE_ID,
+				subspaceId: entry.subspaceId,
+				path: entry.path,
+				timestamp: entry.timestamp,
+				payloadLength: entry.payloadLength,
+				payloadDigest: entry.payloadDigest,
+				payload: entry.payload,
+			};
+		});
 
-		return {
-			entries: sanitizedEntries,
-			timestamp,
-		};
+		response.statusCode = 200;
+		response.setHeader("X-OpenSelves-Pull-Timestamp", timestamp);
+		response.setHeader("Transfer-Encoding", "chunked");
+		response.setHeader("X-Content-Type-Options", "nosniff");
+		response.contentType("application/octet-stream");
+
+		const dropEncoder = Drop.encoder();
+		await Promise.all([
+			(async () => {
+				const writer = dropEncoder.writable.getWriter();
+				for (const entry of sanitizedEntries) {
+					await writer.write(entry);
+				}
+				await writer.close();
+			})(),
+			dropEncoder.readable.pipeTo(Writable.toWeb(response) as WritableStream<ByteString>),
+		]);
 	}
 }

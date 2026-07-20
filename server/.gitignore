@@ -3,6 +3,7 @@
 /node_modules
 /build
 /test/dist
+/.dev
 
 # Logs
 logs

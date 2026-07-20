@@ -1,5 +1,6 @@
 import type { JSONCompatible } from "openselves-common";
-import type { Job as DbJob, JobCreate } from "openselves-common/db";
+
+import type { Job as DbJob, JobCreate } from "../db/index.js";
 
 export type JobType<
 	TypeDbName extends string,

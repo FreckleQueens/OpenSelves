@@ -317,11 +317,11 @@ the maximum allowed per-entry payload
 - [ ] add data export to zip file (json files + image files)
 - [ ] add data import from zip file
 - [ ] add data export to a consolidated json
-- [ ] add an option to create a local profile without registering an account
-- [ ] add an option to switch to a local profile without authentication
+- [ ] add an option to create a user profile without registering an account
+- [ ] add an option to switch to a user profile without authentication
 - [ ] warn the user that using the app in this mode has potential data loss risks and that they should backup their data regularly
 - [ ] add data backup reminder
-- [ ] add a way to copy data to the active local profile from any other local profile
+- [ ] add a way to copy data to the active user profile from any other user profile
 - [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
 
 ## 0.10.0 - Optimizations and UI tweaks

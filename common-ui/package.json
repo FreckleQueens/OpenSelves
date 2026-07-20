@@ -1,6 +1,5 @@
 {
 	"name": "openselves-common-ui",
-	"packageManager": "yarn@4.13.0",
 	"scripts": {
 		"clean": "rm -rf dist .svelte-kit",
 		"build": "svelte-kit sync && svelte-package",
@@ -34,6 +33,7 @@
 		"@sveltejs/package": "^2.5.8",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
+		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"eslint": "^10.5.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",

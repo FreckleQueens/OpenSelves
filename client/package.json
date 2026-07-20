@@ -14,12 +14,11 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "yarn check && prettier --check . && eslint .",
 		"format": "prettier --write . && eslint . --fix",
-		"test": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=http://127.0.0.1:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test test/dist/**/*.test.js'",
-		"test:only": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=http://127.0.0.1:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test-only --test test/dist/**/*.test.js'",
+		"test": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=https://localhost:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test test/dist/**/*.test.js'",
+		"test:only": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=https://localhost:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test-only --test test/dist/**/*.test.js'",
 		"test:nix": "nix-shell ./test/shell.nix --argstr run \"yarn test\"",
 		"test:nix:only": "nix-shell ./test/shell.nix --argstr run \"yarn test:only\""
 	},
-	"packageManager": "yarn@4.13.0",
 	"allowScripts": {
 		"puppeteer": true
 	},
@@ -30,7 +29,7 @@
 		"@types/estree": "^1.0.9",
 		"@types/humanize-duration": "^3.27.4",
 		"@types/is-url": "^1.2.32",
-		"@types/node": "^26.0.1",
+		"@types/node": "^26.1.1",
 		"@types/validator": "^13.15.10",
 		"concurrently": "^10.0.3",
 		"drizzle-orm": "1.0.0-rc.3",

@@ -16,7 +16,6 @@
 		"lint": "yarn check && prettier --check . && eslint .",
 		"format": "prettier --write . && eslint . --fix"
 	},
-	"packageManager": "yarn@4.13.0",
 	"dependencies": {
 		"openselves-common-ui": "workspace:^"
 	},

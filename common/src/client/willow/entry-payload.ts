@@ -1,11 +1,12 @@
-import { isValidSchemaFieldValue } from "./schema-validator.js";
-import type { SchemaStatic, SchemaType } from "./types.js";
+import { type SchemaStaticValue, isValidSchemaFieldValue } from "../../schema/index.js";
+import type { SchemaType } from "../../schema/types.js";
+import { ByteString } from "../../willow/index.js";
 
 export function serializeValueToPayload<Model extends SchemaType>(
 	schema: Model,
 	key: keyof Model & string,
 	value: unknown,
-): string {
+): ByteString {
 	if (!isValidSchemaFieldValue(schema, key, value)) {
 		throw new Error("Invalid value for key " + key, {
 			cause: {
@@ -18,68 +19,75 @@ export function serializeValueToPayload<Model extends SchemaType>(
 	return serializeValueToPayloadUnsafe(value);
 }
 
-export function serializeValueToPayloadUnsafe(value: unknown): string {
+export function serializeValueToPayloadUnsafe(value: unknown): ByteString {
+	if (value === undefined || value === null || value === "") {
+		return new Uint8Array(0);
+	}
+
+	let stringValue: string | undefined;
+
 	switch (typeof value) {
-		case "undefined":
-			return "undefined";
 		case "string":
 		case "boolean":
 		case "number":
-			return `${typeof value};${value.toString()}`;
+			stringValue = value.toString();
+			break;
 		case "object":
-			if (value === null) {
-				return "null";
-			}
 			if (value instanceof Date) {
-				return `${value.constructor.name};${value.getTime().toString()}`;
+				stringValue = value.getTime().toString();
 			}
 			break;
 	}
+
+	if (stringValue !== undefined) {
+		return ByteString.fromUtf8(stringValue);
+	}
+
 	throw new Error(`Unsupported type ${typeof value}`, { cause: value });
 }
 
 export function deserializeValueFromPayload<
 	Model extends SchemaType,
 	K extends keyof Model & string,
->(schema: Model, key: K, payload: string): SchemaStatic<Model>[K] {
-	if (payload === "") {
-		throw new Error("empty string payloads are unsupported");
-	}
-
-	const [type, ...parts] = payload.split(";");
-	const value = parts.join(";");
+>(schema: Model, key: K, payload: ByteString): SchemaStaticValue<Model, K> {
+	const field = schema[key];
 
 	let output: unknown;
 
-	switch (type) {
-		case "undefined":
+	if (payload.length === 0) {
+		if (field.types.some((type) => type.name === "string")) {
+			output = "";
+		} else if (field.isOptional) {
 			output = undefined;
-			break;
-		case "null":
+		} else if (field.isNullable) {
 			output = null;
-			break;
-		case "string":
-			output = value;
-			break;
-		case "boolean":
-			output = value === "true";
-			break;
-		case "number":
-			output = Number(value);
-			break;
-		case "Date":
-			output = new Date(Number(value));
-			break;
-		default:
-			throw new Error(`Unsupported type ${type} for key ${key}`, { cause: schema });
+		}
+	}
+
+	const stringValue = ByteString.toUtf8(payload);
+
+	outer: for (const type of field.types) {
+		switch (type.name) {
+			case "string":
+				output = stringValue;
+				break outer;
+			case "boolean":
+				output = stringValue === "true";
+				break outer;
+			case "number":
+				output = Number(stringValue);
+				break outer;
+			case "Date":
+				output = new Date(Number(stringValue));
+				break outer;
+		}
 	}
 
 	if (!isValidSchemaFieldValue(schema, key, output)) {
 		throw new Error("Got invalid output for key " + key, {
 			cause: {
 				output,
-				type,
-				value,
+				stringValue,
 				schema,
 			},
 		});

@@ -1,15 +1,34 @@
 import assert from "node:assert";
 import test, { before, describe } from "node:test";
 import { Member } from "openselves-common/client";
-import { type EntryCreate, entries } from "openselves-common/db";
-import { EntryWrapper, J2000_TO_UNIX_DIFFERENCE, uint64ToInt64 } from "openselves-common/willow";
+import {
+	ByteString,
+	EntryWrapper,
+	Path,
+	type SubspaceId,
+	Timestamp,
+	UInt64,
+} from "openselves-common/willow";
 
+import { type EntryCreate, entries, pathToPostgresByteaLiteral } from "../src/db/index.js";
+import type { UserAuthData } from "./TestQueryBuilder.js";
+import { getSyncFrom as originalGetSyncFrom } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 const pullEndpoint = "/sync/pull";
 
+// TODO: test request timeout (no consumption in 60s? force close)
+
 describe("/sync/pull", () => {
 	let env: TestEnvWithUsers;
+
+	const getSyncFrom = (
+		timestamp: string,
+		subspaceId: ByteString = env.users.user1.keys.publicKey,
+		user: UserAuthData = env.users.user1,
+		expectStatus: number,
+	) => originalGetSyncFrom(env, timestamp, subspaceId, user, expectStatus);
+
 	let members1: Member[];
 	let deletedMember1: Member;
 	const entries1: EntryWrapper[] = [];
@@ -23,13 +42,13 @@ describe("/sync/pull", () => {
 		let timestamp: number = Date.now() - 1000;
 		const getDate = () => new Date(timestamp++);
 		members1 = [
-			new Member(env.users.user.id, {
+			new Member(env.users.user1.keys.publicKey, {
 				name: "Alice",
 				pronouns: "she/her",
 				description: "a member of our& system",
 				createdAt: getDate(),
 			}),
-			new Member(env.users.user.id, {
+			new Member(env.users.user1.keys.publicKey, {
 				name: "Bob",
 				pronouns: "he/him",
 				description: "another member of our& system",
@@ -37,7 +56,7 @@ describe("/sync/pull", () => {
 			}),
 		];
 
-		deletedMember1 = new Member(env.users.user.id, {
+		deletedMember1 = new Member(env.users.user1.keys.publicKey, {
 			name: "Dex",
 			pronouns: "they/them",
 			description: "a deleted member of our& system",
@@ -53,7 +72,7 @@ describe("/sync/pull", () => {
 		);
 
 		members2 = [
-			new Member(env.users.user2.id, {
+			new Member(env.users.user2.keys.publicKey, {
 				name: "Claire",
 				pronouns: "they/them",
 				description: "someone else somewhere else",
@@ -67,16 +86,21 @@ describe("/sync/pull", () => {
 			...(await Promise.all(members2.map((member) => member.flushDirtyEntries()))).flat(),
 		);
 
-		const valuesToInsert = [...entries1, ...entries2].map(
-			(entry): EntryCreate => ({
-				subspaceId: entry.subspaceId,
-				path: entry.path,
-				timestamp: uint64ToInt64(entry.timestamp),
-				payloadLength: uint64ToInt64(entry.payloadLength),
-				payloadDigest: entry.payloadDigest,
-				payload: typeof entry.payload === "string" ? Buffer.from(entry.payload) : null,
-			}),
-		);
+		const valuesToInsert = [...entries1, ...entries2]
+			.map(
+				(entry): EntryCreate => ({
+					subspaceId: entry.subspaceId,
+					path: entry.path,
+					timestamp: UInt64.toInt64(entry.timestamp),
+					payloadLength: UInt64.toInt64(entry.payloadLength),
+					payloadDigest: entry.payloadDigest,
+					payload: entry.payload !== undefined ? entry.payload : null,
+				}),
+			)
+			.map((entry) => ({
+				...entry,
+				path: pathToPostgresByteaLiteral(entry.path),
+			}));
 
 		assert.strictEqual(valuesToInsert.length, 3 * 5 + 1);
 		const inserted = await env.db.insert(entries).values(valuesToInsert).returning();
@@ -84,19 +108,19 @@ describe("/sync/pull", () => {
 	});
 
 	test("GET 404", async () => {
-		await env.request.get(pullEndpoint).expect(404);
+		await env.request.get(pullEndpoint).expect(404).execute();
 	});
 
 	test("PUT 404", async () => {
-		await env.request.put(pullEndpoint).send({}).expect(404);
+		await env.request.put(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	test("PATCH 404", async () => {
-		await env.request.patch(pullEndpoint).send({}).expect(404);
+		await env.request.patch(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	test("DELETE 404", async () => {
-		await env.request.delete(pullEndpoint).send({}).expect(404);
+		await env.request.delete(pullEndpoint).send({}).expect(404).execute();
 	});
 
 	describe("POST", () => {
@@ -104,59 +128,47 @@ describe("/sync/pull", () => {
 			const response = await env.request
 				.post(pullEndpoint)
 				.send({})
-				.set("Cookie", env.users.cookies)
+				.authenticated(env.users.user1)
 				.expect(400)
-				.expect("Content-type", /json/);
-			assert.strictEqual(response.body.entries, undefined);
+				.json();
+			assert.strictEqual(response.body["entries"], undefined);
 		});
-
-		async function callPull(timestamp: string, expectCode: number, cookies: string) {
-			const response = await env.request
-				.post(pullEndpoint)
-				.send({
-					timestamp: timestamp,
-				})
-				.set("Cookie", cookies)
-				.expect("Content-type", /json/);
-			if (response.status !== expectCode) {
-				console.log(response.body);
-			}
-			assert.strictEqual(response.status, expectCode);
-			return response;
-		}
 
 		async function callPullAndGetEntries(
 			timestamp: string,
+			subspaceId: SubspaceId,
+			user: UserAuthData,
 			expectCode: number,
-			cookies: string,
 		) {
 			const date = new Date();
-			const response = await callPull(timestamp, expectCode, cookies);
-			const responseTimestamp = new Date(response.body.timestamp).getTime();
+			const result = await getSyncFrom(timestamp, subspaceId, user, expectCode);
+			assert(result.timestamp);
+			assert(result.entries);
+			const responseTimestamp = new Date(result.timestamp).getTime();
 			assert.strictEqual(Number.isFinite(responseTimestamp), true);
 			assert(Math.abs((responseTimestamp - date.getTime()) / 1000) < 0.5);
 
-			const entries: unknown[] = response.body.entries;
-			assert.notStrictEqual(entries, undefined);
-			assert(Array.isArray(entries));
-			return await Promise.all(
-				entries.map((entry) => {
-					return EntryWrapper.load(entry);
-				}),
-			);
+			return result.entries;
 		}
 
 		test("initial sync 200", async () => {
-			const entries = await callPullAndGetEntries("", 200, env.users.cookies);
+			const entries = await callPullAndGetEntries(
+				"",
+				env.users.user1.keys.publicKey,
+				env.users.user1,
+				200,
+			);
 
 			assert.strictEqual(entries.length, entries1.length);
 			assert.strictEqual(entries.length, 2 * 5 + 1);
 			for (const actualEntry of entries) {
 				assert.strictEqual(
-					entries.filter((entry) => entry.path === actualEntry.path).length,
+					entries.filter((entry) => Path.equals(entry.path, actualEntry.path)).length,
 					1,
 				);
-				const expectedEntry = entries1.findLast((entry) => entry.path === actualEntry.path);
+				const expectedEntry = entries1.findLast((entry) =>
+					Path.equals(entry.path, actualEntry.path),
+				)?.entryWithPayload;
 				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}
 		});
@@ -164,53 +176,58 @@ describe("/sync/pull", () => {
 		test("serves all entries after timestamp 200", async () => {
 			const date = new Date(Date.now() - 10 * 60 * 60 * 1000); // 10 hours ago
 
-			const entries = await callPullAndGetEntries(date.toISOString(), 200, env.users.cookies);
+			const entries = await callPullAndGetEntries(
+				date.toISOString(),
+				env.users.user1.keys.publicKey,
+				env.users.user1,
+				200,
+			);
 
 			assert.strictEqual(entries.length, entries1.length);
 			assert.strictEqual(entries.length, 2 * 5 + 1);
 			for (const actualEntry of entries) {
-				const expectedEntry = entries1.findLast((entry) => entry.path === actualEntry.path);
+				const expectedEntry = entries1.findLast((entry) =>
+					Path.equals(entry.path, actualEntry.path),
+				)?.entryWithPayload;
 				assert(expectedEntry);
 				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}
 		});
 
 		test("accepts timestamp at j2000 epoch 200", async () => {
-			await callPull(
-				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n)).toISOString(),
+			await getSyncFrom(
+				new Date(Number(Timestamp.J2000_TO_UNIX_DIFFERENCE / 1000n)).toISOString(),
+				env.users.user1.keys.publicKey,
+				env.users.user1,
 				200,
-				env.users.cookies,
 			);
 		});
 
 		test("refuses timestamp older than j2000 epoch 400", async () => {
-			const response = await callPull(
-				new Date(Number(J2000_TO_UNIX_DIFFERENCE / 1000n - 1n)).toISOString(),
+			await getSyncFrom(
+				new Date(Number(Timestamp.J2000_TO_UNIX_DIFFERENCE / 1000n - 1n)).toISOString(),
+				env.users.user1.keys.publicKey,
+				env.users.user1,
 				400,
-				env.users.cookies,
 			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
 		});
 
 		test("refuses timestamp in the future 400", async () => {
-			const response = await callPull(
+			await getSyncFrom(
 				new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now
+				env.users.user1.keys.publicKey,
+				env.users.user1,
 				400,
-				env.users.cookies,
 			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
 		});
 
 		test("refuses invalid timestamp 400", async () => {
-			const response = await callPull(
+			await getSyncFrom(
 				"this is not a valid timestamp",
+				env.users.user1.keys.publicKey,
+				env.users.user1,
 				400,
-				env.users.cookies,
 			);
-			assert.strictEqual(response.body.timestamp, undefined);
-			assert.strictEqual(response.body.entries, undefined);
 		});
 	});
 });

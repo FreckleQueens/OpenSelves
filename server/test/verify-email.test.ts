@@ -8,6 +8,7 @@ import {
 	setupTestSuiteWithUsers,
 	solveCaptcha,
 	testCaptcha,
+	verifyUser1Email,
 } from "./utils.js";
 
 describe("Email verification", () => {
@@ -24,9 +25,10 @@ describe("Email verification", () => {
 	describe("/user", () => {
 		test("GET has field isEmailVerified=false 200", async () => {
 			const response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
+				.get("/user/" + env.users.user1.api.id)
+				.authenticated(env.users.user1)
+				.expect(200)
+				.json();
 			assert.partialDeepStrictEqual(response.body, {
 				isEmailVerified: false,
 			});
@@ -38,7 +40,7 @@ describe("Email verification", () => {
 		test("POST verifies user email 200", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
@@ -47,14 +49,19 @@ describe("Email verification", () => {
 
 			await env.request
 				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+					"/user/" +
+						env.users.user1.api.id +
+						"/verify-email/" +
+						dbUser.emailVerificationToken,
 				)
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			const userResponse = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
+				.get("/user/" + env.users.user1.api.id)
+				.authenticated(env.users.user1)
+				.expect(200)
+				.json();
 			assert.partialDeepStrictEqual(userResponse.body, {
 				isEmailVerified: true,
 			});
@@ -62,21 +69,23 @@ describe("Email verification", () => {
 
 		test("POST bad token length 400", async () => {
 			await env.request
-				.post("/user/" + env.users.user.id + "/verify-email/badtokenlength")
-				.expect(400);
+				.post("/user/" + env.users.user1.api.id + "/verify-email/badtokenlength")
+				.expect(400)
+				.execute();
 		});
 
 		test("POST wrong token 404", async () => {
 			const invalidToken = generateDummyToken();
 			await env.request
-				.post("/user/" + env.users.user.id + "/verify-email/" + invalidToken)
-				.expect(404);
+				.post("/user/" + env.users.user1.api.id + "/verify-email/" + invalidToken)
+				.expect(404)
+				.execute();
 		});
 
 		test("POST wrong user 404", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
@@ -87,24 +96,30 @@ describe("Email verification", () => {
 						"/verify-email/" +
 						dbUser.emailVerificationToken,
 				)
-				.expect(404);
+				.expect(404)
+				.execute();
 		});
 
 		test("POST doesn't modify the user the second time 200", async () => {
 			const dbUser = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser);
 
-			await env.request.post(
-				"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
-			);
+			await env.request
+				.post(
+					"/user/" +
+						env.users.user1.api.id +
+						"/verify-email/" +
+						dbUser.emailVerificationToken,
+				)
+				.execute();
 
 			const dbUser1 = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser1);
@@ -113,13 +128,17 @@ describe("Email verification", () => {
 			await new Promise((resolve) => setTimeout(resolve, 1));
 			await env.request
 				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
+					"/user/" +
+						env.users.user1.api.id +
+						"/verify-email/" +
+						dbUser.emailVerificationToken,
 				)
-				.expect(200);
+				.expect(200)
+				.execute();
 
 			const dbUser2 = await env.db.query.users.findFirst({
 				where: {
-					id: env.users.user.id,
+					id: env.users.user1.api.id,
 				},
 			});
 			assert(dbUser2);
@@ -131,95 +150,94 @@ describe("Email verification", () => {
 	describe("/user/:id/resend-verification-email", () => {
 		test("POST 200", async () => {
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 		});
 
 		test("POST wrong user 403", async () => {
 			await env.request
-				.post(`/user/${env.users.user2.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user2.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.api.email),
 				})
-				.expect(403);
+				.expect(403)
+				.execute();
 		});
 
 		test("POST twice in a row 429", async () => {
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(429);
+				.expect(429)
+				.execute();
 		});
 
 		test("POST once, flush, once 429", async () => {
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 			await env.app.get(QueueService).flushJobs();
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(429);
+				.expect(429)
+				.execute();
 		});
 
 		test("POST twice with different users 200", async () => {
 			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 			await env.request
-				.post(`/user/${env.users.user2.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies2)
+				.post(`/user/${env.users.user2.api.id}/resend-verification-email`)
+				.set("Cookie", env.users.user2.cookies)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 		});
 
 		test("POST already verified 403", async () => {
-			const dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
+			await verifyUser1Email(env);
 			await env.request
-				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
-				)
-				.expect(200);
-			await env.request
-				.post(`/user/${env.users.user.id}/resend-verification-email`)
-				.set("Cookie", env.users.cookies)
+				.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+				.authenticated(env.users.user1)
 				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user.email),
+					captcha: await solveCaptcha(env, "sendEmail", env.users.user1.api.email),
 				})
-				.expect(200);
+				.expect(200)
+				.execute();
 		});
 
 		testCaptcha(
@@ -228,16 +246,16 @@ describe("Email verification", () => {
 			(testName, testCallback) => {
 				test(testName, testCallback);
 			},
-			async (captcha) => {
+			(captcha) => {
 				return env.request
-					.post(`/user/${env.users.user.id}/resend-verification-email`)
-					.set("Cookie", env.users.cookies)
+					.post(`/user/${env.users.user1.api.id}/resend-verification-email`)
+					.authenticated(env.users.user1)
 					.send({
 						captcha,
 					});
 			},
 			"sendEmail",
-			() => env.users.user.email,
+			() => env.users.user1.api.email,
 			undefined,
 			true,
 		);

@@ -1,13 +1,17 @@
 import { PersistentStorage } from "$lib/PersistentStorage";
 import { appState } from "$lib/appState.svelte";
 import { IDBStore } from "$lib/idb/IDBStore";
+import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
+import { EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
+import { type SchemaStatic, isValidSchemaKey } from "openselves-common/schema";
 import {
-	EntryDataModel,
-	type EntryDataModelSchema,
-	type SchemaStatic,
-	isValidSchemaKey,
-} from "openselves-common/client";
-import { EntryWrapper, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+	EntryWrapper,
+	OPENSELVES_NAMESPACE_ID,
+	Path,
+	PayloadDigest,
+	type SubspaceId,
+} from "openselves-common/willow";
+import { PathComponent } from "openselves-common/willow";
 import { onDestroy } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -21,7 +25,10 @@ export type SubscriptionState<Schema extends EntryDataModelSchema> = {
 };
 
 export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
-	new (subspaceId: string, from: SchemaStatic<Schema> | EntryWrapper[]): EntryDataModel<Schema>;
+	new (
+		subspaceId: SubspaceId,
+		from: SchemaStatic<Schema> | EntryWrapper[],
+	): EntryDataModel<Schema>;
 	getModelKey(): string;
 }): () => SubscriptionState<Schema> {
 	let loaded: boolean = $state(false);
@@ -36,7 +43,9 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
 
 	let unsubscribe: (() => void) | undefined;
 	onDestroy(async () => {
-		activeSubscriptions.delete(stateFn);
+		activeSubscriptions.delete(
+			stateFn as unknown as () => SubscriptionState<EntryDataModelSchema>,
+		);
 		if (unsubscribe) {
 			unsubscribe();
 		}
@@ -46,25 +55,28 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
 		if (!appState.isAuthenticated) {
 			return;
 		}
-		activeSubscriptions.add(stateFn);
+		activeSubscriptions.add(
+			stateFn as unknown as () => SubscriptionState<EntryDataModelSchema>,
+		);
 
-		const modelPathPrefix = `/${model.getModelKey()}`;
-		const storage = PersistentStorage.getInstance();
-		const userId = storage.getUserId();
+		const modelPathPrefix = Path.fromStrings(model.getModelKey());
+		const profile = UserProfile.of(PersistentStorage.getInstance().getUserId());
+		const userSubspaceId = profile.ownSubspace.subspaceId;
 
 		const store = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
 		unsubscribe = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
-			.userArea(userId, modelPathPrefix)
+			.area(userSubspaceId, modelPathPrefix)
 			.subscribe(async (entry) => {
-				const modelId = entry.path.substring(1).split("/")[1];
-				const modelPath = `${modelPathPrefix}/${modelId}`;
-				const storeEntries = store.userArea(userId, modelPath).getEntries();
-				if (entry.path === modelPath && storeEntries.length === 0) {
+				const modelIdComponent = entry.path[1];
+				const modelId = PathComponent.toString(entry.path[1]);
+				const modelPath: Path = [...modelPathPrefix, modelIdComponent];
+				const storeEntries = store.area(userSubspaceId, modelPath).getEntries();
+				if (Path.equals(entry.path, modelPath) && storeEntries.length === 0) {
 					dataModels = dataModels.filter((model) => model.get("id") !== modelId);
 				} else {
 					const newEntries: EntryWrapper[] = [];
-					if (entry.payloadLength > 0n) {
+					if (entry.payloadLength.valueOf() > 0n) {
 						newEntries.push(await EntryWrapper.load(entry));
 					}
 
@@ -73,14 +85,20 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
 						dataModels = dataModels.filter((model) => model !== loadedModel);
 						const loadedEntries = loadedModel.getEntries();
 						for (const storeEntry of storeEntries) {
-							if (storeEntry.payloadLength === 0n || storeEntry.path === entry.path) {
+							if (
+								storeEntry.payloadLength === 0n ||
+								Path.equals(storeEntry.path, entry.path)
+							) {
 								continue;
 							}
 
 							const loadedEntry = loadedEntries.find(
 								(loadedEntry) =>
-									loadedEntry.path === storeEntry.path &&
-									loadedEntry.payloadDigest === storeEntry.payloadDigest,
+									Path.equals(loadedEntry.path, storeEntry.path) &&
+									PayloadDigest.equals(
+										loadedEntry.payloadDigest,
+										storeEntry.payloadDigest,
+									),
 							);
 							newEntries.push(
 								loadedEntry ? loadedEntry : await EntryWrapper.load(storeEntry),
@@ -88,37 +106,41 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
 						}
 					}
 					if (newEntries.length > 0) {
-						dataModels.push(new model(userId, newEntries));
+						dataModels.push(new model(userSubspaceId, newEntries));
 					}
 				}
 			});
 
 		await store.init();
-		const initialEntries = store.userArea(userId, modelPathPrefix).getEntries();
+		const initialEntries = store.area(userSubspaceId, modelPathPrefix).getEntries();
 
 		const entries = await Promise.all(initialEntries.map((entry) => EntryWrapper.load(entry)));
 		dataModels = [
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
-			...new Set(
-				entries.map(
-					(entry) => entry.path.substring(modelPathPrefix.length + 1).split("/")[0],
-				),
-			),
+			...new Set(entries.map((entry) => PathComponent.toString(entry.path[1]))),
 		]
 			.map((id) =>
-				entries.filter((entry) => entry.path.startsWith(`/${model.getModelKey()}/${id}/`)),
+				entries.filter(
+					(entry) =>
+						entry.path.length > 2 &&
+						Path.extends(entry.path, [
+							...modelPathPrefix,
+							PathComponent.fromString(id),
+						]),
+				),
 			)
 			.filter((entries) => entries.length > 0)
-			.map((entries) => new model(userId, entries));
+			.map((entries) => new model(userSubspaceId, entries));
 		loaded = true;
 	})();
 
 	return stateFn;
 }
 
-export function proxyEntryDataModel<Schema extends EntryDataModelSchema>(
-	model: EntryDataModel<Schema>,
-): SchemaStatic<Schema> {
+export function proxyEntryDataModel<
+	Model extends EntryDataModel<Schema>,
+	Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+>(model: Model): SchemaStatic<Schema> {
 	const data = $state(model.data);
 	return new Proxy<SchemaStatic<Schema>>(data, {
 		get(target: SchemaStatic<Schema>, p: string | symbol, receiver?: unknown) {
@@ -147,8 +169,9 @@ export function proxyEntryDataModel<Schema extends EntryDataModelSchema>(
 	});
 }
 
-export function proxyEntryDataModels<Schema extends EntryDataModelSchema>(
-	models: EntryDataModel<Schema>[],
-): SchemaStatic<Schema>[] {
+export function proxyEntryDataModels<
+	Model extends EntryDataModel<Schema>,
+	Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+>(models: Model[]): SchemaStatic<Schema>[] {
 	return models.map((model) => proxyEntryDataModel(model));
 }
