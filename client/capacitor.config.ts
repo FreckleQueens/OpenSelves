@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
 	appName: "openselves-client",
 	webDir: "build",
 	// server: {
-	// url: "http://10.0.2.2:5173",
+	// url: "https://10.0.2.2:5173",
 	// cleartext: true,
 	// },
 	android: {

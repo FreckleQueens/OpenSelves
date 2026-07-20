@@ -158,7 +158,7 @@ describe(pushEndpoint, () => {
 			for (const { testName, image, expectCode, isServed } of [
 				{
 					testName: "valid http url 200",
-					image: "http://example.com/image.png",
+					image: "https://example.com/image.png",
 					expectCode: 200,
 					isServed: true,
 				},

@@ -14,8 +14,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "yarn check && prettier --check . && eslint .",
 		"format": "prettier --write . && eslint . --fix",
-		"test": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=http://127.0.0.1:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test test/dist/**/*.test.js'",
-		"test:only": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=http://127.0.0.1:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test-only --test test/dist/**/*.test.js'",
+		"test": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=https://localhost:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test test/dist/**/*.test.js'",
+		"test:only": "PUBLIC_TEST_ENVIRONMENT=1 yarn build && concurrently --success 'command-3' --kill-others 'mailpit' 'yarn preview' 'cd ../server && ACCESS_TOKEN_DURATION=4 REFRESH_TOKEN_SHORT_DURATION=10 INSECURE_EASY_CAPTCHA_FOR_TESTS=true CLIENT_PUBLIC_URL=https://localhost:4173 yarn start:prod' 'node --enable-source-maps --experimental-test-module-mocks --test-only --test test/dist/**/*.test.js'",
 		"test:nix": "nix-shell ./test/shell.nix --argstr run \"yarn test\"",
 		"test:nix:only": "nix-shell ./test/shell.nix --argstr run \"yarn test:only\""
 	},
