@@ -91,8 +91,8 @@ export class PuppeteerContext {
 		page.on("response", (response) => {
 			const url = response
 				.url()
-				.replace("http://127.0.0.1:4173", "(client)")
-				.replace("http://127.0.0.1:3000", "(api)");
+				.replace("https://localhost:4173", "(client)")
+				.replace("https://localhost:3000", "(api)");
 			this.logs.push({
 				type: "response",
 				content: [response.request().method(), url, "-", response.status()],
@@ -118,13 +118,16 @@ export class PuppeteerContext {
 		this._ctx = ctx;
 
 		try {
-			this.browser = await puppeteer.launch(debugLaunchOptions);
+			this.browser = await puppeteer.launch({
+				...debugLaunchOptions,
+				acceptInsecureCerts: true,
+			});
 
 			const pages = await this.browser.pages();
 			const page = pages[0];
 			await ctx.waitFor(
 				async () => {
-					await page.goto("http://127.0.0.1:4173", {
+					await page.goto("https://localhost:4173", {
 						timeout: 1000,
 					});
 				},
@@ -134,7 +137,7 @@ export class PuppeteerContext {
 			);
 			await ctx.waitFor(
 				async () => {
-					await page.goto("http://127.0.0.1:3000", {
+					await page.goto("https://localhost:3000", {
 						timeout: 1000,
 					});
 				},
@@ -223,7 +226,7 @@ export class PuppeteerContext {
 			const fullUrl =
 				url.startsWith("http") || url === "about:blank"
 					? url
-					: "http://127.0.0.1:4173" + url;
+					: "https://localhost:4173" + url;
 			this.logs.push({
 				type: "goto",
 				content: [fullUrl],

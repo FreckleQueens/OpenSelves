@@ -80,11 +80,11 @@ jobs:
       - run: mkdir server/tmp_upload
       - run: yarn workspace openselves-client test
         env:
-          PUBLIC_URL: http://127.0.0.1:3000
-          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
+          PUBLIC_URL: https://localhost:3000
+          CLIENT_PUBLIC_URL: https://localhost:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          ALLOWED_ORIGINS: http://127.0.0.1:4173
+          ALLOWED_ORIGINS: https://localhost:4173
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000
@@ -152,12 +152,12 @@ jobs:
       - run: mkdir server/tmp_upload
       - run: yarn workspace openselves-server test
         env:
-          PUBLIC_URL: http://127.0.0.1:3000
-          CLIENT_PUBLIC_URL: http://127.0.0.1:5173
+          PUBLIC_URL: https://localhost:3000
+          CLIENT_PUBLIC_URL: https://localhost:5173
           LISTEN_PORT: 3000
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres-dummy"
           TEST_DB_URL: "postgres://postgres:postgres@localhost:5432/postgres"
-          ALLOWED_ORIGINS: http://localhost
+          ALLOWED_ORIGINS: https://localhost
           JWT_SECRET: thisisnotarealsecretthisisfortestingonlydonotuseinprod
           ACCESS_TOKEN_DURATION: 900
           REFRESH_TOKEN_DURATION: 2592000

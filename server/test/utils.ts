@@ -126,7 +126,7 @@ export function setupTestSuite(
 	let env: TestEnv;
 
 	before(async () => {
-		const urlBase = setCaptchaToEasyMode ? "http://127.0.0.1:3000" : "http://127.0.0.1:3002";
+		const urlBase = setCaptchaToEasyMode ? "https://localhost:3000" : "https://localhost:3002";
 		await waitForServerToComeOnline(urlBase);
 
 		const { AppModule, configureApp } = await import("../src/app.module.js");

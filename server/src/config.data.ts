@@ -5,6 +5,7 @@ export interface ConfigData {
 
 	PUBLIC_URL: string;
 	CLIENT_PUBLIC_URL: string;
+	LISTEN_HOST: string;
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
 	TEST_DB_URL: string;
@@ -67,6 +68,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 			scheme: ["http", "https"],
 		})
 		.required(),
+	LISTEN_HOST: Joi.string().hostname(),
 	LISTEN_PORT: Joi.number(),
 	DATABASE_URL: Joi.string().uri().required(),
 	TEST_DB_URL: Joi.string().uri().not(Joi.ref("DATABASE_URL")).messages({
