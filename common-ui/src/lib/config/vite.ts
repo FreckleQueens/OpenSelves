@@ -18,6 +18,7 @@ export function makeViteConfig(listenPort: number, additionalConfig?: UserConfig
 						extension: "svelte",
 					}),
 				],
+				dts: "./src/generated/auto-imports.d.ts",
 			}),
 			Icons({
 				compiler: "svelte",

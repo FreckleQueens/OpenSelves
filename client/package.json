@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"clean": "rm -rf auto-imports.d.ts build .svelte-kit test-results",
+		"clean": "rm -rf ./src/generated/auto-imports.d.ts build .svelte-kit test-results",
 		"dev": "vite dev",
 		"build": "yarn build:src && yarn build:tests",
 		"build:src": "yarn prepare && vite build && yarn cap sync",

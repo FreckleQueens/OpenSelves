@@ -27,4 +27,4 @@ vite.config.ts.timestamp-*
 /.yarn
 
 # Generated
-/auto-imports.d.ts
+/src/generated/
