@@ -1,26 +1,31 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { USER_LANDED_STORAGE_KEY } from "$lib";
-import { PersistentStorage } from "$lib/PersistentStorage";
-import { appState } from "$lib/appState.svelte.js";
+import { Settings } from "$lib/Settings";
+import { Profile } from "$lib/idb/profiles";
 
-export function requireAuth() {
+export function requireCurrentProfile() {
 	return (async () => {
-		if (!appState.isAuthenticated) {
+		if (Profile.hasCurrentProfile()) {
+			return Profile.getCurrentProfile();
+		} else {
 			await gotoHomeRoute({
 				requires_auth: "1",
 			});
+			return undefined;
 		}
 	})();
 }
 
-export function requireGuest() {
+export function requireNoCurrentProfile() {
 	return (async () => {
-		if (appState.isAuthenticated) {
+		if (Profile.hasCurrentProfile()) {
 			await gotoHomeRoute({
 				requires_guest: "1",
 			});
+			return false;
 		}
+		return true;
 	})();
 }
 
@@ -31,11 +36,16 @@ export async function gotoHomeRoute(
 	const urlSuffix = searchParams ? `?${new URLSearchParams(searchParams).toString()}` : "";
 
 	let url: string;
-	if (appState.isAuthenticated) {
-		url = resolve("/dashboard");
+	if (Profile.hasCurrentProfile()) {
+		const profile = Profile.getCurrentProfile();
+		if (profile.ownSubspaces.length === 0) {
+			url = resolve("/subspaces/create-own");
+		} else {
+			url = resolve("/dashboard");
+		}
 	} else {
-		if (await PersistentStorage.getInstance().get(USER_LANDED_STORAGE_KEY, true)) {
-			url = resolve("/auth");
+		if (await Settings.get(USER_LANDED_STORAGE_KEY)) {
+			url = resolve("/profiles");
 		} else {
 			url = resolve("/land");
 		}

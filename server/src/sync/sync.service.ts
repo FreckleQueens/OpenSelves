@@ -21,8 +21,13 @@ import {
 	UInt64,
 } from "openselves-common/willow";
 
+import type { AccessTokenPayload } from "../auth/session/data/access-token-payload.data.js";
 import { DB, excludedColumn } from "../db/drizzle.js";
-import { type EntryCreate, type User, entries, pathToPostgresByteaLiteral } from "../db/index.js";
+import {
+	type EntryCreate,
+	byteStringArrayToPostgresByteaArrayLiteral,
+	entries,
+} from "../db/index.js";
 import type { Transaction } from "../db/type-utils.js";
 import { S3Service } from "./s3.service.js";
 
@@ -33,14 +38,17 @@ export class SyncService {
 		private readonly s3Service: S3Service,
 	) {}
 
-	private async verifyEntries(userId: string, entries: EntryWithPayload[]) {
+	public hasReadWriteAccess(accessTokenPayload: AccessTokenPayload, subspaceId: SubspaceId) {
+		const allowedSubspaceIds: SubspaceId[] = accessTokenPayload.subspaceIds.map((base64Value) =>
+			SubspaceId.fromBase64(base64Value),
+		);
+		return allowedSubspaceIds.some((allowedSubspaceId) =>
+			SubspaceId.equals(allowedSubspaceId, subspaceId),
+		);
+	}
+
+	private async verifyEntries(entries: EntryWithPayload[]) {
 		for (const entry of entries) {
-			// !!DON'T MERGE WITHOUT THIS!! TODO: verify user has write access (meadowcap)
-			// if (!SubspaceId.equals(dto.subspaceId, userId)) {
-			// 	throw new ForbiddenException("Invalid subspaceId", {
-			// 		cause: dto,
-			// 	});
-			// }
 			if (entry.payload) {
 				if (entry.timestamp === UInt64.MAX_VALUE && entry.payloadLength.valueOf() > 0) {
 					throw new BadRequestException(
@@ -93,7 +101,7 @@ export class SyncService {
 							eq(entries.subspaceId, entry.subspaceId),
 							eq(
 								entries.path,
-								pathToPostgresByteaLiteral(entry.path).append(
+								byteStringArrayToPostgresByteaArrayLiteral(entry.path).append(
 									sql`[:(array_length(${entries.path}, 1))]`,
 								),
 							),
@@ -152,8 +160,8 @@ export class SyncService {
 		};
 	}
 
-	public async ingestEntries(userId: string, entriesToIngest: EntryWithPayload[]): Promise<void> {
-		await this.verifyEntries(userId, entriesToIngest);
+	public async ingestEntries(entriesToIngest: EntryWithPayload[]): Promise<void> {
+		await this.verifyEntries(entriesToIngest);
 
 		try {
 			await this.db.transaction(async (tx) => {
@@ -176,7 +184,7 @@ export class SyncService {
 
 				const pathPreparedEntries = s3PreparedEntries.map((entry) => ({
 					...entry,
-					path: pathToPostgresByteaLiteral(entry.path),
+					path: byteStringArrayToPostgresByteaArrayLiteral(entry.path),
 				}));
 
 				const oldUpdatedRows = await tx
@@ -244,7 +252,7 @@ export class SyncService {
 								and(
 									eq(entries.subspaceId, entry.subspaceId),
 									eq(
-										pathToPostgresByteaLiteral(entry.path),
+										byteStringArrayToPostgresByteaArrayLiteral(entry.path),
 										sql`(${entries.path})[:(${entry.path.length})]`,
 									),
 									or(
@@ -319,8 +327,7 @@ export class SyncService {
 	}
 
 	public async getEntriesFrom(
-		userId: User["id"],
-		subspaceId: SubspaceId,
+		subspaceIds: SubspaceId[],
 		timestamp: string,
 	): Promise<{
 		timestamp: string;
@@ -328,9 +335,8 @@ export class SyncService {
 	}> {
 		const entries = await this.db.query.entries.findMany({
 			where: {
-				// !!DON'T MERGE WITHOUT THIS!! TODO: verify user has write access (meadowcap)
 				subspaceId: {
-					eq: subspaceId,
+					in: subspaceIds,
 				},
 				updatedAt: {
 					gte: timestamp === "" ? "-infinity" : timestamp,

@@ -1,25 +1,11 @@
 import { PUBLIC_ENABLE_PERFORMANCE_LOGS } from "$env/static/public";
-import { IDBStorage, PersistentStorage } from "$lib/PersistentStorage";
-import {
-	SERVER_STATUS_STORAGE_KEY,
-	SERVER_URL_STORAGE_KEY,
-	apiState,
-	needsApiLogout,
-	scheduleOnlineCheck,
-	tryApiLogout,
-} from "$lib/api.svelte";
-import { appState } from "$lib/appState.svelte.js";
+import { Settings } from "$lib/Settings";
 import { DEFAULT_LOCALE } from "$lib/i18n/i18n";
 import { LOCALE_STORAGE_KEY, setLocale } from "$lib/i18n/i18n-client";
 import { IDB } from "$lib/idb";
-import { SyncWorker } from "$lib/idb/SyncWorker";
-import { UserProfileManager } from "$lib/idb/local-profiles";
-import {
-	API_VERSION,
-	GetStatus,
-	logPerformanceMarkDeltas,
-	parseApiResult,
-} from "openselves-common";
+import { Profile } from "$lib/idb/profiles";
+import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
+import { API_VERSION, logPerformanceMarkDeltas } from "openselves-common";
 
 if (PUBLIC_ENABLE_PERFORMANCE_LOGS === "1") {
 	logPerformanceMarkDeltas();
@@ -34,18 +20,18 @@ export async function initApp() {
 	await IDB.init();
 	performance.mark("init.idb");
 
-	// Persistent storage
-	performance.mark("init.storage");
-	await PersistentStorage.setInstance(new IDBStorage());
-	const storage = PersistentStorage.getInstance();
-	performance.mark("init.storage");
+	// Profiles
+	performance.mark("init.profiles");
+	await Profile.loadProfilesData();
+	await Profile.loadCurrentProfile();
+	performance.mark("init.profiles");
 
 	// SyncWorker
 	performance.mark("init.syncworker");
-	SyncWorker.initialize(appState.isAuthenticated && navigator.onLine);
+	SyncWorker.initialize(Profile.hasCurrentProfile() && navigator.onLine);
 
-	window.addEventListener("online", () => {
-		if (appState.isAuthenticated) {
+	window.addEventListener("online", async () => {
+		if (Profile.hasCurrentProfile() && Profile.getCurrentProfile().isSyncEnabled()) {
 			SyncWorker.getInstance().resume();
 		}
 	});
@@ -56,36 +42,8 @@ export async function initApp() {
 
 	// i18n
 	performance.mark("init.locale");
-	await setLocale((await storage.get(LOCALE_STORAGE_KEY, true)) || DEFAULT_LOCALE, false);
+	await setLocale((await Settings.get(LOCALE_STORAGE_KEY)) || DEFAULT_LOCALE, false);
 	performance.mark("init.locale");
-
-	// Server url
-	performance.mark("init.api.url");
-	const storedUrl = await storage.get(SERVER_URL_STORAGE_KEY, true);
-	if (storedUrl) {
-		apiState.url = storedUrl;
-	}
-	performance.mark("init.api.url");
-
-	performance.mark("init.api.status");
-	const storedStatus = await storage.get(SERVER_STATUS_STORAGE_KEY, true);
-	if (storedStatus) {
-		apiState.status = parseApiResult(GetStatus, JSON.parse(storedStatus));
-	} else {
-		scheduleOnlineCheck(0);
-	}
-	performance.mark("init.api.status");
-
-	// User data
-	performance.mark("init.userProfileState");
-	await UserProfileManager.getInstance().loadProfilesData();
-	performance.mark("init.userProfileState");
-
-	if (!appState.isAuthenticated && (await needsApiLogout())) {
-		performance.mark("init.logout");
-		await tryApiLogout(5000, false);
-		performance.mark("init.logout");
-	}
 
 	performance.mark("init");
 }

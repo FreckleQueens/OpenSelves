@@ -7,11 +7,13 @@
 	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import { type OSFormProps } from "$lib/forms";
+	import { Profile } from "$lib/idb/profiles";
 	import { Block, BlockTitle, Dialog, DialogButton } from "konsta/svelte";
 	import { type Snippet } from "svelte";
 
 	let {
 		children,
+		profile,
 		loaded,
 		formState = $bindable(),
 		title,
@@ -22,6 +24,7 @@
 		...rest
 	}: OSFormProps & {
 		children: Snippet;
+		profile: Profile | undefined;
 		loaded: boolean;
 		title: string;
 		successDialogTitle: string;
@@ -49,6 +52,7 @@
 		<Block>
 			<OSForm
 				bind:formState
+				{profile}
 				onSuccess={() => {
 					successDialogOpen = true;
 				}}

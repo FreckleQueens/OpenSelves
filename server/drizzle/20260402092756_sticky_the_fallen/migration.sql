@@ -1,1 +1,0 @@
-ALTER TABLE "logs" ADD CONSTRAINT "delete_op_data_null_check" CHECK ((not "operationType" = 'delete' or ("data" is null)));

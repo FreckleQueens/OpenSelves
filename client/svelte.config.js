@@ -5,5 +5,11 @@ import { i18nSveltePreprocessor } from "./build-tools/i18n-svelte-preprocessor.t
 
 export default makeSvelteConfig(
 	[i18nSveltePreprocessor],
-	["*", "/verify-email/[userId]/[token]", "/auth/recover-password/[userId]/[token]"],
+	[
+		"*",
+		"/members/[subspaceId]",
+		"/members/[subspaceId]/edit/[[memberId]]",
+		"/members/[subspaceId]/front/edit/[[frontId]]",
+		"/members/[subspaceId]/front/history",
+	],
 );

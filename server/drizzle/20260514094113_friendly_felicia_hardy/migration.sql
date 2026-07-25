@@ -1,2 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "isEmailVerified" boolean DEFAULT false;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "emailVerificationToken" text DEFAULT concat(md5(random()::text), md5(random()::text)) NOT NULL;

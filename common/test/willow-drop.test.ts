@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { describe } from "node:test";
 import test from "node:test";
 
+import { readStream } from "../src/index.js";
 import {
 	ByteString,
 	Drop,
@@ -152,20 +153,9 @@ describe("Willow drop format", () => {
 				await writer.close();
 			})(),
 			encoder.readable.pipeTo(decoder.writable),
-			(async () => {
-				const reader = decoder.readable.getReader();
-				while (true) {
-					const result = await reader.read();
-
-					if (result.value) {
-						decodedEntries.push(result.value);
-					}
-
-					if (result.done) {
-						break;
-					}
-				}
-			})(),
+			readStream(decoder.readable, {
+				onValue: decodedEntries.push,
+			}),
 		]);
 
 		assert.deepStrictEqual(decodedEntries, entries);

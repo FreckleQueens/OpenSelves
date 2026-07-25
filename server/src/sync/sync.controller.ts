@@ -2,6 +2,7 @@ import {
 	BadRequestException,
 	Body,
 	Controller,
+	ForbiddenException,
 	Post,
 	Put,
 	Req,
@@ -16,6 +17,7 @@ import {
 	Drop,
 	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
+	SubspaceId,
 	Timestamp,
 } from "openselves-common/willow";
 
@@ -67,11 +69,18 @@ export class SyncController {
 			}
 		}
 
-		const userId = request.accessTokenPayload.user.id;
+		for (const base64SubspaceId of request.accessTokenPayload.subspaceIds) {
+			const subspaceId = SubspaceId.fromBase64(base64SubspaceId);
+			if (!this.syncService.hasReadWriteAccess(request.accessTokenPayload, subspaceId)) {
+				throw new ForbiddenException(
+					"Tried to read entries of an unauthorized subspaceId",
+					{ cause: subspaceId.toHex() },
+				);
+			}
+		}
 
 		const { entries, timestamp } = await this.syncService.getEntriesFrom(
-			userId,
-			pullDto.subspaceId,
+			pullDto.subspaceIds,
 			pullDto.timestamp,
 		);
 
@@ -89,6 +98,11 @@ export class SyncController {
 
 		response.statusCode = 200;
 		response.setHeader("X-OpenSelves-Pull-Timestamp", timestamp);
+		const aceh = response.getHeader("Access-Control-Expose-Headers");
+		response.setHeader(
+			"Access-Control-Expose-Headers",
+			(typeof aceh === "string" ? aceh + ", " : "") + "X-OpenSelves-Pull-Timestamp",
+		);
 		response.setHeader("Transfer-Encoding", "chunked");
 		response.setHeader("X-Content-Type-Options", "nosniff");
 		response.contentType("application/octet-stream");

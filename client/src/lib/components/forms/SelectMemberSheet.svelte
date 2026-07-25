@@ -4,8 +4,10 @@
 	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
 	import { Block, Navbar, Searchbar, Sheet } from "konsta/svelte";
 	import { Member, type MemberStatic } from "openselves-common/client";
+	import type { SubspaceId } from "openselves-common/willow";
 
 	let {
+		subspaceId,
 		opened,
 		onCancel,
 		onSelect,
@@ -13,6 +15,7 @@
 		excludedMembers = [],
 		title = t("Select member"),
 	}: {
+		subspaceId: SubspaceId;
 		opened: boolean;
 		onCancel: () => Promise<void> | void;
 		onSelect: (member: MemberStatic | undefined) => Promise<void> | void;
@@ -21,7 +24,8 @@
 		title?: string;
 	} = $props();
 
-	let members = $derived.by(subscribeToModel(Member));
+	// svelte-ignore state_referenced_locally
+	let members = $derived.by(subscribeToModel(Member, subspaceId));
 	let memberSearch: string = $state("");
 	let selectableMembers = $derived(
 		members.staticData

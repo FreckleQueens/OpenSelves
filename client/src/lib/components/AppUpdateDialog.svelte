@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { PersistentStorage } from "$lib/PersistentStorage";
-	import { apiState } from "$lib/api.svelte";
+	import { Settings } from "$lib/Settings";
 	import AppUpdateIcon from "$lib/components/icons/AppUpdateIcon.svelte";
 	import DismissIcon from "$lib/components/icons/DismissIcon.svelte";
 	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import ReloadIcon from "$lib/components/icons/ReloadIcon.svelte";
+	import { Profile } from "$lib/idb/profiles";
 	import { Button, Checkbox, Dialog } from "konsta/svelte";
 	import { API_VERSION } from "openselves-common";
 	import { onMount } from "svelte";
 
 	const DO_NOT_ASK_AGAIN_KEY = "appUpdatePromptDoNotAskAgainForVersion";
 	const ALREADY_ASKED_KEY = "appUpdatePromptAlreadyAskedForVersion";
-	const storage = PersistentStorage.getInstance();
 
+	let profile: Profile | undefined = $state();
 	let canUpdate = $derived.by(() => {
-		if (apiState.mismatchedRemoteVersion) {
+		if (profile && profile.isSyncEnabled() && profile.api.mismatchedRemoteVersion) {
 			const current = API_VERSION.split(".");
-			const remote = apiState.mismatchedRemoteVersion.split(".");
+			const remote = profile.api.mismatchedRemoteVersion.split(".");
 			if (current.length === remote.length) {
 				for (let i = 0; i < remote.length; i++) {
 					if (remote[i] > current[i]) {
@@ -37,10 +37,17 @@
 	let doNotAskAgain: boolean = $state(false);
 
 	onMount(async () => {
-		canPrompt =
-			apiState.mismatchedRemoteVersion !== (await storage.get(DO_NOT_ASK_AGAIN_KEY, true));
-		alreadyAsked =
-			apiState.mismatchedRemoteVersion === (await storage.get(ALREADY_ASKED_KEY, true));
+		if (!Profile.hasCurrentProfile()) {
+			return;
+		}
+
+		profile = Profile.getCurrentProfile();
+		if (profile && profile.isSyncEnabled()) {
+			canPrompt =
+				profile.api.mismatchedRemoteVersion !== (await Settings.get(DO_NOT_ASK_AGAIN_KEY));
+			alreadyAsked =
+				profile.api.mismatchedRemoteVersion === (await Settings.get(ALREADY_ASKED_KEY));
+		}
 	});
 
 	async function reload() {
@@ -49,10 +56,10 @@
 
 	async function close() {
 		canPrompt = false;
-		if (apiState.mismatchedRemoteVersion) {
-			await storage.set(ALREADY_ASKED_KEY, apiState.mismatchedRemoteVersion, true);
+		if (profile && profile.isSyncEnabled() && profile.api.mismatchedRemoteVersion) {
+			await Settings.set(ALREADY_ASKED_KEY, profile.api.mismatchedRemoteVersion);
 			if (doNotAskAgain) {
-				await storage.set(DO_NOT_ASK_AGAIN_KEY, apiState.mismatchedRemoteVersion, true);
+				await Settings.set(DO_NOT_ASK_AGAIN_KEY, profile.api.mismatchedRemoteVersion);
 			}
 		}
 	}
@@ -70,7 +77,7 @@
 		{t(
 			"({LOCAL_VERSION} => {REMOTE_VERSION})",
 			API_VERSION,
-			apiState.mismatchedRemoteVersion || "undefined",
+			(profile?.isSyncEnabled() && profile.api.mismatchedRemoteVersion) || "undefined",
 		)}
 	</p>
 

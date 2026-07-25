@@ -1,15 +1,11 @@
-import { boolean, camelCase, text } from "drizzle-orm/pg-core";
+import { boolean, bytea, camelCase, text } from "drizzle-orm/pg-core";
+import type { ByteString } from "openselves-common/willow";
 
-import { users } from "./users.js";
 import { timestamps } from "./utils.js";
 
 export const sessions = camelCase.table("sessions", {
 	token: text().notNull().unique().primaryKey(),
-	userId: text()
-		.notNull()
-		.references(() => users.id, {
-			onDelete: "cascade",
-		}),
+	subspaceIds: bytea().array().notNull().$type<ByteString>(),
 	persist: boolean().notNull().default(false),
 	...timestamps(),
 });

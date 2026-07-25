@@ -10,7 +10,11 @@ import {
 	UInt64,
 } from "openselves-common/willow";
 
-import { type EntryCreate, entries, pathToPostgresByteaLiteral } from "../src/db/index.js";
+import {
+	type EntryCreate,
+	byteStringArrayToPostgresByteaArrayLiteral,
+	entries,
+} from "../src/db/index.js";
 import type { UserAuthData } from "./TestQueryBuilder.js";
 import { getSyncFrom as originalGetSyncFrom } from "./sync-utils.js";
 import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
@@ -99,7 +103,7 @@ describe("/sync/pull", () => {
 			)
 			.map((entry) => ({
 				...entry,
-				path: pathToPostgresByteaLiteral(entry.path),
+				path: byteStringArrayToPostgresByteaArrayLiteral(entry.path),
 			}));
 
 		assert.strictEqual(valuesToInsert.length, 3 * 5 + 1);

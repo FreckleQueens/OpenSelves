@@ -5,96 +5,27 @@ import {
 	PUBLIC_TEST_ENVIRONMENT,
 } from "$env/static/public";
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
-import { PersistentStorage } from "$lib/PersistentStorage";
-import { appState } from "$lib/appState.svelte.js";
+import { Settings } from "$lib/Settings";
+import { solveCaptcha } from "$lib/captcha";
 import { IDBStore } from "$lib/idb/IDBStore";
-import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { UserProfileManager, getUserProfiles } from "$lib/idb/local-profiles";
-import { UserProfile } from "$lib/idb/local-profiles/UserProfile";
-import { gotoHomeRoute } from "$lib/routing-utils";
+import { Profile } from "$lib/idb/profiles";
+import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte.js";
 import {
 	API_VERSION,
-	GetStatus,
-	type GetStatusResult,
-	GetUser,
+	type GetStatus,
+	GetStatusSchema,
 	MISSING_REFRESH_TOKEN_COOKIE,
 	SESSION_EXPIRED_ERROR,
 	TOKEN_EXPIRED_ERROR,
-	parseApiResult,
+	readStream,
 } from "openselves-common";
+import { isValidSchemaStatic } from "openselves-common/schema";
 import { ByteString, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 
-export const apiState: {
-	url: string;
-	mismatchedRemoteVersion: string | undefined;
-	status: GetStatusResult | undefined;
-} = $state({
-	url:
-		dev || PUBLIC_TEST_ENVIRONMENT === "1"
-			? PUBLIC_DEFAULT_API_URL_DEV
-			: PUBLIC_DEFAULT_API_URL,
-	status: undefined,
-	mismatchedRemoteVersion: undefined,
-});
+// TODO: make this file a static class `Api`
 
-export const SERVER_URL_STORAGE_KEY = "serverUrl";
-export const SERVER_STATUS_STORAGE_KEY = "serverStatus";
-export const USER_DATA_STORAGE_KEY = "userData";
-
-export async function setServerUrl(newUrl: string) {
-	apiState.url = newUrl;
-	await PersistentStorage.getInstance().set(SERVER_URL_STORAGE_KEY, newUrl, true);
-}
-
-export async function setApiStatus(status: GetStatusResult) {
-	apiState.status = status;
-	await PersistentStorage.getInstance().set(
-		SERVER_STATUS_STORAGE_KEY,
-		JSON.stringify(status),
-		true,
-	);
-}
-
-export async function refreshUserData() {
-	if (!appState.isAuthenticated) {
-		throw new Error("Cannot use while not authenticated.");
-	}
-
-	const storage = PersistentStorage.getInstance();
-	const userId = storage.getUserId();
-	const result = await call(`/user/${userId}`);
-	if (!result) {
-		throw new Error("Couldn't fetch user data");
-	}
-	appState.userData = parseApiResult(GetUser, result.responseBody);
-	await storage.set(USER_DATA_STORAGE_KEY, JSON.stringify(appState.userData));
-}
-
-let refreshUserDataTimeout: number | undefined = undefined;
-export function scheduleRefreshUserData(delay: number = 5000) {
-	if (!appState.isAuthenticated) {
-		if (delay === 0 && !appState.isAuthenticated) {
-			throw new Error("Cannot use while not authenticated.");
-		}
-		return;
-	}
-
-	clearTimeout(refreshUserDataTimeout);
-
-	refreshUserDataTimeout = window.setTimeout(async () => {
-		if (!appState.isAuthenticated) {
-			return;
-		}
-
-		try {
-			await refreshUserData();
-		} catch (e) {
-			console.debug("refreshUserData failed", e);
-			scheduleRefreshUserData();
-			return;
-		}
-	}, delay);
-}
+export const DEFAULT_API_URL =
+	dev || PUBLIC_TEST_ENVIRONMENT === "1" ? PUBLIC_DEFAULT_API_URL_DEV : PUBLIC_DEFAULT_API_URL;
 
 export type Attachment = {
 	id: string;
@@ -107,6 +38,8 @@ export type CallOptions = {
 	attachments?: Attachment[];
 	returnUnhandledResponses?: boolean;
 	isUnauthenticated?: boolean;
+	attempts?: number;
+	profile?: Profile;
 };
 
 export enum CallResult {
@@ -125,6 +58,9 @@ export async function callRaw(
 	path: string,
 	options?: CallOptions,
 ): Promise<CallResult | { response: Response; responseBody?: Record<string, unknown> }> {
+	const attempts = typeof options?.attempts === "number" ? options.attempts : 3;
+	const profile = options?.profile ? options.profile : Profile.getCurrentProfile();
+	const apiUrl = profile.api.url;
 	const isFileUpload = (options?.attachments?.length || 0) > 0;
 
 	const headers = new Headers(baseApiRequestHeaders);
@@ -144,7 +80,6 @@ export async function callRaw(
 		if (options?.data) {
 			if (options.data instanceof ReadableStream) {
 				headers.set("Content-Type", "application/octet-stream");
-				console.log(options.data.locked);
 
 				let isSupported = false;
 				try {
@@ -153,26 +88,15 @@ export async function callRaw(
 					isSupported = true;
 				}
 
-				// TODO: neither work
-				if (isSupported) {
-					console.info("Request body streaming is supported");
+				// TODO: when getting rid of nestjs for our own http2 server, re-enable this
+				const isHttpUploadStreamingEnabled = false;
+				if (isSupported && isHttpUploadStreamingEnabled) {
 					body = options.data;
 				} else {
-					console.warn("Pre-load request body stream, not compatible in this browser");
-					let newBody = new Uint8Array(0);
-					const reader = (options.data as ReadableStream<ByteString>).getReader();
-					while (true) {
-						const result = await reader.read();
-
-						if (result.value) {
-							newBody = ByteString.concat(newBody, result.value);
-						}
-
-						if (result.done) {
-							break;
-						}
-					}
-					body = newBody;
+					console.warn("Pre-loading request body stream");
+					body = ByteString.concat(
+						...(await readStream(options.data as ReadableStream<ByteString>)),
+					);
 				}
 			} else {
 				headers.set("Content-Type", "application/json");
@@ -194,12 +118,15 @@ export async function callRaw(
 		fetchInit["duplex"] = "half";
 	}
 
-	const tryFetch = async () => await fetch(`${apiState.url}${path}`, fetchInit);
+	const tryFetch = async () => await fetch(`${apiUrl}${path}`, fetchInit);
 	let response: Response | undefined = undefined;
 	let responseBody: Record<string, unknown> | undefined = undefined;
 
-	let responseType: undefined | "json" | "raw" = undefined;
-	for (let attempt = 0; attempt < 3; attempt++) {
+	let responseType: undefined | "json" | "raw";
+	for (let attempt = 0; attempt < attempts; attempt++) {
+		responseType = undefined;
+		responseBody = undefined;
+
 		if (attempt !== 0) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
@@ -229,7 +156,7 @@ export async function callRaw(
 		}
 
 		if (responseBody && typeof responseBody.expectedVersion === "string") {
-			apiState.mismatchedRemoteVersion = responseBody.expectedVersion;
+			await profile.setApiMismatchedRemoteVersion(responseBody.expectedVersion);
 		}
 
 		if (response && response.headers.get("X-OpenSelves-Version") !== API_VERSION) {
@@ -243,7 +170,7 @@ export async function callRaw(
 			!responseType ||
 			(responseType === "json" && !responseBody)
 		) {
-			if (!(await isApiReachable())) {
+			if (!(await profile.checkApiReachable())) {
 				return CallResult.API_UNREACHABLE;
 			}
 			continue;
@@ -259,16 +186,23 @@ export async function callRaw(
 			responseBody &&
 			responseBody.name === TOKEN_EXPIRED_ERROR
 		) {
-			const result = await refreshAuth();
+			const result = await refreshAccessToken(apiUrl);
 			console.debug(
-				"refreshAuth",
+				"refreshAccessToken",
 				typeof result === "boolean" ? result : CallResult[result].toString(),
 			);
-			if (
-				result === CallResult.SESSION_EXPIRED ||
-				(attempt === 2 && result === CallResult.MISSING_REFRESH_TOKEN_COOKIE)
-			) {
-				return CallResult.SESSION_EXPIRED;
+
+			if (attempt < attempts - 1) {
+				if (
+					result === CallResult.SESSION_EXPIRED ||
+					result === CallResult.MISSING_REFRESH_TOKEN_COOKIE
+				) {
+					await openSession(profile);
+				}
+			} else {
+				if (result === CallResult.MISSING_REFRESH_TOKEN_COOKIE) {
+					return CallResult.SESSION_EXPIRED;
+				}
 			}
 
 			continue;
@@ -312,91 +246,108 @@ export async function call(
 	const result = await callRaw(path, options);
 
 	switch (result) {
-		case CallResult.SESSION_EXPIRED:
-			console.debug("Got result", result, "from callRaw");
-			await tryLogout(false);
-			await gotoHomeRoute({
-				session_expired: "1",
-				call_path: path,
-			});
-			return undefined;
-		case CallResult.API_UNREACHABLE:
-		case CallResult.MISSING_REFRESH_TOKEN_COOKIE:
 		case CallResult.WRONG_VERSION:
-			handleApiUnreachable();
+		case CallResult.API_UNREACHABLE:
+			scheduleOnlineCheck();
+			return undefined;
+		case CallResult.SESSION_EXPIRED:
+		case CallResult.MISSING_REFRESH_TOKEN_COOKIE:
 			return undefined;
 		default:
 			return result;
 	}
 }
 
-let refreshingAuthPromise: Promise<
-	boolean | CallResult.SESSION_EXPIRED | CallResult.MISSING_REFRESH_TOKEN_COOKIE
-> | null = null;
-async function refreshAuth(): Promise<
-	boolean | CallResult.SESSION_EXPIRED | CallResult.MISSING_REFRESH_TOKEN_COOKIE
-> {
-	if (refreshingAuthPromise) {
-		try {
-			return await refreshingAuthPromise;
-		} catch {
-			return false;
-		}
+export async function openSession(profile: Profile): Promise<boolean> {
+	if (!profile.isSyncEnabled()) {
+		throw new Error("Profile sync is not enabled on this profile", { cause: profile });
 	}
 
+	if (!profile.knownSubspaces.length) {
+		console.warn("No known subspace in profile");
+		return false;
+	}
+
+	if (!profile.isApiReachable() && !(await profile.checkApiReachable())) {
+		console.warn("Api is unreachable");
+		return false;
+	}
+
+	const apiUrl = profile.api.url;
+	let result;
 	try {
-		return await (refreshingAuthPromise = (async () => {
-			const authResponse = await fetch(`${apiState.url}/auth/refresh`, {
-				method: "POST",
-				credentials: "include",
-				headers: baseApiRequestHeaders,
-			});
+		result = await solveCaptcha(apiUrl);
+	} catch (e) {
+		console.warn("solveCaptcha threw error", e);
+		return false;
+	}
 
-			const authResponseBody = await authResponse.json();
-			if (!authResponse.ok && authResponse.status === 401) {
-				if (authResponseBody.name === SESSION_EXPIRED_ERROR) {
-					console.warn("Session expired with response", authResponseBody);
-					return CallResult.SESSION_EXPIRED;
-				} else if (authResponseBody.name === MISSING_REFRESH_TOKEN_COOKIE) {
-					console.warn("Refresh token cookie missing with response", authResponseBody);
-					return CallResult.MISSING_REFRESH_TOKEN_COOKIE;
-				}
+	if (!result.challenge || !result.solution) {
+		console.warn("Couldn't solve captcha", result);
+		return false;
+	}
+
+	const loginResponse = await call(`/auth/login`, {
+		method: "POST",
+		data: {
+			subspaceIds: profile.ownSubspaces.map((subspace) => subspace.subspaceId.toBase64()),
+			persistSession: false,
+			captcha: result,
+		},
+		isUnauthenticated: true,
+	});
+
+	return !!loginResponse;
+}
+
+async function refreshAccessToken(
+	apiUrl: string,
+): Promise<boolean | CallResult.SESSION_EXPIRED | CallResult.MISSING_REFRESH_TOKEN_COOKIE> {
+	try {
+		const response = await fetch(`${apiUrl}/auth/refresh`, {
+			method: "POST",
+			credentials: "include",
+			headers: baseApiRequestHeaders,
+		});
+
+		const responseBody = await response.json();
+		if (!response.ok && response.status === 401) {
+			if (responseBody.name === SESSION_EXPIRED_ERROR) {
+				console.warn("Session expired with response", responseBody);
+				return CallResult.SESSION_EXPIRED;
+			} else if (responseBody.name === MISSING_REFRESH_TOKEN_COOKIE) {
+				console.warn("Refresh token cookie missing with response", responseBody);
+				return CallResult.MISSING_REFRESH_TOKEN_COOKIE;
 			}
+		}
 
-			return authResponse.ok;
-		})());
+		return response.ok;
 	} catch (e) {
 		console.error(e);
 		return false;
-	} finally {
-		refreshingAuthPromise = null;
 	}
 }
 
-async function isApiReachable(): Promise<boolean> {
-	const debugData: unknown[] = [];
+export async function getApiStatus(apiUrl: string): Promise<GetStatus | undefined> {
 	try {
-		const response = await fetch(`${apiState.url}/status`, {
+		const response = await fetch(`${apiUrl}/status`, {
 			headers: baseApiRequestHeaders,
 		});
 		if (response.ok) {
-			const status = parseApiResult(GetStatus, await response.json());
-			if (status.ready && status.version === API_VERSION) {
-				console.debug("online");
-				await setApiStatus(status);
-				return true;
+			const responseBody = await response.json();
+			if (!isValidSchemaStatic(GetStatusSchema, responseBody)) {
+				throw new Error("Invalid GetStatus response from server", { cause: responseBody });
 			}
-			debugData.push(status);
+			return responseBody;
 		}
-		debugData.push(response);
 	} catch (error) {
-		debugData.push(error);
+		console.warn("Error while fetching and parsing api status", error);
 	}
-	console.debug("offline", debugData);
-	return false;
+	return undefined;
 }
 
 export async function tryLogout(
+	profile: Profile,
 	wipeData: boolean,
 	forceWipe: boolean = false,
 	apiLogoutNeeded: boolean = false,
@@ -405,7 +356,7 @@ export async function tryLogout(
 		throw new Error("SyncWorker is not initialized");
 	}
 
-	if (!appState.isAuthenticated) {
+	if (!Profile.hasCurrentProfile()) {
 		// We're already logged out
 		return true;
 	}
@@ -415,25 +366,22 @@ export async function tryLogout(
 		onlineCheckTimeout = undefined;
 	}
 	await SyncWorker.getInstance().shutdown();
-	const storage = PersistentStorage.getInstance();
-	const userId = storage.getUserId();
-	const userProfile = UserProfile.of(userId);
 
 	if (wipeData) {
-		if (!forceWipe && SyncWorker.getInstance().hasPushBacklog()) {
-			if (appState.isApiReachable && appState.isAuthenticated) {
+		if (!forceWipe && SyncWorker.getInstance().hasEntriesToPush()) {
+			if (profile.isApiReachable() && Profile.hasCurrentProfile()) {
 				SyncWorker.getInstance().resume();
 			}
 			scheduleOnlineCheck();
 			return false;
 		} else {
-			await UserProfileManager.getInstance().wipeUserData(userProfile, getUserProfiles());
+			await Profile.wipeProfileData(profile.id);
 		}
 	} else {
-		await storage.set(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, userId, true);
+		await Settings.set(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY, profile.id);
 	}
 
-	await storage.setOffline();
+	await Profile.setCurrentProfile(null);
 	IDBStore.free(OPENSELVES_NAMESPACE_ID);
 
 	if (apiLogoutNeeded) {
@@ -445,24 +393,25 @@ export async function tryLogout(
 let logoutAttemptTimeout: number | undefined = undefined;
 const NEEDS_API_LOGOUT_STORAGE_KEY = "needsApiLogout";
 export async function needsApiLogout(): Promise<boolean> {
-	return !!(await PersistentStorage.getInstance().get(NEEDS_API_LOGOUT_STORAGE_KEY, true));
+	return !!(await Settings.get(NEEDS_API_LOGOUT_STORAGE_KEY));
 }
 export async function tryApiLogout(delay: number = 0, firstCall: boolean = true) {
 	console.debug("Scheduling api logout...");
 	clearTimeout(logoutAttemptTimeout);
-	const storage = PersistentStorage.getInstance();
 	if (firstCall) {
-		await storage.set(NEEDS_API_LOGOUT_STORAGE_KEY, "1", true);
+		await Settings.set(NEEDS_API_LOGOUT_STORAGE_KEY, "1");
 	}
 
 	logoutAttemptTimeout = window.setTimeout(async () => {
-		if (appState.isApiReachable) {
+		const profile = Profile.getCurrentProfile();
+
+		if (profile.isApiReachable()) {
 			const result = await call("/auth/logout", {
 				method: "POST",
 			});
 			if (result) {
 				console.debug("Api logout success!");
-				await storage.delete(NEEDS_API_LOGOUT_STORAGE_KEY, true);
+				await Settings.delete(NEEDS_API_LOGOUT_STORAGE_KEY);
 				return;
 			}
 		}
@@ -473,29 +422,22 @@ export async function tryApiLogout(delay: number = 0, firstCall: boolean = true)
 }
 
 let onlineCheckTimeout: number | undefined = undefined;
-export function handleApiUnreachable() {
-	appState.isApiReachable = false;
-	SyncWorker.getInstance().pause();
-	scheduleOnlineCheck();
-}
-
 export function scheduleOnlineCheck(delay: number = 5000) {
 	clearTimeout(onlineCheckTimeout);
 
 	onlineCheckTimeout = window.setTimeout(async () => {
 		console.debug("Checking for api reachability");
+		const profile = Profile.getCurrentProfile();
 		let reachable = false;
 		try {
-			if (await isApiReachable()) {
+			if (await profile.checkApiReachable()) {
 				reachable = true;
-				appState.isApiReachable = true;
-				if (appState.isAuthenticated) {
+				if (Profile.hasCurrentProfile()) {
 					SyncWorker.getInstance().resume();
 				}
 			}
 		} finally {
 			if (!reachable) {
-				appState.isApiReachable = false;
 				scheduleOnlineCheck();
 			}
 		}

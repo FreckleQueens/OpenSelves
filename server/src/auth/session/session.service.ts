@@ -3,12 +3,15 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { createId } from "@paralleldrive/cuid2";
 import { randomBytes } from "crypto";
-import { type RelationsFilterColumns, and, eq, gte, or } from "drizzle-orm";
-import { type PartialBy } from "openselves-common";
+import { and, eq, gte, or } from "drizzle-orm";
 
 import { type ConfigData } from "../../config.data.js";
 import { DB } from "../../db/drizzle.js";
-import { type Session, type User, sessions } from "../../db/index.js";
+import {
+	type Session,
+	byteStringArrayToPostgresByteaArrayLiteral,
+	sessions,
+} from "../../db/index.js";
 import { AccessTokenPayload } from "./data/access-token-payload.data.js";
 
 @Injectable()
@@ -19,35 +22,35 @@ export class SessionService {
 		private readonly jwtService: JwtService,
 	) {}
 
-	public async getSession(where: RelationsFilterColumns<typeof sessions._.columns>): Promise<
-		| (Session & {
-				user: User | null;
-		  })
-		| undefined
-	> {
+	public async getSessionByToken(token: string): Promise<Session | undefined> {
 		return this.db.query.sessions.findFirst({
-			where: where,
-			with: {
-				user: true,
+			where: {
+				token,
 			},
 		});
 	}
 
-	public async makeAccessToken(user: PartialBy<User, "passwordHash">) {
-		const { passwordHash, ...userWithoutPasswordHash } = user;
+	public async makeAccessToken(session: Session) {
 		return await this.jwtService.signAsync<AccessTokenPayload>({
 			uniqueId: createId(),
 			timestampMs: Date.now(),
-			user: userWithoutPasswordHash,
+			subspaceIds: session.subspaceIds.map((subspaceId) => subspaceId.toBase64()),
 		});
 	}
 
-	public async createSession(userId: User["id"], persistSession: boolean): Promise<Session> {
+	public async createSession(
+		subspaceIds: Session["subspaceIds"],
+		persistSession: boolean,
+	): Promise<Session> {
 		const token = this.generateNewSessionToken();
 		return (
 			await this.db
 				.insert(sessions)
-				.values({ token, userId, persist: persistSession })
+				.values({
+					token,
+					subspaceIds: byteStringArrayToPostgresByteaArrayLiteral(subspaceIds),
+					persist: persistSession,
+				})
 				.returning()
 		)[0];
 	}

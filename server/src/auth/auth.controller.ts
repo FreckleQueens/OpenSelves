@@ -3,7 +3,6 @@ import {
 	Controller,
 	HttpCode,
 	HttpStatus,
-	InternalServerErrorException,
 	NotFoundException,
 	Post,
 	Req,
@@ -19,13 +18,11 @@ import { type ConfigData } from "../config.data.js";
 import { LoginDto } from "./data/login.dto.js";
 import { Public } from "./decorators/public.decorator.js";
 import { SessionService } from "./session/session.service.js";
-import { UserService } from "./user/user.service.js";
 
 @Controller("auth")
 export class AuthController {
 	constructor(
 		private readonly configService: ConfigService<ConfigData>,
-		private readonly userService: UserService,
 		private readonly sessionService: SessionService,
 	) {}
 
@@ -34,20 +31,15 @@ export class AuthController {
 	@HttpCode(HttpStatus.OK)
 	@Captcha()
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
-		const user = await this.userService.getUserWithPassword({ email: loginDto.email });
-		if (user && (await this.userService.verifyPassword(user, loginDto.password))) {
-			const session = await this.sessionService.createSession(
-				user.id,
-				!!loginDto.persistSession,
-			);
-			const accessToken = await this.sessionService.makeAccessToken(user);
-			this.setAuthCookies(accessToken, session.token, session.persist, response);
-			return {
-				userId: user.id,
-			};
-		}
+		// !!DO NOT MERGE WITHOUT THIS!! TODO: verify write access to subspaceId (needs tests)
 
-		throw new UnauthorizedException("Incorrect email or password");
+		const session = await this.sessionService.createSession(
+			loginDto.subspaceIds,
+			!!loginDto.persistSession,
+		);
+		const accessToken = await this.sessionService.makeAccessToken(session);
+		this.setAuthCookies(accessToken, session.token, session.persist, response);
+		return {};
 	}
 
 	@Public()
@@ -59,7 +51,7 @@ export class AuthController {
 	) {
 		const refreshToken = this.getRefreshTokenFromRequest(request);
 
-		const session = await this.sessionService.getSession({ token: refreshToken });
+		const session = await this.sessionService.getSessionByToken(refreshToken);
 		if (!session) {
 			throw new UnauthorizedException({
 				name: SESSION_EXPIRED_ERROR,
@@ -74,17 +66,12 @@ export class AuthController {
 			});
 		}
 
-		const user = session.user;
-		if (user === null) {
-			throw new InternalServerErrorException("User was not loaded with old session");
-		}
-
 		const newSession = await this.sessionService.refreshSession(session.token, session.persist);
 		if (!newSession) {
 			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
 		}
 
-		const accessToken = await this.sessionService.makeAccessToken(user);
+		const accessToken = await this.sessionService.makeAccessToken(newSession);
 		this.setAuthCookies(accessToken, newSession.token, session.persist, response);
 		return {};
 	}

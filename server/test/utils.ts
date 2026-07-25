@@ -1,13 +1,11 @@
 import { ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
-import { createId } from "@paralleldrive/cuid2";
 import { type Challenge, type Solution, solveChallenge } from "altcha-lib";
 import { deriveKey } from "altcha-lib/algorithms/argon2id";
-import { inArray } from "drizzle-orm";
 import assert from "node:assert";
 import { after, afterEach, before, beforeEach } from "node:test";
-import { API_VERSION, GetUser, type GetUserResult, parseApiResult } from "openselves-common";
+import { API_VERSION } from "openselves-common";
 import { isValidSchemaStatic } from "openselves-common/schema";
 import { Ed25519, type Ed25519KeyPair } from "openselves-common/willow";
 
@@ -15,7 +13,6 @@ import { challengeSchema } from "../src/captcha/captcha-type-helpers.js";
 import { CaptchaService } from "../src/captcha/captcha.service.js";
 import type { ConfigData } from "../src/config.data.js";
 import { DB } from "../src/db/drizzle.js";
-import { users } from "../src/db/index.js";
 import { QueueService } from "../src/queue/queue.service.js";
 import { TestQueryBuilder } from "./TestQueryBuilder.js";
 
@@ -30,8 +27,7 @@ type CreateUsersEnv = {
 	get request(): TestQueryBuilder;
 	get rawRequest(): TestQueryBuilder;
 };
-type TestEnvUser = {
-	api: GetUserResult;
+export type TestEnvUser = {
 	cookies: string;
 	keys: Ed25519KeyPair;
 	password: string;
@@ -79,46 +75,23 @@ async function waitForServerToComeOnline(urlBase: string) {
 }
 
 export async function createAndLoginUser(env: CreateUsersEnv): Promise<TestEnvUser> {
+	const keys = await Ed25519.generateKey();
 	const password = "12345678";
-
-	const email = createId() + "@" + createId() + ".com";
-	const getUserResponse = await env.request
-		.post("/user")
-		.send({
-			email: email,
-			password: password,
-			registrationPassword: env.registrationPassword,
-			captcha: await solveCaptcha(env, "sendEmail", email),
-		})
-		.expect(201)
-		.json();
-	const user = parseApiResult(GetUser, getUserResponse.body);
 	const response = await env.request
 		.post("/auth/login")
 		.send({
-			email: user.email,
-			password: password,
+			subspaceIds: [keys.publicKey.toBase64()],
 			captcha: await solveCaptcha(env),
 		})
 		.expect(200)
 		.execute();
 	const cookies = convertResponseCookiesToRequestCookies(response);
-	return { api: user, cookies, password, keys: await Ed25519.generateKey() };
+	return { cookies, keys: keys, password };
 }
 
-async function createUsers(
-	env: CreateUsersEnv,
-	existingUsers?: TestEnvUsers,
-): Promise<TestEnvUsers> {
-	if (existingUsers) {
-		await env.db
-			.delete(users)
-			.where(inArray(users.id, [existingUsers.user1.api.id, existingUsers.user2.api.id]));
-	}
-
+async function createUsers(env: CreateUsersEnv): Promise<TestEnvUsers> {
 	const user1 = await createAndLoginUser(env);
 	const user2 = await createAndLoginUser(env);
-
 	return { user1, user2 };
 }
 export function setupTestSuite(
@@ -201,7 +174,7 @@ export function setupTestSuiteWithUsers(
 
 	if (recreateUsersBeforeEach) {
 		beforeEach(async () => {
-			env.users = await createUsers(env, env.users);
+			env.users = await createUsers(env);
 		});
 	}
 
@@ -445,23 +418,4 @@ export function testCaptcha(
 			await callback(captcha, actionValue).expect(status).execute();
 		});
 	}
-}
-
-export function generateDummyToken() {
-	const token = crypto.randomUUID().replaceAll("-", "").repeat(2);
-	assert.strictEqual(token.length, 64);
-	return token;
-}
-
-export async function verifyUser1Email(env: TestEnvWithUsers) {
-	const dbUser = await env.db.query.users.findFirst({
-		where: {
-			id: env.users.user1.api.id,
-		},
-	});
-	assert(dbUser);
-	await env.request
-		.post("/user/" + env.users.user1.api.id + "/verify-email/" + dbUser.emailVerificationToken)
-		.expect(200)
-		.execute();
 }

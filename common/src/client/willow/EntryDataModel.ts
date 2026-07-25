@@ -22,7 +22,7 @@ import {
 	serializeValueToPayloadUnsafe,
 } from "./entry-payload.js";
 
-export const BaseSchema = {
+export const BaseSchema = Object.freeze({
 	id: SchemaBuilder.string()
 		.required()
 		.default(() => createId())
@@ -31,7 +31,7 @@ export const BaseSchema = {
 		.required()
 		.default(() => new Date())
 		.readonly(),
-} satisfies SchemaType;
+}) satisfies SchemaType;
 
 export type EntryDataModelSchema = SchemaType & typeof BaseSchema;
 export type AnyEntryDataModel = EntryDataModel<typeof BaseSchema>;

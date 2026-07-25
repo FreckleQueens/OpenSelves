@@ -20,7 +20,6 @@ import {
 } from "openselves-common/willow";
 
 import { S3Service } from "../src/sync/s3.service.js";
-import type { UserAuthData } from "./TestQueryBuilder.js";
 import {
 	type FileRef,
 	LARGE_IMAGE_FILE_PATH,
@@ -33,7 +32,7 @@ import {
 	pushEndpoint,
 	readFile,
 } from "./sync-utils.js";
-import { type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
+import { type TestEnvUser, type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
 
 async function timeModelEntries(
 	model: AnyEntryDataModel,
@@ -50,18 +49,18 @@ describe(pushEndpoint, () => {
 	const putEntry = (
 		entry: EntryWithPayload,
 		expectCode: number = 200,
-		user: UserAuthData = env.users.user1,
+		user: TestEnvUser = env.users.user1,
 	) => originalPutEntry(env, entry, expectCode, user);
 	const putEntries = (
 		entries: EntryWithPayload[],
 		expectCode: number = 200,
-		user: UserAuthData = env.users.user1,
+		user: TestEnvUser = env.users.user1,
 	) => originalPutEntries(env, entries, expectCode, user);
 
 	const getSyncFrom = (
 		timestamp: string,
 		subspaceId: ByteString = env.users.user1.keys.publicKey,
-		user: UserAuthData = env.users.user1,
+		user: TestEnvUser = env.users.user1,
 	) => originalGetSyncFrom(env, timestamp, subspaceId, user);
 
 	function makeFront(member: Member, date: Date) {
@@ -113,7 +112,7 @@ describe(pushEndpoint, () => {
 	async function checkEntriesAreServed(
 		entries: (EntryWrapper | Entry | EntryWithPayload)[],
 		subspaceId: ByteString = env.users.user1.keys.publicKey,
-		user: UserAuthData = env.users.user1,
+		user: TestEnvUser = env.users.user1,
 	) {
 		assert(entries.length > 0);
 
@@ -876,7 +875,7 @@ describe(pushEndpoint, () => {
 				user,
 				entries,
 			}: {
-				user: UserAuthData;
+				user: TestEnvUser;
 				entries: EntryWithPayload[];
 			}) => Promise<void>,
 		) {

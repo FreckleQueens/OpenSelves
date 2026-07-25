@@ -3,7 +3,7 @@ import type { SchemaCreate, SchemaStatic, SchemaType } from "../../../schema/ind
 import { type EntryWrapper, SubspaceId } from "../../../willow/index.js";
 import { BaseSchema, EntryDataModel } from "../EntryDataModel.js";
 
-export const FrontSchema = {
+export const FrontSchema = Object.freeze({
 	...BaseSchema,
 	memberId: SchemaBuilder.string().required().nullable().default(null),
 	startedAt: SchemaBuilder.date()
@@ -11,7 +11,7 @@ export const FrontSchema = {
 		.default(() => new Date()),
 	endedAt: SchemaBuilder.date().required().nullable().default(null),
 	note: SchemaBuilder.string(),
-} satisfies SchemaType;
+}) satisfies SchemaType;
 export type FrontStatic = SchemaStatic<typeof FrontSchema>;
 export type FrontCreate = SchemaCreate<typeof FrontSchema>;
 

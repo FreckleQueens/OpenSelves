@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ForbiddenException,
 	Injectable,
 	type NestInterceptor,
 	PayloadTooLargeException,
@@ -9,7 +10,7 @@ import type { ExecutionContext } from "@nestjs/common/interfaces/features/execut
 import type { CallHandler } from "@nestjs/common/interfaces/features/nest-interceptor.interface.js";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
-import type { ReadableStreamReadResult } from "node:stream/web";
+import { readStream } from "openselves-common";
 import { ByteString, Drop, type EntryWithPayload } from "openselves-common/willow";
 import { Observable } from "rxjs";
 
@@ -44,8 +45,6 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 		let bytesReceived: number = 0;
 		let stalledRequestCheckInterval: NodeJS.Timeout | undefined;
 		let onRequestEnd: (() => void) | undefined;
-
-		const reader = decoder.readable.getReader();
 
 		const entries: EntryWithPayload[] = [];
 		await Promise.all([
@@ -99,32 +98,38 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 					});
 				});
 			}),
-			(async () => {
-				while (true) {
-					let result: ReadableStreamReadResult<EntryWithPayload>;
-					try {
-						result = await reader.read();
-					} catch (e) {
-						throw new BadRequestException("Drop decoding failed.", { cause: e });
+			readStream(decoder.readable, {
+				onValue: (value) => {
+					if (value.payloadLength.valueOf() > maxPayloadLength) {
+						throw new PayloadTooLargeException(
+							"Max payload size per entry is " +
+								maxPayloadLength +
+								", got " +
+								value.payloadLength.valueOf(),
+						);
 					}
-
-					if (result.value) {
-						if (result.value.payloadLength.valueOf() > maxPayloadLength) {
-							throw new PayloadTooLargeException(
-								"Max payload size per entry is " +
-									maxPayloadLength +
-									", got " +
-									result.value.payloadLength.valueOf(),
-							);
-						}
-						entries.push(result.value);
+					if (!req.accessTokenPayload) {
+						throw new Error("accessTokenPayload went missing");
 					}
-
-					if (result.done) {
-						break;
+					if (
+						!this.syncService.hasReadWriteAccess(
+							req.accessTokenPayload,
+							value.subspaceId,
+						)
+					) {
+						throw new ForbiddenException(
+							"Tried to write entry with unauthorized subspaceId",
+							{
+								cause: value.subspaceId.toHex(),
+							},
+						);
 					}
-				}
-			})(),
+					entries.push(value);
+				},
+				onError: (e) => {
+					throw new BadRequestException("Drop decoding failed.", { cause: e });
+				},
+			}),
 			new Promise<void>((resolve, reject) => {
 				onRequestEnd = () => {
 					onRequestEnd = undefined;
@@ -151,7 +156,7 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 			throw new BadRequestException("At least one entry must be present in the drop");
 		}
 
-		await this.syncService.ingestEntries(req.accessTokenPayload.user.id, entries);
+		await this.syncService.ingestEntries(entries);
 
 		res.send({});
 

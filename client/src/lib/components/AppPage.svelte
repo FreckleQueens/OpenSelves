@@ -3,21 +3,18 @@
 	import { resolve } from "$app/paths";
 	import { MenuItem } from "$lib";
 	import { transformErrorToReadable } from "$lib";
-	import { apiState } from "$lib/api.svelte";
-	import { appState } from "$lib/appState.svelte.js";
 	import AppUpdateDialog from "$lib/components/AppUpdateDialog.svelte";
 	import ErrorDialog from "$lib/components/ErrorDialog.svelte";
 	import AccountIcon from "$lib/components/icons/AccountIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
 	import DashboardIcon from "$lib/components/icons/DashboardIcon.svelte";
-	import InfoIcon from "$lib/components/icons/InfoIcon.svelte";
 	import MenuIcon from "$lib/components/icons/MenuIcon.svelte";
 	import PeopleIcon from "$lib/components/icons/PeopleIcon.svelte";
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { OSIconProps } from "$lib/components/os-icon";
-	import { SyncWorker } from "$lib/idb/SyncWorker.js";
 	import { activeSubscriptions } from "$lib/idb/entry-subscription.svelte";
-	import humanizeDuration from "humanize-duration";
+	import { Profile } from "$lib/idb/profiles";
+	import { SyncWorker } from "$lib/idb/sync";
 	import {
 		Block,
 		BlockTitle,
@@ -63,7 +60,7 @@
 	} = $props();
 
 	let openMenu = $state(false);
-	let syncWorkerError: unknown = $derived(appState.syncWorkerError);
+	let syncWorkerError: unknown = $derived(SyncWorker.error);
 	let areSubscriptionsLoading: boolean = $derived(
 		activeSubscriptions.values().some((sub) => !sub().loaded),
 	);
@@ -97,9 +94,9 @@
 			href: resolve("/members"),
 			iconComponent: PeopleIcon,
 		},
-		[MenuItem.ACCOUNT]: {
-			title: t("Account"),
-			href: resolve("/account"),
+		[MenuItem.PROFILE]: {
+			title: t("Profile"),
+			href: resolve("/profile"),
 			iconComponent: AccountIcon,
 		},
 		[MenuItem.SETTINGS]: {
@@ -130,7 +127,7 @@
 
 <ErrorDialog
 	additionalErrors={[syncWorkerError ? transformErrorToReadable(syncWorkerError) : null]}
-	onDismiss={() => SyncWorker.getInstance().clearError()}
+	onDismiss={() => SyncWorker.clearError()}
 />
 
 <AppUpdateDialog />
@@ -165,9 +162,9 @@
 		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />
 		<Block>
 			<div class="flex items-center">
-				{#if !appState.isAuthenticated}
+				{#if !Profile.hasCurrentProfile()}
 					Exclusive offline mode
-				{:else if appState.syncWorkerOnline}
+				{:else if SyncWorker.running}
 					Sync active (online)
 				{:else}
 					<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
@@ -229,44 +226,13 @@
 		{@render bottomNav()}
 	{/if}
 
-	{#if appState.isAuthenticated && !appState.syncWorkerOnline}
+	{#if Profile.hasCurrentProfile() && !SyncWorker.running}
 		<div
 			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
 			transition:fly={{ duration: 150, y: 16 }}
 		>
 			<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
 		</div>
-	{/if}
-
-	{#if appState.isAuthenticated && apiState.status && appState.userData}
-		{#if !appState.userData.isEmailVerified}
-			{@const willBeDeletedAt =
-				appState.userData.createdAt.getTime() +
-				apiState.status.unverifiedAccountCullingDelay}
-			<div
-				class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
-				transition:fly={{ duration: 150, y: 16 }}
-			>
-				<DangerIcon before class="text-brand-red" />
-				{t(
-					"Email not verified. Your account is at risk of being deleted in {time}.",
-					humanizeDuration(Math.max(willBeDeletedAt - Date.now(), 0), {
-						largest: 1,
-						round: true,
-					}),
-				)}
-			</div>
-		{/if}
-
-		{#if appState.userData.newEmailRequest}
-			<div
-				class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
-				transition:fly={{ duration: 150, y: 16 }}
-			>
-				<InfoIcon before />
-				Email change request pending: please check your inbox
-			</div>
-		{/if}
 	{/if}
 </div>
 

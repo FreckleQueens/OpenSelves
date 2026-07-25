@@ -88,7 +88,29 @@
 	}
 </script>
 
-<AppPage title={pageTitle} loading={!ready} showMenu={false} nested>
+{#snippet subnavbar()}
+	<Segmented class="p-0">
+		{#each tabs as tab (tab.id)}
+			<SegmentedButton
+				id={tab.id + "-tab-button"}
+				active={activeTab === tab.id}
+				onClick={() => (activeTab = tab.id)}
+			>
+				{@const Comp = tab.icon}
+				<Comp button before />
+				{tab.title}
+			</SegmentedButton>
+		{/each}
+	</Segmented>
+{/snippet}
+
+<AppPage
+	title={pageTitle}
+	loading={!ready}
+	showMenu={false}
+	subnavbar={tabs ? subnavbar : undefined}
+	nested
+>
 	{#snippet navbarLeft()}
 		<BackLink onClick={backLinkOnClick} />
 		{#if isDirty}
@@ -101,22 +123,6 @@
 		<Link id="save-record-button" onClick={() => submitForm()}>
 			<SaveIcon button />
 		</Link>
-	{/snippet}
-
-	{#snippet subnavbar()}
-		<Segmented class="p-0">
-			{#each tabs as tab (tab.id)}
-				<SegmentedButton
-					id={tab.id + "-tab-button"}
-					active={activeTab === tab.id}
-					onClick={() => (activeTab = tab.id)}
-				>
-					{@const Comp = tab.icon}
-					<Comp button before />
-					{tab.title}
-				</SegmentedButton>
-			{/each}
-		</Segmented>
 	{/snippet}
 
 	<form bind:this={form} onsubmit={submitForm}>

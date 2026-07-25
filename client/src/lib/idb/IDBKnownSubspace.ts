@@ -3,25 +3,25 @@ import { Ed25519Sk, SubspaceId } from "openselves-common/willow";
 
 export type KnownSubspaceStore = "knownSubspaces";
 export const KNOWN_SUBSPACE_STORE_NAME: KnownSubspaceStore = "knownSubspaces";
-export type KnownSubspace = { userId: string; subspaceId: SubspaceId; secretKey?: Ed25519Sk };
+export type KnownSubspace = { profileId: string; subspaceId: SubspaceId; secretKey?: Ed25519Sk };
 
 export class IDBKnownSubspace {
 	public constructor(private readonly idb: IDB) {}
 
-	public async get(
-		userId: string,
+	public async getByProfileId(
+		profileId: string,
 		tx?: IDBTransactionWrapper<KnownSubspaceStore>,
 	): Promise<KnownSubspace[]> {
 		const records = await this.idb.getByIndex(
 			KNOWN_SUBSPACE_STORE_NAME,
-			"userId",
-			userId,
+			"profileId",
+			profileId,
 			undefined,
 			tx,
 		);
 
 		if (!records.every((record) => this.isValidKnownSubspace(record))) {
-			throw new Error("A known subspace of userId " + userId + " is invalid", {
+			throw new Error("A known subspace of profileId " + profileId + " is invalid", {
 				cause: records,
 			});
 		}
@@ -34,11 +34,11 @@ export class IDBKnownSubspace {
 	}
 
 	public async delete(
-		userId: string,
+		profileId: string,
 		subspaceId: SubspaceId,
 		tx?: IDBTransactionWrapper<KnownSubspaceStore>,
 	) {
-		return this.idb.delete(KNOWN_SUBSPACE_STORE_NAME, [userId, subspaceId], tx);
+		return this.idb.delete(KNOWN_SUBSPACE_STORE_NAME, [profileId, subspaceId], tx);
 	}
 
 	public async getAll(tx?: IDBTransactionWrapper<KnownSubspaceStore>): Promise<KnownSubspace[]> {
@@ -57,7 +57,7 @@ export class IDBKnownSubspace {
 		return !!(
 			value &&
 			typeof value === "object" &&
-			typeof value["userId"] === "string" &&
+			typeof value["profileId"] === "string" &&
 			SubspaceId.is(value["subspaceId"]) &&
 			(value["secretKey"] === undefined || Ed25519Sk.is(value["secretKey"]))
 		);

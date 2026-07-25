@@ -12,16 +12,13 @@ import { QueueModule } from "../queue/queue.module.js";
 import { THROTTLER_OPTIONS_PROVIDER } from "../throttler-options.provider.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
-import { MailService } from "./mail/mail.service.js";
 import { ParseJwtMiddleware } from "./parse-jwt.middleware.js";
 import { SessionService } from "./session/session.service.js";
-import { UserController } from "./user/user.controller.js";
-import { UserService } from "./user/user.service.js";
 
 // Default rates are configured for an average of 3 requests per second
 const authThrottlerOptions: ThrottlerOptions[] = <const>[
 	{
-		name: "user",
+		name: "session",
 		limit: 900,
 		ttl: 5 * 60 * 1000, // 5min
 		skipIf: (context) => {
@@ -30,9 +27,9 @@ const authThrottlerOptions: ThrottlerOptions[] = <const>[
 		},
 		getTracker(_, context): Promise<string> {
 			const request = context.switchToHttp().getRequest<Request>();
-			let tracker = request.accessTokenPayload?.user.id;
+			let tracker = request.accessTokenPayload?.uniqueId;
 			if (tracker === undefined) {
-				throw new Error("Couldn't determine userId for throttler tracker", {
+				throw new Error("Couldn't determine session id for throttler tracker", {
 					cause: request.accessTokenPayload,
 				});
 			}
@@ -98,15 +95,13 @@ const authThrottlerOptions: ThrottlerOptions[] = <const>[
 			provide: APP_GUARD,
 			useClass: AuthGuard,
 		},
-		MailService,
 		{
 			provide: THROTTLER_OPTIONS_PROVIDER,
 			useValue: authThrottlerOptions satisfies ThrottlerOptions[],
 		},
-		UserService,
 		SessionService,
 	],
-	controllers: [AuthController, UserController],
+	controllers: [AuthController],
 	exports: [THROTTLER_OPTIONS_PROVIDER],
 })
 export class AuthModule implements NestModule {

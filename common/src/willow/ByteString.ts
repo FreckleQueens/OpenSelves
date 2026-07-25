@@ -10,6 +10,14 @@ export class ByteString extends Uint8Array<ArrayBuffer> {
 		return this.textDecoder.decode(input);
 	}
 
+	public static fromHex(input: string): ByteString {
+		return Uint8Array.fromHex(input);
+	}
+
+	public static fromBase64(input: string): ByteString {
+		return Uint8Array.fromBase64(input);
+	}
+
 	public static is(value: unknown): value is ByteString {
 		return value instanceof Uint8Array && value.buffer instanceof ArrayBuffer;
 	}

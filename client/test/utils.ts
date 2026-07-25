@@ -358,20 +358,23 @@ export class PuppeteerContext {
 
 	public async getEntriesCount() {
 		return await this.page.evaluate(async () => {
-			const storage = window.openselves.PersistentStorage.getInstance();
-			const userId = storage.getUserId();
-			const profile = window.openselves.UserProfile.of(userId);
+			const profile = await window.openselves.Profile.getCurrentProfile();
 			const idb = window.openselves.IDB.getInstance();
 			return (
-				await idb.entries.getByNamespaceIdSubspaceId(
-					window.openselves.OPENSELVES_NAMESPACE_ID,
-					profile.ownSubspace.subspaceId,
+				await Promise.all(
+					profile.ownSubspaces.map(
+						async (subspace) =>
+							await idb.entries.getByNamespaceIdSubspaceId(
+								window.openselves.OPENSELVES_NAMESPACE_ID,
+								subspace.subspaceId,
+							),
+					),
 				)
-			).length;
+			).flat().length;
 		});
 	}
 
-	public async registerAndLoginUser(persistSession: boolean = false) {
+	public async registerAndLoginUser() {
 		const email = createId() + "@example.com";
 		const password = "12345678";
 
@@ -381,27 +384,29 @@ export class PuppeteerContext {
 			.filter((el) => el.textContent.trim() === "Register")
 			.click();
 
-		const form = this.within("form.register");
-		await form.locator("input[name=email]").fill(email);
-		await form.locator("input[name=password]").fill(password);
-		await form.locator('input[name="registrationPassword"]').fill("12345678");
-		await form
-			.locator("button")
-			.filter((el) => el.textContent.trim() === "Register")
-			.click();
-		await this.clickOnOpeningDialogButtonWithId("autofill-login-button");
+		const form = this.within(".app-page-content form");
+		const saveButton = this.locator("#save-record-button");
+		await saveButton.wait();
+		const profileName = createId();
+		await form.locator("input[name=name]").fill(profileName);
+		await saveButton.click();
 
-		if (persistSession) {
-			await this.locator("#persist-session-checkbox").click();
-		}
-		await this.locator("#login-button").click();
+		await this.waitForNavigation("/profiles");
+		await this.locator(".profile-card").wait();
+		assert.strictEqual((await this.page.$$(".profile-card")).length, 1);
+		await this.withinProfileCard(profileName).locator(".login-button").click();
+		await this.waitForNavigation("/subspaces/create-own?logged_in=1");
+		await this.locator("#download-recovery-file-button").click();
+		await this.locator("#confirm-checkbox").click();
+		await this.locator("#continue-button").click();
 
-		await this.waitForNavigation("/dashboard?user_logged_in=1");
+		await this.waitForNavigation("/dashboard?subspace_setup_finish=1");
 
-		return {
-			email,
-			password,
-		};
+		return profileName;
+	}
+
+	public withinProfileCard(profileName: string) {
+		return this.within(`.profile-card[data-profile-name=${profileName}]`);
 	}
 
 	public async logout() {

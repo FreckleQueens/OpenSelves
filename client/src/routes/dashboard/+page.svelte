@@ -7,7 +7,7 @@
 	import FrontTimeFrontedFor from "$lib/components/FrontTimeFrontedFor.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
-	import { requireAuth } from "$lib/routing-utils";
+	import { requireCurrentProfile } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
 	import { Front, Member } from "openselves-common/client";
 
@@ -29,7 +29,7 @@
 	);
 	let pageContent: HTMLDivElement | undefined = $state();
 
-	requireAuth();
+	requireCurrentProfile();
 </script>
 
 <AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD}>

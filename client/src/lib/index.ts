@@ -5,7 +5,7 @@ export const WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY = "warnForRemainingLocalD
 export enum MenuItem {
 	DASHBOARD,
 	MEMBERS,
-	ACCOUNT,
+	PROFILE,
 	SETTINGS,
 }
 

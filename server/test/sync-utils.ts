@@ -1,10 +1,11 @@
 import * as fs from "node:fs";
 import assert from "node:assert";
+import { readStream } from "openselves-common";
 import { Member } from "openselves-common/client";
 import { ByteString, Drop, type EntryWithPayload, SubspaceId } from "openselves-common/willow";
 
 import type { UserAuthData } from "./TestQueryBuilder.js";
-import type { TestEnvWithUsers } from "./utils.js";
+import type { TestEnvUser, TestEnvWithUsers } from "./utils.js";
 
 export const pushEndpoint = "/sync/push";
 export const pullEndpoint = "/sync/pull";
@@ -22,7 +23,7 @@ export async function putEntry(
 	env: TestEnvWithUsers,
 	entry: EntryWithPayload,
 	expectCode: number = 200,
-	user: UserAuthData = env.users.user1,
+	user: TestEnvUser = env.users.user1,
 ) {
 	return putEntries(env, [entry], expectCode, user);
 }
@@ -31,7 +32,7 @@ export async function putEntries(
 	env: TestEnvWithUsers,
 	entries: EntryWithPayload[],
 	expectCode: number = 200,
-	user: UserAuthData = env.users.user1,
+	user: TestEnvUser = env.users.user1,
 ) {
 	const encoder = Drop.encoder();
 
@@ -89,20 +90,23 @@ export async function getSyncFrom(
 	user: UserAuthData = env.users.user1,
 	expectStatus: number = 200,
 ): Promise<{
-	response: Response;
+	response: {
+		headers: Headers;
+		body: object | Response["body"];
+	};
 	timestamp?: string;
 	entries?: EntryWithPayload[];
 }> {
-	const response = await env.request
+	const query = env.request
 		.post(pullEndpoint)
 		.authenticated(user)
 		.accept("application/octet-stream", expectStatus === 200)
 		.send({
 			timestamp: timestamp,
-			subspaceId: subspaceId.toBase64(),
+			subspaceIds: [subspaceId.toBase64()],
 		})
-		.expect(expectStatus)
-		.execute();
+		.expect(expectStatus);
+	const response = expectStatus === 200 ? await query.execute() : await query.json();
 
 	if (expectStatus !== 200) {
 		return {
@@ -110,24 +114,14 @@ export async function getSyncFrom(
 		};
 	}
 
+	assert(response.body instanceof ReadableStream);
+
 	const responseTimestamp = response.headers.get("X-OpenSelves-Pull-Timestamp");
 
 	assert(typeof responseTimestamp === "string");
 
 	assert(response.body);
-	const readable = response.body.pipeThrough(Drop.decoder());
-	const entries: EntryWithPayload[] = [];
-
-	const reader = readable.getReader();
-	while (true) {
-		const result = await reader.read();
-		if (result.value) {
-			entries.push(result.value);
-		}
-		if (result.done) {
-			break;
-		}
-	}
+	const entries: EntryWithPayload[] = await readStream(response.body.pipeThrough(Drop.decoder()));
 
 	return {
 		response,

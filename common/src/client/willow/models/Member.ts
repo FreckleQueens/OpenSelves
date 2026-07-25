@@ -3,7 +3,7 @@ import type { SchemaCreate, SchemaStatic, SchemaType } from "../../../schema/typ
 import { type EntryWrapper, SubspaceId } from "../../../willow/index.js";
 import { BaseSchema, EntryDataModel } from "../EntryDataModel.js";
 
-export const MemberSchema = {
+export const MemberSchema = Object.freeze({
 	...BaseSchema,
 	name: SchemaBuilder.string().required().default(""),
 	pronouns: SchemaBuilder.string(),
@@ -12,7 +12,7 @@ export const MemberSchema = {
 	image: SchemaBuilder.string(),
 	isArchived: SchemaBuilder.boolean().required().default(false),
 	archivedReason: SchemaBuilder.string(),
-} satisfies SchemaType;
+}) satisfies SchemaType;
 export type MemberStatic = SchemaStatic<typeof MemberSchema>;
 export type MemberCreate = SchemaCreate<typeof MemberSchema>;
 

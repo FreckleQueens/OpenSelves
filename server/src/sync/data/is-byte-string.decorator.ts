@@ -33,6 +33,13 @@ export function IsByteString(length?: number, options: ValidationOptions = {}) {
 	};
 	return applyDecorators(
 		Transform(({ value }) => {
+			if (options.each) {
+				return Array.isArray(value)
+					? value.map((val) =>
+							typeof val === "string" ? Uint8Array.fromBase64(val) : (val as unknown),
+						)
+					: (value as unknown);
+			}
 			return typeof value === "string" ? Uint8Array.fromBase64(value) : (value as unknown);
 		}),
 		validationDecorator,

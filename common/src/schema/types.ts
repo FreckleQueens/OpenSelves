@@ -19,34 +19,34 @@ export type FieldType<
 };
 
 export type UndefinedFieldType = FieldType<"undefined", undefined>;
-export const UndefinedFieldType: UndefinedFieldType = {
+export const UndefinedFieldType: UndefinedFieldType = Object.freeze({
 	name: "undefined",
-};
+});
 
 export type NullFieldType = FieldType<"null", null>;
-export const NullFieldType: NullFieldType = {
+export const NullFieldType: NullFieldType = Object.freeze({
 	name: "null",
-};
+});
 
 export type StringFieldType = FieldType<"string", string>;
-export const StringFieldType: StringFieldType = {
+export const StringFieldType: StringFieldType = Object.freeze({
 	name: "string",
-};
+});
 
 export type BooleanFieldType = FieldType<"boolean", boolean>;
-export const BooleanFieldType: BooleanFieldType = {
+export const BooleanFieldType: BooleanFieldType = Object.freeze({
 	name: "boolean",
-};
+});
 
 export type NumberFieldType = FieldType<"number", number>;
-export const NumberFieldType: NumberFieldType = {
+export const NumberFieldType: NumberFieldType = Object.freeze({
 	name: "number",
-};
+});
 
 export type DateFieldType = FieldType<"Date", Date>;
-export const DateFieldType: DateFieldType = {
+export const DateFieldType: DateFieldType = Object.freeze({
 	name: "Date",
-};
+});
 
 export type RecordFieldType<Record extends RecordType = RecordType> = FieldType<
 	"record",
@@ -90,13 +90,13 @@ export type FieldTypeValue<Field extends FieldType, IsNullable extends boolean =
 export type AnyFieldTypesValue = FieldTypeValue<FieldTypes>;
 
 export type SchemaFieldInfo = {
-	types: FieldType[];
-	isOptional: boolean;
-	isNullable: boolean;
-	hasDefault: boolean;
-	isDefaultGenerated: boolean;
-	isReadonly: boolean;
-	getDefault: () => AnyFieldTypesValue;
+	readonly types: ReadonlyArray<FieldType>;
+	readonly isOptional: boolean;
+	readonly isNullable: boolean;
+	readonly hasDefault: boolean;
+	readonly isDefaultGenerated: boolean;
+	readonly isReadonly: boolean;
+	readonly getDefault: () => AnyFieldTypesValue;
 };
 export type SchemaField<
 	Field extends FieldType = FieldTypes,
@@ -104,15 +104,15 @@ export type SchemaField<
 	IsNullable extends boolean = boolean,
 	HasDefault extends boolean = boolean,
 > = SchemaFieldInfo & {
-	types: Field[];
-	isOptional: IsOptional;
-	isNullable: IsNullable;
-	hasDefault: HasDefault;
+	readonly types: ReadonlyArray<Field>;
+	readonly isOptional: IsOptional;
+	readonly isNullable: IsNullable;
+	readonly hasDefault: HasDefault;
 };
 
-export type SchemaType = {
+export type SchemaType = Readonly<{
 	[key in string]: SchemaField;
-};
+}>;
 
 export type Nullable<T, IsNullable extends boolean> = IsNullable extends true ? T | null : T;
 
@@ -133,9 +133,9 @@ type GetOptionalKey<
 	K extends keyof Schema,
 > = Schema[K]["isOptional"] extends true ? K : never;
 export type SchemaStatic<Schema extends SchemaType> = {
-	[K in keyof Schema as GetRequiredKey<Schema, K>]-?: SchemaStaticValue<Schema, K>;
+	-readonly [K in keyof Schema as GetRequiredKey<Schema, K>]-?: SchemaStaticValue<Schema, K>;
 } & {
-	[K in keyof Schema as GetOptionalKey<Schema, K>]?: SchemaStaticValue<Schema, K>;
+	-readonly [K in keyof Schema as GetOptionalKey<Schema, K>]?: SchemaStaticValue<Schema, K>;
 };
 type SchemaKeysWithDefault<Schema extends SchemaType> = {
 	[K in KeyOfSchema<Schema>]: Schema[K]["hasDefault"] extends true ? K : never;

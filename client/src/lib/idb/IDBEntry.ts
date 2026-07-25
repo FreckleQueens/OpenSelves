@@ -1,5 +1,6 @@
 import { PAYLOAD_STORE_NAME, type PayloadStore } from "$lib/idb/IDBPayload";
 import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
+import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
 import {
 	Entry,
 	EntryWithPayload,
@@ -205,6 +206,7 @@ export class IDBEntry {
 			},
 			tx,
 		);
+		SyncWorker.getInstance().setHasEntriesToPush();
 	}
 
 	private async loadPayload(

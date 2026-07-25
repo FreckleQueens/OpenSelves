@@ -2,10 +2,10 @@
 // for information about these interfaces
 import "../auto-imports";
 
-import type { PersistentStorage } from "$lib/PersistentStorage.ts";
+import type { Settings } from "$lib/Settings.ts";
 import { IDB } from "$lib/idb";
-import type { SyncWorker } from "$lib/idb/SyncWorker.js";
-import type { UserProfile } from "$lib/idb/local-profiles/UserProfile.ts";
+import { Profile } from "$lib/idb/profiles";
+import type { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte.js";
 import type { tick } from "svelte";
 
 declare global {
@@ -22,11 +22,11 @@ declare global {
 	interface Window {
 		openselves: {
 			IDB: typeof IDB;
-			PersistentStorage: typeof PersistentStorage;
+			Settings: typeof Settings;
 			SyncWorker: typeof SyncWorker;
 			tick: typeof tick;
 			OPENSELVES_NAMESPACE_ID: typeof OPENSELVES_NAMESPACE_ID;
-			UserProfile: typeof UserProfile;
+			Profile: typeof Profile;
 		};
 	}
 }

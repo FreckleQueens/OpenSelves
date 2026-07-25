@@ -1,11 +1,13 @@
-import { IsBoolean, IsEmail, IsOptional, MinLength } from "class-validator";
+import { ArrayMinSize, IsArray, IsBoolean, IsOptional } from "class-validator";
+import { SubspaceId } from "openselves-common/willow";
+
+import { IsByteString } from "../../sync/data/is-byte-string.decorator.js";
 
 export class LoginDto {
-	@IsEmail()
-	public readonly email!: string;
-
-	@MinLength(8)
-	public readonly password!: string;
+	@IsArray()
+	@ArrayMinSize(1)
+	@IsByteString(SubspaceId.LENGTH, { each: true })
+	public readonly subspaceIds!: SubspaceId[];
 
 	@IsBoolean()
 	@IsOptional()

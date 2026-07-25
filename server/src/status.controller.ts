@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { GetStatusResult } from "openselves-common";
+import type { GetStatus } from "openselves-common";
 
 import { Public } from "./auth/decorators/public.decorator.js";
 import type { ConfigData } from "./config.data.js";
@@ -11,7 +11,7 @@ export class StatusController {
 
 	@Public()
 	@Get("")
-	public status(): GetStatusResult {
+	public status(): GetStatus {
 		return {
 			ready: true,
 			version: this.configService.getOrThrow("_APP_VERSION", {
