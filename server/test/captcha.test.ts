@@ -13,11 +13,11 @@ async function verifySolutionCounter(rawExpectedFactor: number, response: { body
 	const solution: Solution | null = await solveChallenge({
 		challenge: response.body,
 		deriveKey,
-		counterStart: expectedFactor * 40,
+		counterStart: expectedFactor * 10,
 	});
 	assert(solution);
-	assert(solution.counter >= expectedFactor * 40);
-	assert(solution.counter <= expectedFactor * 80);
+	assert(solution.counter >= expectedFactor * 10);
+	assert(solution.counter <= expectedFactor * 20);
 }
 
 describe("/captcha/generate", () => {

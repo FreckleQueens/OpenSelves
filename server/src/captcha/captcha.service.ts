@@ -81,7 +81,7 @@ export class CaptchaService {
 			cost: 3,
 			memoryCost: 16384,
 			parallelism: 1,
-			counter: randomInt(80 * factor, 40 * factor),
+			counter: randomInt(20 * factor, 10 * factor),
 			deriveKey,
 			hmacSignatureSecret: this.configService.getOrThrow("CAPTCHA_SECRET", {
 				infer: true,

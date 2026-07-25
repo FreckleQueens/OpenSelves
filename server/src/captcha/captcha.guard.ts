@@ -30,7 +30,7 @@ export class CaptchaGuard implements CanActivate {
 		const request = context.switchToHttp().getRequest<Request>();
 		const payload = request.captchaPayload;
 		if (!payload) {
-			throw new BadRequestException("Missing captcha field");
+			throw new BadRequestException("Captcha field was not parsed");
 		}
 
 		if (!(await this.captchaService.verifySolution(payload.challenge, payload.solution))) {
