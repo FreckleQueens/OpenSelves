@@ -17,7 +17,23 @@ export class NamespaceId extends Ed25519Pk {
 	public static encode(namespaceId: NamespaceId): ByteString {
 		return namespaceId;
 	}
-	public static decode(input: ByteString): NamespaceId {
-		return input;
+
+	public static decode(input: ByteString): {
+		namespaceId: NamespaceId;
+		consumedBytes: number;
+	} {
+		if (input.length < NamespaceId.LENGTH) {
+			throw new Error(
+				"input is too short, needs " + NamespaceId.LENGTH + " bytes, got " + input.length,
+				{
+					cause: input,
+				},
+			);
+		}
+
+		return {
+			namespaceId: input.slice(0, NamespaceId.LENGTH),
+			consumedBytes: NamespaceId.LENGTH,
+		};
 	}
 }

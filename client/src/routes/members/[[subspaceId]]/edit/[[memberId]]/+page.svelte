@@ -131,19 +131,33 @@
 	});
 
 	async function saveMember() {
+		if (!profile) {
+			throw new Error("Current profile is undefined");
+		}
+
 		let image = member.image ? member.image : null;
 		if (image && image.startsWith("data:") && !isDataURI(image)) {
 			formState.errors["image"] = t("Image url must be a valid data uri");
 			return false;
 		}
 
-		await idbStore.area(memberObj.subspaceId).saveDataModel(memberObj);
+		await idbStore.area(memberObj.subspaceId).saveDataModel(memberObj, profile);
 		return true;
 	}
 
 	async function deleteMember() {
+		if (!profile) {
+			throw new Error("Current profile is undefined");
+		}
+
 		await idbStore.ingest(
-			[(await memberObj.makePermanentDeleteEntry()).entryWithPayload],
+			[
+				(
+					await memberObj.makePermanentDeleteEntry(
+						profile.getSignDataForSubspaceId(memberObj.subspaceId),
+					)
+				).entryWithPayload,
+			],
 			undefined,
 		);
 	}

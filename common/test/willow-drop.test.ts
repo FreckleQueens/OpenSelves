@@ -4,12 +4,12 @@ import test from "node:test";
 
 import { readStream } from "../src/index.js";
 import {
+	AuthorisedEntryWithPayload,
 	ByteString,
 	Drop,
 	type DropDecodeSingleStep,
 	type DropDecodeStep,
 	Ed25519,
-	EntryWithPayload,
 	EntryWrapper,
 	NamespaceId,
 	OPENSELVES_NAMESPACE_ID,
@@ -30,7 +30,7 @@ function execSimpleDecodeSteps(encoded: ByteString, steps: DropDecodeStep[]) {
 
 		nextConsume = step.decode(
 			encoded.slice(consumedBytes, consumedBytes + consumed),
-			EntryWithPayload.default(),
+			AuthorisedEntryWithPayload.default(),
 		);
 		consumedBytes += consumed;
 	}
@@ -49,22 +49,26 @@ function execSimpleDecodeSteps(encoded: ByteString, steps: DropDecodeStep[]) {
 
 describe("Willow drop format", () => {
 	test("Encode and decode header byte", async () => {
+		const keys1 = await Ed25519.generateKey();
 		const previousEntry = (
 			await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				(await Ed25519.generateKey()).publicKey,
+				keys1.publicKey,
 				Path.fromString("/aa/bbb/cccc"),
 				1234n,
 				ByteString.fromUtf8("hello"),
+				keys1,
 			)
 		).entryWithPayload;
+		const keys2 = await Ed25519.generateKey();
 		const entry = (
 			await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
-				(await Ed25519.generateKey()).publicKey,
+				keys2.publicKey,
 				Path.fromString("/aa/bbb/cccc/ddddd"),
 				1235n,
 				ByteString.fromUtf8("bye"),
+				keys2,
 			)
 		).entryWithPayload;
 		const encoded = Drop.encodeHeaderByte(previousEntry, entry);
@@ -80,70 +84,110 @@ describe("Willow drop format", () => {
 	test("Encode and decode namespaceId", async () => {
 		const namespaceId = (await Ed25519.generateKey()).publicKey;
 		const encoded = NamespaceId.encode(namespaceId);
-		const decoded = NamespaceId.decode(encoded);
+		const { namespaceId: decoded, consumedBytes } = NamespaceId.decode(encoded);
 		assert.deepStrictEqual(namespaceId, decoded);
+		assert.strictEqual(consumedBytes, NamespaceId.LENGTH);
 	});
 
 	test("Encode and decode subspaceId", async () => {
 		const subspaceId = (await Ed25519.generateKey()).publicKey;
 		const encoded = SubspaceId.encode(subspaceId);
 		const decoded = SubspaceId.decode(encoded);
-		assert.deepStrictEqual(subspaceId, decoded);
+		assert.deepStrictEqual(decoded.subspaceId, subspaceId);
+		assert.deepStrictEqual(decoded.consumedBytes, SubspaceId.LENGTH);
 	});
 
-	test("Encode and decode path", () => {
-		const path = Path.fromString("/a/bb/ccc");
-		const encoded = Path.encodePath(path);
+	for (const expectedPath of [
+		Path.EMPTY,
+		Path.fromString("/"),
+		Path.fromString("/a//b////c"),
+		Path.fromString("/a/bb/ccc"),
+	]) {
+		test('Encode and decode path "' + Path.toString(expectedPath) + '"', () => {
+			const encoded = Path.encodePath(expectedPath);
 
-		assert.strictEqual(encoded[0], 0x63);
+			assert.strictEqual(
+				encoded[0],
+				(expectedPath.reduce((prev, comp) => prev + comp.length, 0) << 4) |
+					expectedPath.length,
+			);
 
-		let decodedPath: Path | undefined;
-		const steps = Path.decodePath((val) => {
-			decodedPath = val;
+			let decodedPath: Path | undefined;
+			const steps = Path.decodePath((val) => {
+				decodedPath = val;
+			});
+
+			execSimpleDecodeSteps(encoded, steps);
+
+			assert.deepStrictEqual(
+				decodedPath && Path.toString(decodedPath),
+				Path.toString(expectedPath),
+			);
+		});
+	}
+
+	for (const [expectedPath, rel] of [
+		[Path.fromString("/a/bb/ccc"), Path.fromString("/a/bb")],
+		[Path.fromString("/a/b/c"), Path.EMPTY],
+		[Path.fromString("/a/b/c"), Path.fromString("/")],
+		[Path.fromString("/uuu"), Path.EMPTY],
+		[Path.fromString("/uuu"), Path.fromString("/")],
+		[Path.EMPTY, Path.EMPTY],
+	]) {
+		test("Encode and decode encodePathRelativePath", () => {
+			const encoded = Path.encodePathRelativePath(expectedPath, rel);
+
+			let decodedPath: Path | undefined;
+			const steps = Path.decodePathRelativePath(
+				() => expectedPath,
+				(val) => {
+					decodedPath = val;
+				},
+			);
+
+			execSimpleDecodeSteps(encoded, steps);
+
+			assert.deepStrictEqual(
+				decodedPath && Path.toString(decodedPath),
+				Path.toString(expectedPath),
+			);
 		});
 
-		execSimpleDecodeSteps(encoded, steps);
-
-		assert.deepStrictEqual(decodedPath && Path.toString(decodedPath), Path.toString(path));
-	});
-
-	test("Encode and decode encodePathRelativePath", () => {
-		const previousPath = Path.fromString("/a/bb");
-		const currentPath = Path.fromString("/a/bb/ccc");
-		const encoded = Path.encodePathRelativePath(currentPath, previousPath);
-
-		let decodedPath: Path | undefined;
-		const steps = Path.decodePathRelativePath(
-			() => previousPath,
-			(val) => {
-				decodedPath = val;
+		test(
+			"Path.encodePathRelativePath " +
+				Path.toString(expectedPath) +
+				"; " +
+				Path.toString(rel),
+			() => {
+				const encodedPath = Path.encodePathRelativePath(expectedPath, rel);
+				const { path: decodedPath, consumedBytes } = Path.decodePathRelativePathRaw(
+					encodedPath,
+					rel,
+				);
+				assert.deepStrictEqual(expectedPath, decodedPath);
+				assert.deepStrictEqual(consumedBytes, encodedPath.length);
 			},
 		);
-
-		execSimpleDecodeSteps(encoded, steps);
-
-		assert.deepStrictEqual(
-			decodedPath && Path.toString(decodedPath),
-			Path.toString(currentPath),
-		);
-	});
+	}
 
 	test("Full encode then decode", async () => {
-		const entries: EntryWithPayload[] = (
+		const keys = await Ed25519.generateKey();
+		const entries: AuthorisedEntryWithPayload[] = (
 			await Promise.all([
 				EntryWrapper.create(
 					OPENSELVES_NAMESPACE_ID,
-					(await Ed25519.generateKey()).publicKey,
+					keys.publicKey,
 					Path.fromString("/aa/bbb/cccc"),
 					1234n,
 					ByteString.fromUtf8("hello"),
+					keys,
 				),
 			])
 		).map((entry) => entry.entryWithPayload);
 		const encoder = Drop.encoder();
-		const decoder = Drop.decoder();
+		const decoder = await Drop.decoder();
 
-		const decodedEntries: EntryWithPayload[] = [];
+		const decodedEntries: AuthorisedEntryWithPayload[] = [];
 		await Promise.all([
 			(async () => {
 				const writer = encoder.writable.getWriter();
@@ -154,7 +198,9 @@ describe("Willow drop format", () => {
 			})(),
 			encoder.readable.pipeTo(decoder.writable),
 			readStream(decoder.readable, {
-				onValue: decodedEntries.push,
+				onValue: (value) => {
+					decodedEntries.push(value);
+				},
 			}),
 		]);
 

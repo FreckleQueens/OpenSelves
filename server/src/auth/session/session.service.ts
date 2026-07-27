@@ -7,11 +7,7 @@ import { and, eq, gte, or } from "drizzle-orm";
 
 import { type ConfigData } from "../../config.data.js";
 import { DB } from "../../db/drizzle.js";
-import {
-	type Session,
-	byteStringArrayToPostgresByteaArrayLiteral,
-	sessions,
-} from "../../db/index.js";
+import { type Session, sessions } from "../../db/index.js";
 import { AccessTokenPayload } from "./data/access-token-payload.data.js";
 
 @Injectable()
@@ -34,12 +30,12 @@ export class SessionService {
 		return await this.jwtService.signAsync<AccessTokenPayload>({
 			uniqueId: createId(),
 			timestampMs: Date.now(),
-			subspaceIds: session.subspaceIds.map((subspaceId) => subspaceId.toBase64()),
+			userKey: session.userKey.toBase64(),
 		});
 	}
 
 	public async createSession(
-		subspaceIds: Session["subspaceIds"],
+		userKey: Session["userKey"],
 		persistSession: boolean,
 	): Promise<Session> {
 		const token = this.generateNewSessionToken();
@@ -48,7 +44,7 @@ export class SessionService {
 				.insert(sessions)
 				.values({
 					token,
-					subspaceIds: byteStringArrayToPostgresByteaArrayLiteral(subspaceIds),
+					userKey,
 					persist: persistSession,
 				})
 				.returning()

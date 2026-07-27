@@ -1,11 +1,19 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "8efe0f01-4b7f-4ea6-a660-63f3042a2983",
+  "id": "b409c5e0-6550-4f81-813a-26122f796639",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
+    {
+      "values": [
+        "s3"
+      ],
+      "name": "entryPayloadStorage",
+      "entityType": "enums",
+      "schema": "public"
+    },
     {
       "isRlsEnabled": false,
       "name": "entries",
@@ -111,6 +119,19 @@
       "generated": null,
       "identity": null,
       "name": "payloadStorage",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "entries"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "authorisationToken",
       "entityType": "columns",
       "schema": "public",
       "table": "entries"
@@ -249,11 +270,11 @@
       "type": "bytea",
       "typeSchema": null,
       "notNull": true,
-      "dimensions": 1,
+      "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "subspaceIds",
+      "name": "userKey",
       "entityType": "columns",
       "schema": "public",
       "table": "sessions"

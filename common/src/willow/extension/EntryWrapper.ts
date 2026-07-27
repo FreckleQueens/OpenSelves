@@ -1,15 +1,18 @@
 import { ByteString } from "../ByteString.js";
 import { Path } from "../Path.js";
 import {
+	AuthorisedEntryWithPayload,
 	Entry,
-	EntryWithPayload,
 	NamespaceId,
 	PayloadDigest,
 	SubspaceId,
 	Timestamp,
 	UInt64,
 } from "../index.js";
+import type { CapabilitySignData } from "../meadowcap/CapabilitySignData.js";
+import { AuthorisedEntry } from "../meadowcap/index.js";
 
+// TODO: get rid of this class
 export class EntryWrapper implements Entry {
 	public static async create(
 		namespaceId: ByteString,
@@ -17,22 +20,26 @@ export class EntryWrapper implements Entry {
 		path: Path,
 		timestamp: Timestamp,
 		payload: ByteString,
+		signData: CapabilitySignData,
 	): Promise<EntryWrapper> {
 		return new EntryWrapper(
-			{
-				namespaceId,
-				subspaceId,
-				path,
-				timestamp,
-				payloadLength: BigInt(payload.length),
-				payloadDigest: await PayloadDigest.hash(payload),
-			},
+			await AuthorisedEntry.signEntry(
+				{
+					namespaceId,
+					subspaceId,
+					path,
+					timestamp,
+					payloadLength: BigInt(payload.length),
+					payloadDigest: await PayloadDigest.hash(payload),
+				},
+				signData,
+			),
 			payload,
 		);
 	}
 
 	public static async load(entry: unknown, payload?: ByteString): Promise<EntryWrapper> {
-		if (!Entry.is(entry) || !Entry.isValid(entry)) {
+		if (!AuthorisedEntry.is(entry) || !(await AuthorisedEntry.isValid(entry))) {
 			throw new Error("Tried to load an invalid entry", {
 				cause: entry,
 			});
@@ -40,7 +47,7 @@ export class EntryWrapper implements Entry {
 
 		const entryObject = new EntryWrapper(entry);
 
-		if (payload === undefined && EntryWithPayload.is(entry)) {
+		if (payload === undefined && AuthorisedEntryWithPayload.is(entry)) {
 			payload = entry.payload;
 		}
 
@@ -51,30 +58,33 @@ export class EntryWrapper implements Entry {
 		return entryObject;
 	}
 
-	private readonly _entry: Entry;
+	private _entry: AuthorisedEntry;
 	private _payload: ByteString | undefined;
 
-	private constructor(entry: Entry, payload?: ByteString) {
-		this._entry = Entry.copy(entry);
+	private constructor(entry: AuthorisedEntry, payload?: ByteString) {
+		this._entry = AuthorisedEntry.copy(entry);
 
 		if (payload) {
 			this._payload = ByteString.copy(payload);
 		}
 	}
 
-	public get entry(): Entry {
-		return Entry.copy(this._entry);
+	public get entry(): AuthorisedEntry {
+		return AuthorisedEntry.copy(this._entry);
 	}
 
-	public get entryWithPayload(): EntryWithPayload {
+	public get entryWithPayload(): AuthorisedEntryWithPayload {
 		if (this._payload) {
-			return { ...Entry.copy(this._entry), payload: ByteString.copy(this._payload) };
+			return {
+				...AuthorisedEntry.copy(this._entry),
+				payload: ByteString.copy(this._payload),
+			};
 		} else {
 			throw new Error("this entry doesn't have a payload");
 		}
 	}
 
-	public get entryMaybeWithPayload(): Entry | EntryWithPayload {
+	public get entryMaybeWithPayload(): AuthorisedEntry | AuthorisedEntryWithPayload {
 		if (this._payload) {
 			return this.entryWithPayload;
 		} else {
@@ -131,12 +141,15 @@ export class EntryWrapper implements Entry {
 		this._payload = ByteString.copy(payload);
 	}
 
-	public async setPayload(payload: ByteString, timestamp: Timestamp = Timestamp.now()) {
-		const length: UInt64 = BigInt(payload.length);
-		const digest: PayloadDigest = await PayloadDigest.hash(payload);
-		this._entry.timestamp = timestamp;
-		this._entry.payloadDigest = digest;
-		this._entry.payloadLength = length;
+	public async setPayload(
+		payload: ByteString,
+		signData: CapabilitySignData,
+		timestamp: Timestamp = Timestamp.now(),
+	) {
+		this._entry = await AuthorisedEntry.signEntry(
+			await Entry.setPayload(this._entry, payload, timestamp),
+			signData,
+		);
 		this._payload = ByteString.copy(payload);
 	}
 }

@@ -4,8 +4,9 @@ import { IDBStore } from "$lib/idb/IDBStore";
 import { Profile } from "$lib/idb/profiles";
 import { readStream } from "openselves-common";
 import {
+	type AuthorisedEntryWithPayload,
+	Capability,
 	Drop,
-	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
 	SubspaceId,
 	Timestamp,
@@ -255,8 +256,9 @@ export class SyncWorker {
 		}
 
 		const profile = Profile.getCurrentProfile();
+		const capabilities = profile.getReadCapabilities();
 
-		if (profile.knownSubspaces.length === 0) {
+		if (capabilities.length === 0) {
 			return;
 		}
 
@@ -265,9 +267,7 @@ export class SyncWorker {
 			method: "POST",
 			data: {
 				timestamp: lastPullTimestamp,
-				subspaceIds: profile.knownSubspaces.map((subspace) =>
-					subspace.subspaceId.toBase64(),
-				),
+				capabilities: capabilities.map((cap) => Capability.encode(cap).toBase64()),
 			},
 		});
 
@@ -276,10 +276,10 @@ export class SyncWorker {
 			return;
 		}
 
-		const decoder = Drop.decoder();
+		const decoder = await Drop.decoder();
 		const readable = result.response.body.pipeThrough(decoder);
 
-		let entries: EntryWithPayload[];
+		let entries: AuthorisedEntryWithPayload[];
 		try {
 			entries = await readStream(readable);
 		} catch (e) {

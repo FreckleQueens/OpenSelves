@@ -1,6 +1,5 @@
 import {
 	BadRequestException,
-	ForbiddenException,
 	Injectable,
 	type NestInterceptor,
 	PayloadTooLargeException,
@@ -11,7 +10,12 @@ import type { CallHandler } from "@nestjs/common/interfaces/features/nest-interc
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
 import { readStream } from "openselves-common";
-import { ByteString, Drop, type EntryWithPayload } from "openselves-common/willow";
+import {
+	AuthorisedEntry,
+	type AuthorisedEntryWithPayload,
+	ByteString,
+	Drop,
+} from "openselves-common/willow";
 import { Observable } from "rxjs";
 
 import type { ConfigData } from "../config.data.js";
@@ -38,7 +42,7 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 
 		const maxPayloadLength = this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true });
 
-		const decoder = Drop.decoder();
+		const decoder = await Drop.decoder();
 
 		const writer = decoder.writable.getWriter();
 
@@ -46,7 +50,7 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 		let stalledRequestCheckInterval: NodeJS.Timeout | undefined;
 		let onRequestEnd: (() => void) | undefined;
 
-		const entries: EntryWithPayload[] = [];
+		const entries: AuthorisedEntryWithPayload[] = [];
 		await Promise.all([
 			new Promise<void>((resolve, reject) => {
 				const dataEventListener = (chunk: ByteString) => {
@@ -99,7 +103,7 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 				});
 			}),
 			readStream(decoder.readable, {
-				onValue: (value) => {
+				onValue: async (value) => {
 					if (value.payloadLength.valueOf() > maxPayloadLength) {
 						throw new PayloadTooLargeException(
 							"Max payload size per entry is " +
@@ -111,18 +115,10 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 					if (!req.accessTokenPayload) {
 						throw new Error("accessTokenPayload went missing");
 					}
-					if (
-						!this.syncService.hasReadWriteAccess(
-							req.accessTokenPayload,
-							value.subspaceId,
-						)
-					) {
-						throw new ForbiddenException(
-							"Tried to write entry with unauthorized subspaceId",
-							{
-								cause: value.subspaceId.toHex(),
-							},
-						);
+					if (!(await AuthorisedEntry.isAuthorisedWrite(value))) {
+						throw new BadRequestException("Received an entry with invalid signature", {
+							cause: value,
+						});
 					}
 					entries.push(value);
 				},

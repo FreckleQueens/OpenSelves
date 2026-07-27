@@ -303,8 +303,10 @@ export class PuppeteerContext {
 				(!excludePreflight || response.request().method() !== "OPTIONS")
 			);
 		});
-		if (typeof expectOk === "boolean") {
-			assert.strictEqual(response.ok(), expectOk);
+		if (typeof expectOk === "boolean" && response.ok() !== expectOk) {
+			throw new Error("response.ok() is " + response.ok() + ", expected " + expectOk, {
+				cause: response,
+			});
 		}
 		return response;
 	}

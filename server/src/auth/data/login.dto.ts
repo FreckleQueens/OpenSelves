@@ -1,13 +1,15 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsOptional } from "class-validator";
-import { SubspaceId } from "openselves-common/willow";
+import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
+import { type ByteString, Ed25519Signature } from "openselves-common/willow";
 
 import { IsByteString } from "../../sync/data/is-byte-string.decorator.js";
 
 export class LoginDto {
-	@IsArray()
-	@ArrayMinSize(1)
-	@IsByteString(SubspaceId.LENGTH, { each: true })
-	public readonly subspaceIds!: SubspaceId[];
+	@IsString()
+	@MinLength(1)
+	public readonly challenge!: string;
+
+	@IsByteString(Ed25519Signature.LENGTH)
+	public readonly signature!: ByteString;
 
 	@IsBoolean()
 	@IsOptional()

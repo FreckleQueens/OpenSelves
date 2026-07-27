@@ -1,5 +1,5 @@
 import { ArrayMinSize, IsArray, IsString } from "class-validator";
-import { SubspaceId } from "openselves-common/willow";
+import { ByteString } from "openselves-common/willow";
 
 import { IsByteString } from "./is-byte-string.decorator.js";
 
@@ -9,6 +9,6 @@ export class PullDto {
 
 	@IsArray()
 	@ArrayMinSize(1)
-	@IsByteString(SubspaceId.LENGTH, { each: true })
-	public readonly subspaceIds!: SubspaceId[];
+	@IsByteString(undefined, { each: true })
+	public readonly capabilities!: ByteString[];
 }

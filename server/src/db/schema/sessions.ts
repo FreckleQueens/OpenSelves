@@ -5,7 +5,7 @@ import { timestamps } from "./utils.js";
 
 export const sessions = camelCase.table("sessions", {
 	token: text().notNull().unique().primaryKey(),
-	subspaceIds: bytea().array().notNull().$type<ByteString>(),
+	userKey: bytea().notNull().$type<ByteString>(),
 	persist: boolean().notNull().default(false),
 	...timestamps(),
 });

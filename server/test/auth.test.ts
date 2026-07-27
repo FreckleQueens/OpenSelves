@@ -1,9 +1,10 @@
 import { JwtService } from "@nestjs/jwt";
+import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import assert from "node:assert";
 import test, { describe } from "node:test";
 import { TOKEN_EXPIRED_ERROR } from "openselves-common";
-import type { SubspaceId } from "openselves-common/willow";
+import { ByteString, Ed25519, UserPublicKey } from "openselves-common/willow";
 
 import { sessions } from "../src/db/index.js";
 import type { UserAuthData } from "./TestQueryBuilder.js";
@@ -30,11 +31,10 @@ describe("Auth (e2e)", () => {
 	);
 
 	async function testUserIsAuthenticated(
-		user: UserAuthData = env.users.user1,
-		subspaceId: SubspaceId = env.users.user1.keys.publicKey,
+		user: UserAuthData & { keys: { publicKey: UserPublicKey } } = env.users.user1,
 		expectCode: number = 200,
 	) {
-		return await getSyncFrom(env, "", subspaceId, user, expectCode);
+		return await getSyncFrom(env, "", user, expectCode);
 	}
 
 	async function makeExpiredAccessToken(originalTokenForPayload: string) {
@@ -71,14 +71,75 @@ describe("Auth (e2e)", () => {
 	}
 
 	describe("/auth", () => {
+		describe("/challenge", () => {
+			test("POST returns a string payload 200", async () => {
+				const response = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				assert("challenge" in response.body);
+				assert.strictEqual(typeof response.body.challenge, "string");
+			});
+
+			test("POST returns a different payload every time", async () => {
+				const response1 = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				const response2 = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				assert("challenge" in response1.body);
+				assert.strictEqual(typeof response1.body.challenge, "string");
+				assert.notStrictEqual(response1.body["challenge"], response2.body["challenge"]);
+			});
+
+			test("POST invalid userKey", async () => {
+				await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: ByteString.fromUtf8("not valid").toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(400)
+					.json();
+			});
+
+			testCaptcha(
+				() => env,
+				200,
+				(name, callback) => {
+					test(name, callback);
+				},
+				(captcha) => {
+					return env.request.post("/auth/challenge").send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: captcha,
+					});
+				},
+			);
+		});
+
 		describe("/login", () => {
 			test("POST 200", async () => {
 				const response = await env.request
 					.post("/auth/login")
 					.send({
-						subspaceIds: [env.users.user1.keys.publicKey.toBase64()],
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: true,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
 					.expectCookie({
@@ -122,9 +183,8 @@ describe("Auth (e2e)", () => {
 				await env.request
 					.post("/auth/login")
 					.send({
-						subspaceIds: [env.users.user1.keys.publicKey.toBase64()],
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: false,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
 					.expectCookie({
@@ -141,35 +201,70 @@ describe("Auth (e2e)", () => {
 					.json();
 			});
 
-			// TODO: meadowcap
-			// for (const { test: testName, data, status } of [
-			// ]) {
-			// 	test(testName, async () => {
-			// 		await env.request
-			// 			.post("/auth/login")
-			// 			.send({
-			// 				...data(),
-			// 				captcha: await solveCaptcha(env),
-			// 			})
-			// 			.expectNotCookie("refreshToken")
-			// 			.expect(status)
-			// 			.json();
-			// 	});
-			// }
+			test("POST invalid challenge", async () => {
+				const params = await env.getValidAuthLoginParameters();
 
-			testCaptcha(
-				() => env,
-				200,
-				(name, callback) => {
-					test(name, callback);
-				},
-				(captcha) => {
-					return env.request.post("/auth/login").send({
-						subspaceIds: [env.users.user1.keys.publicKey.toBase64()],
-						captcha: captcha,
-					});
-				},
-			);
+				// Invalid challenge
+				params.challenge = createId();
+				params.signature = (
+					await Ed25519.sign(
+						env.users.user1.keys.secretKey,
+						ByteString.fromUtf8(params.challenge),
+					)
+				).toBase64();
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
+
+			test("POST invalid signature", async () => {
+				const params = await env.getValidAuthLoginParameters();
+
+				// Sign something else
+				params.signature = (
+					await Ed25519.sign(
+						env.users.user1.keys.secretKey,
+						ByteString.fromUtf8(createId()),
+					)
+				).toBase64();
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
+
+			test("POST expired challenge", async () => {
+				const params = await env.getValidAuthLoginParameters();
+
+				// This duration is set to 5s for tests in package.json
+				await waitFor(5000);
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
 		});
 
 		describe("/refresh", () => {
@@ -226,13 +321,13 @@ describe("Auth (e2e)", () => {
 				assert.notStrictEqual(newRefreshToken, oldRefreshToken);
 
 				// New access token must work
-				await testUserIsAuthenticated({ cookies: newCookies });
+				await testUserIsAuthenticated({ cookies: newCookies, keys: env.users.user1.keys });
 
 				// Old refresh token must be revoked
 				await testAuthRefreshFails(env.users.user1, 401);
 
 				// New access token must still work
-				await testUserIsAuthenticated({ cookies: newCookies });
+				await testUserIsAuthenticated({ cookies: newCookies, keys: env.users.user1.keys });
 
 				// New refresh token must work
 				await env.request
@@ -246,9 +341,8 @@ describe("Auth (e2e)", () => {
 				const response = await env.request
 					.post("/auth/login")
 					.send({
-						subspaceIds: [env.users.user1.keys.publicKey.toBase64()],
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: true,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
 					.json();
@@ -341,7 +435,10 @@ describe("Auth (e2e)", () => {
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
 				// Access token removed from cookies
-				await testUserIsAuthenticated({ cookies: newCookies }, undefined, 401);
+				await testUserIsAuthenticated(
+					{ cookies: newCookies, keys: env.users.user1.keys },
+					401,
+				);
 
 				// Refresh token revoked
 				await env.request
@@ -389,8 +486,8 @@ describe("Auth (e2e)", () => {
 			const { response } = await testUserIsAuthenticated(
 				{
 					cookies: `accessToken=${expiredAccessToken}`,
+					keys: env.users.user1.keys,
 				},
-				undefined,
 				401,
 			);
 			assert(response.body);

@@ -56,6 +56,26 @@ export class Entry {
 		};
 	}
 
+	/**
+	 * @param entry
+	 * @param payload
+	 * @param timestamp `null` skips timestamp update
+	 * @returns an updated copy of entry
+	 */
+	public static async setPayload(
+		entry: Entry,
+		payload: ByteString,
+		timestamp: Timestamp | null = Timestamp.now(),
+	): Promise<Entry> {
+		const newEntry = Entry.copy(entry);
+		newEntry.payloadLength = BigInt(payload.length);
+		newEntry.payloadDigest = await PayloadDigest.hash(payload);
+		if (timestamp !== null) {
+			newEntry.timestamp = timestamp;
+		}
+		return newEntry;
+	}
+
 	public static toHumanReadable(entry: Entry) {
 		return {
 			namespaceId: NamespaceId.toUtf8(entry.namespaceId),
@@ -82,9 +102,25 @@ export class Entry {
 		};
 	}
 
-	constructor(
-		public namespaceId: ByteString,
-		public subspaceId: ByteString,
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodeEntry
+	 */
+	public static encodeEntry(entry: Entry): ByteString {
+		const parts: ByteString[] = [];
+
+		parts.push(NamespaceId.encode(entry.namespaceId));
+		parts.push(SubspaceId.encode(entry.subspaceId));
+		parts.push(Path.encodePath(entry.path));
+		parts.push(UInt64.encodeToVariable8(entry.timestamp));
+		parts.push(UInt64.encodeToVariable8(entry.payloadLength));
+		parts.push(PayloadDigest.encode(entry.payloadDigest));
+
+		return ByteString.concat(...parts);
+	}
+
+	public constructor(
+		public namespaceId: NamespaceId,
+		public subspaceId: SubspaceId,
 		public path: Path,
 		public timestamp: Timestamp,
 		public payloadLength: UInt64,

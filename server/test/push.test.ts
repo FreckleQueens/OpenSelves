@@ -5,15 +5,18 @@ import test, { describe } from "node:test";
 import { shuffleArray } from "openselves-common";
 import { type AnyEntryDataModel, Front, Member } from "openselves-common/client";
 import {
+	AuthorisedEntry,
+	AuthorisedEntryWithPayload,
 	ByteString,
+	CapabilitySignData,
+	type Ed25519KeyPair,
 	Entry,
-	EntryWithPayload,
 	EntryWrapper,
 	MAX_IN_DB_PAYLOAD_LENGTH,
+	MemoryStore,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
 	PayloadDigest,
-	type SubspaceId,
 	Timestamp,
 	UInt64,
 	Willow25,
@@ -26,6 +29,8 @@ import {
 	TEST_IMAGE_DATA_URL,
 	TEST_IMAGE_LONG_DATA_URL,
 	makeMember,
+	checkEntriesAreNotServed as originalCheckEntriesAreNotServed,
+	checkEntriesAreServed as originalCheckEntriesAreServed,
 	getSyncFrom as originalGetSyncFrom,
 	putEntries as originalPutEntries,
 	putEntry as originalPutEntry,
@@ -37,31 +42,42 @@ import { type TestEnvUser, type TestEnvWithUsers, setupTestSuiteWithUsers } from
 async function timeModelEntries(
 	model: AnyEntryDataModel,
 	timestamp: Timestamp,
-): Promise<EntryWithPayload[]> {
-	return (await model.flushDirtyEntries()).map((entry) => ({
-		...entry.entryWithPayload,
-		timestamp,
-	}));
+	signData: CapabilitySignData,
+): Promise<AuthorisedEntryWithPayload[]> {
+	return Promise.all(
+		(await model.flushDirtyEntries(signData)).map(async (entryWrapper) => {
+			const entry = entryWrapper.entryWithPayload;
+			entry.timestamp = timestamp;
+			return AuthorisedEntryWithPayload.signEntry(entry, signData);
+		}),
+	);
 }
 
 describe(pushEndpoint, () => {
 	let env: TestEnvWithUsers;
 	const putEntry = (
-		entry: EntryWithPayload,
+		entry: AuthorisedEntryWithPayload,
 		expectCode: number = 200,
 		user: TestEnvUser = env.users.user1,
 	) => originalPutEntry(env, entry, expectCode, user);
 	const putEntries = (
-		entries: EntryWithPayload[],
+		entries: AuthorisedEntryWithPayload[],
 		expectCode: number = 200,
 		user: TestEnvUser = env.users.user1,
 	) => originalPutEntries(env, entries, expectCode, user);
 
-	const getSyncFrom = (
-		timestamp: string,
-		subspaceId: ByteString = env.users.user1.keys.publicKey,
+	const getSyncFrom = (timestamp: string, user: TestEnvUser = env.users.user1) =>
+		originalGetSyncFrom(env, timestamp, user);
+
+	const checkEntriesAreServed = (
+		entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
 		user: TestEnvUser = env.users.user1,
-	) => originalGetSyncFrom(env, timestamp, subspaceId, user);
+	) => originalCheckEntriesAreServed(env, entries, user);
+
+	const checkEntriesAreNotServed = (
+		entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
+		user: TestEnvUser = env.users.user1,
+	) => originalCheckEntriesAreNotServed(env, entries, user);
 
 	function makeFront(member: Member, date: Date) {
 		const front = new Front(member.subspaceId, {
@@ -75,12 +91,12 @@ describe(pushEndpoint, () => {
 	}
 
 	async function createMember(
-		subspaceId: SubspaceId,
+		keys: Ed25519KeyPair,
 		date?: Date,
 		image?: string | FileRef | null,
 	) {
-		const { member } = makeMember(subspaceId, date, image);
-		const entries = await member.flushDirtyEntries();
+		const { member } = makeMember(keys.publicKey, date, image);
+		const entries = await member.flushDirtyEntries(keys);
 		const response = await putEntries(entries.map((entry) => entry.entryWithPayload));
 		const responseBody = response.body;
 		assert(responseBody);
@@ -89,17 +105,17 @@ describe(pushEndpoint, () => {
 		await checkEntriesAreServed(entries);
 		return { member, entries, response, responseBody };
 	}
-	async function createAndDeleteMember(subspaceId: SubspaceId = env.users.user1.keys.publicKey) {
-		const { member, entries } = await createMember(subspaceId);
-		const deleteEntry = await member.makePermanentDeleteEntry();
+	async function createAndDeleteMember(keys: Ed25519KeyPair = env.users.user1.keys) {
+		const { member, entries } = await createMember(keys);
+		const deleteEntry = await member.makePermanentDeleteEntry(keys);
 		const response = await putEntry(deleteEntry.entryWithPayload);
 		return { member, createEntries: entries, deleteEntry, response };
 	}
 
-	async function createFront(subspaceId: SubspaceId) {
-		const { member, entries: memberEntries } = await createMember(subspaceId);
+	async function createFront(keys: Ed25519KeyPair) {
+		const { member, entries: memberEntries } = await createMember(keys);
 		const { front } = makeFront(member, new Date());
-		const entries = await front.flushDirtyEntries();
+		const entries = await front.flushDirtyEntries(keys);
 		const response = await putEntries(entries.map((entry) => entry.entryWithPayload));
 		const responseBody = response.body;
 		assert(responseBody);
@@ -107,54 +123,6 @@ describe(pushEndpoint, () => {
 		assert.strictEqual(responseBody["entries"], undefined);
 		await checkEntriesAreServed(entries);
 		return { front, entries, member, memberEntries, response, responseBody };
-	}
-
-	async function checkEntriesAreServed(
-		entries: (EntryWrapper | Entry | EntryWithPayload)[],
-		subspaceId: ByteString = env.users.user1.keys.publicKey,
-		user: TestEnvUser = env.users.user1,
-	) {
-		assert(entries.length > 0);
-
-		const response = await getSyncFrom("", subspaceId, user);
-
-		assert(response.entries);
-		assert(response.entries.length > 0);
-
-		const actualEntries = (
-			await Promise.all(response.entries.map((entry: unknown) => EntryWrapper.load(entry)))
-		).map((entry) => entry.entryMaybeWithPayload);
-
-		const expectedEntries = entries.map((entry) =>
-			entry instanceof EntryWrapper ? entry.entryMaybeWithPayload : entry,
-		);
-		for (const expectedEntry of expectedEntries) {
-			const actualEntry = actualEntries.find((entry) =>
-				Path.equals(entry.path, expectedEntry.path),
-			);
-			assert(actualEntry);
-			assert.deepStrictEqual(actualEntry, expectedEntry);
-		}
-	}
-
-	async function checkEntriesAreNotServed(entries: (EntryWrapper | Entry | EntryWithPayload)[]) {
-		const response = await getSyncFrom("");
-		assert(response.entries);
-
-		const actualEntries = await Promise.all(
-			response.entries.map((entry: unknown) => EntryWrapper.load(entry)),
-		);
-
-		for (const expectedEntry of entries) {
-			for (const actualEntry of actualEntries) {
-				assert.notDeepStrictEqual(
-					actualEntry.entryWithPayload,
-					expectedEntry instanceof EntryWrapper
-						? expectedEntry.entryWithPayload
-						: expectedEntry,
-				);
-			}
-		}
 	}
 
 	function testImage(
@@ -283,10 +251,27 @@ describe(pushEndpoint, () => {
 			type TestCase = {
 				name: string;
 				forgeEntry: (
-					entry: Partial<EntryWithPayload> & Record<string, unknown>,
+					entry: AuthorisedEntryWithPayload & Record<string, unknown>,
 				) => Promise<void> | void;
 				expectCode?: number;
+				expectServe?: boolean;
 			};
+
+			async function setEntryPayloadToForged(
+				payload: ByteString,
+				entry: AuthorisedEntryWithPayload & Record<string, unknown>,
+				payloadDigest?: ByteString,
+				payloadLength: UInt64 = BigInt(payload.length),
+			) {
+				entry.payload = payload;
+				entry.payloadLength = payloadLength;
+				entry.payloadDigest =
+					payloadDigest === undefined ? await PayloadDigest.hash(payload) : payloadDigest;
+				entry.authorisationToken = (
+					await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+				).authorisationToken;
+			}
+
 			const testCases: TestCase[] = [
 				{
 					name: "control 200",
@@ -297,100 +282,136 @@ describe(pushEndpoint, () => {
 				// namespaceId
 				{
 					name: "empty namespaceId 400",
-					forgeEntry: (entry) => {
-						entry.namespaceId = new Uint8Array(0);
-						assert(EntryWithPayload.is(entry));
+					forgeEntry: async (entry) => {
+						entry.namespaceId = entry.authorisationToken.capability.inner.namespaceKey =
+							ByteString.empty();
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 				{
 					name: "wrong namespaceId 400",
-					forgeEntry: (entry) => {
-						entry.namespaceId = ByteString.fromUtf8("not the correct namespaceId");
-						assert(EntryWithPayload.is(entry));
+					forgeEntry: async (entry) => {
+						entry.namespaceId = entry.authorisationToken.capability.inner.namespaceKey =
+							ByteString.fromUtf8("not the correct namespaceId");
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 
 				// subspaceId
 				{
 					name: "correct subspaceId 200",
-					forgeEntry: (entry) => {
-						entry.subspaceId = env.users.user1.keys.publicKey;
-						assert(EntryWithPayload.is(entry));
+					forgeEntry: async (entry) => {
+						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
+							env.users.user1.keys.publicKey;
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "empty subspaceId 400",
 					forgeEntry: (entry) => {
-						entry.subspaceId = new Uint8Array(0);
-						assert(EntryWithPayload.is(entry));
+						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
+							ByteString.empty();
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 400,
 				},
 				{
 					name: "invalid subspaceId 400",
 					forgeEntry: (entry) => {
-						entry.subspaceId = ByteString.fromUtf8("not the correct subspaceId");
-						assert(EntryWithPayload.is(entry));
+						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
+							ByteString.fromUtf8("not the correct subspaceId");
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 400,
 				},
 				{
-					name: "other user's subspaceId 403",
-					forgeEntry: (entry) => {
+					name: "authored by another user 200",
+					forgeEntry: async (entry) => {
 						entry.subspaceId = env.users.user2.keys.publicKey;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user2.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
-					expectCode: 403,
+					expectCode: 200,
+					expectServe: false,
 				},
 
 				// path
 				{
 					name: "empty path 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = [];
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "single empty component path 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/");
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "single component path 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/hi");
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "path with empty components 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("//hi///hello//bye/");
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "too long path 400",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = Path.fromString(
 							"/" + "a".repeat(Willow25.MAX_PATH_LENGTH + 1),
 						);
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 				{
 					name: "just long enough path 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/" + "a".repeat(Willow25.MAX_PATH_LENGTH));
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
@@ -398,50 +419,63 @@ describe(pushEndpoint, () => {
 				// timestamp
 				{
 					name: "now timestamp 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now();
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "0 timestamp 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.timestamp = 0n;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "timestamp 15min in the future 400",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now().valueOf() + 15n * 60n * 1000_000n;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 				{
 					name: "timestamp 5min in the future 200",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now().valueOf() + 5n * 60n * 1000_000n;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "timestamp max uint64 with non-empty payload 400",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						entry.timestamp = UInt64.MAX_VALUE;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 				{
 					name: "timestamp max uint64 with empty payload 200",
 					forgeEntry: async (entry) => {
 						entry.timestamp = UInt64.MAX_VALUE;
-						entry.payload = new Uint8Array(0);
-						entry.payloadLength = 0n;
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						await setEntryPayloadToForged(ByteString.empty(), entry);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
@@ -449,12 +483,15 @@ describe(pushEndpoint, () => {
 				// payloadLength
 				{
 					name: "wrong payloadLength 400",
-					forgeEntry: (entry) => {
+					forgeEntry: async (entry) => {
 						const forgedLength = 999999999n;
 						assert(entry.payload);
 						assert.notStrictEqual(Number(forgedLength), entry.payload.length);
 						entry.payloadLength = forgedLength;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 
@@ -469,7 +506,10 @@ describe(pushEndpoint, () => {
 						assert.notStrictEqual(forgedDigest, entry.payloadDigest);
 
 						entry.payloadDigest = forgedDigest;
-						assert(EntryWithPayload.is(entry));
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+						).authorisationToken;
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 				},
 
@@ -477,92 +517,97 @@ describe(pushEndpoint, () => {
 				{
 					name: "empty payload 200",
 					forgeEntry: async (entry) => {
-						entry.payload = new Uint8Array(0);
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						await setEntryPayloadToForged(ByteString.empty(), entry);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "empty payload with wrong payloadLength 400",
 					forgeEntry: async (entry) => {
-						entry.payload = new Uint8Array(0);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						await setEntryPayloadToForged(
+							ByteString.empty(),
+							entry,
+							undefined,
+							entry.payloadLength,
+						);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 400,
 				},
 				{
 					name: "empty payload with wrong payloadDigest 400",
-					forgeEntry: (entry) => {
-						entry.payload = new Uint8Array(0);
-						entry.payloadLength = BigInt(entry.payload.length);
-						assert(EntryWithPayload.is(entry));
+					forgeEntry: async (entry) => {
+						await setEntryPayloadToForged(
+							ByteString.empty(),
+							entry,
+							entry.payloadDigest,
+						);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 400,
 				},
 				{
 					name: "small payload (<=8192) 200",
 					forgeEntry: async (entry) => {
-						entry.payload = ByteString.fromUtf8("a".repeat(MAX_IN_DB_PAYLOAD_LENGTH));
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						await setEntryPayloadToForged(
+							ByteString.fromUtf8("a".repeat(MAX_IN_DB_PAYLOAD_LENGTH)),
+							entry,
+						);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "large payload (>8192) 200",
 					forgeEntry: async (entry) => {
-						entry.payload = ByteString.fromUtf8(
-							"a".repeat(MAX_IN_DB_PAYLOAD_LENGTH + 1),
+						await setEntryPayloadToForged(
+							ByteString.fromUtf8("a".repeat(MAX_IN_DB_PAYLOAD_LENGTH + 1)),
+							entry,
 						);
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "payload length at limit 200",
 					forgeEntry: async (entry) => {
-						entry.payload = ByteString.fromUtf8(
-							"a".repeat(
-								env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
-									infer: true,
-								}),
+						await setEntryPayloadToForged(
+							ByteString.fromUtf8(
+								"a".repeat(
+									env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
+										infer: true,
+									}),
+								),
 							),
+							entry,
 						);
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
 					name: "payload length over limit 413",
 					forgeEntry: async (entry) => {
-						entry.payload = ByteString.fromUtf8(
-							"a".repeat(
-								env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
-									infer: true,
-								}) + 1,
+						await setEntryPayloadToForged(
+							ByteString.fromUtf8(
+								"a".repeat(
+									env.configService.getOrThrow("MAX_UPLOAD_SIZE", {
+										infer: true,
+									}) + 1,
+								),
 							),
+							entry,
 						);
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 413,
 				},
 				{
 					name: "payload with null byte 200",
 					forgeEntry: async (entry) => {
-						entry.payload = new Uint8Array([0x00]);
-						entry.payloadLength = BigInt(entry.payload.length);
-						entry.payloadDigest = await PayloadDigest.hash(entry.payload);
-						assert(EntryWithPayload.is(entry));
+						await setEntryPayloadToForged(new Uint8Array([0x00]), entry);
+						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
@@ -571,10 +616,13 @@ describe(pushEndpoint, () => {
 			for (const testCase of testCases) {
 				test(testCase.name, async () => {
 					const { member } = makeMember(env.users.user1.keys.publicKey);
-					const entry = (await member.flushDirtyEntries())[0].entryMaybeWithPayload;
-					assert(EntryWithPayload.is(entry));
+					const entry = (await member.flushDirtyEntries(env.users.user1.keys))[0]
+						.entryWithPayload;
+					assert(AuthorisedEntryWithPayload.is(entry));
 
-					await testCase.forgeEntry(entry as EntryWithPayload & Record<string, unknown>);
+					await testCase.forgeEntry(
+						entry as AuthorisedEntryWithPayload & Record<string, unknown>,
+					);
 
 					await putEntry(
 						entry,
@@ -582,7 +630,10 @@ describe(pushEndpoint, () => {
 						undefined,
 					);
 
-					if (testCase.expectCode === 200) {
+					if (
+						testCase.expectServe === true ||
+						(testCase.expectServe !== false && testCase.expectCode === 200)
+					) {
 						await checkEntriesAreServed([entry]);
 					} else {
 						await checkEntriesAreNotServed([entry]);
@@ -593,19 +644,20 @@ describe(pushEndpoint, () => {
 
 		test("Putting an entry twice only has an effect the first time", async () => {
 			const { member } = makeMember(env.users.user1.keys.publicKey);
-			const entries = await member.flushDirtyEntries();
+			const entries = await member.flushDirtyEntries(env.users.user1.keys);
 			const unrelatedEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + createId()),
 				Timestamp.now(),
 				ByteString.fromUtf8("hi"),
+				env.users.user1.keys,
 			);
 
 			await putEntries([...entries, unrelatedEntry].map((entry) => entry.entryWithPayload));
 			await checkEntriesAreServed([...entries, unrelatedEntry]);
 
-			const memberDeleteEntry = await member.makePermanentDeleteEntry();
+			const memberDeleteEntry = await member.makePermanentDeleteEntry(env.users.user1.keys);
 			await putEntry(memberDeleteEntry.entryWithPayload);
 			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
 			await checkEntriesAreNotServed(entries);
@@ -623,6 +675,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root + "/a"),
 				1n,
 				ByteString.fromUtf8("hi"),
+				env.users.user1.keys,
 			);
 			const supersedingEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
@@ -630,6 +683,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root + "/a"),
 				2n,
 				ByteString.fromUtf8("bye"),
+				env.users.user1.keys,
 			);
 
 			await putEntry(supersedingEntry.entryWithPayload);
@@ -648,6 +702,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root + "/child"),
 				1n,
 				ByteString.fromUtf8("hi"),
+				env.users.user1.keys,
 			);
 			const supersedingEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
@@ -655,6 +710,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root),
 				2n,
 				ByteString.fromUtf8("bye"),
+				env.users.user1.keys,
 			);
 
 			await putEntry(supersedingEntry.entryWithPayload);
@@ -673,6 +729,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root),
 				1n,
 				ByteString.fromUtf8("hi"),
+				env.users.user1.keys,
 			);
 			const childEntry = await EntryWrapper.create(
 				OPENSELVES_NAMESPACE_ID,
@@ -680,6 +737,7 @@ describe(pushEndpoint, () => {
 				Path.fromString("/test/" + root + "/child"),
 				2n,
 				ByteString.fromUtf8("bye"),
+				env.users.user1.keys,
 			);
 
 			await putEntry(childEntry.entryWithPayload);
@@ -693,7 +751,7 @@ describe(pushEndpoint, () => {
 			test("200", async () => {
 				const { member } = makeMember(env.users.user1.keys.publicKey);
 
-				const entries = await member.flushDirtyEntries();
+				const entries = await member.flushDirtyEntries(env.users.user1.keys);
 				await putEntries(entries.map((entry) => entry.entryWithPayload));
 				await checkEntriesAreServed(entries);
 			});
@@ -706,7 +764,7 @@ describe(pushEndpoint, () => {
 					true,
 				);
 
-				const entries = await member.flushDirtyEntries();
+				const entries = await member.flushDirtyEntries(env.users.user1.keys);
 				await putEntries(entries.map((entry) => entry.entryWithPayload));
 				await checkEntriesAreServed(entries);
 			});
@@ -720,7 +778,7 @@ describe(pushEndpoint, () => {
 					member.set("image", image === null ? undefined : image);
 				}
 
-				const entry = (await member.flushDirtyEntries()).find((entry) =>
+				const entry = (await member.flushDirtyEntries(env.users.user1.keys)).find((entry) =>
 					Path.endsWith(entry.path, Path.fromString("/image")),
 				);
 				assert(entry);
@@ -738,14 +796,16 @@ describe(pushEndpoint, () => {
 			test("delete member twice succeeds 200", async () => {
 				const { member } = await createAndDeleteMember();
 
-				await putEntry((await member.makePermanentDeleteEntry()).entryWithPayload);
+				await putEntry(
+					(await member.makePermanentDeleteEntry(env.users.user1.keys)).entryWithPayload,
+				);
 			});
 
-			test("delete member of another user fails 403", async () => {
-				const { member, entries } = await createMember(env.users.user1.keys.publicKey);
+			test("delete member of another user fails 400", async () => {
+				const { member, entries } = await createMember(env.users.user1.keys);
 
-				const deleteEntry = await member.makeDeleteEntry();
-				await putEntry(deleteEntry.entryWithPayload, 403, env.users.user2);
+				const deleteEntry = await member.makeDeleteEntry(env.users.user2.keys);
+				await putEntry(deleteEntry.entryWithPayload, 400, env.users.user2);
 
 				// Check member was not deleted
 				await checkEntriesAreServed(entries);
@@ -753,7 +813,7 @@ describe(pushEndpoint, () => {
 
 			test("Delete member with image deletes image from s3", async () => {
 				const { member, entries } = await createMember(
-					env.users.user1.keys.publicKey,
+					env.users.user1.keys,
 					undefined,
 					readFile(LARGE_IMAGE_FILE_PATH) +
 						crypto.getRandomValues(Buffer.alloc(32)).toString(),
@@ -765,13 +825,16 @@ describe(pushEndpoint, () => {
 				assert(imageEntry);
 
 				await testPayloadIsDeletedFromS3(imageEntry, async () => {
-					await putEntry((await member.makeDeleteEntry()).entryWithPayload, 200);
+					await putEntry(
+						(await member.makeDeleteEntry(env.users.user1.keys)).entryWithPayload,
+						200,
+					);
 				});
 			});
 
 			test("Delete member's image deletes image from s3", async () => {
 				const { entries } = await createMember(
-					env.users.user1.keys.publicKey,
+					env.users.user1.keys,
 					undefined,
 					readFile(LARGE_IMAGE_FILE_PATH) +
 						crypto.getRandomValues(Buffer.alloc(32)).toString(),
@@ -783,8 +846,8 @@ describe(pushEndpoint, () => {
 				assert(imageEntry);
 
 				await testPayloadIsDeletedFromS3(imageEntry, async () => {
-					const deleteEntry = await EntryWrapper.load(imageEntry);
-					await deleteEntry.setPayload(new Uint8Array(0));
+					const deleteEntry = await EntryWrapper.load(imageEntry.entryWithPayload);
+					await deleteEntry.setPayload(ByteString.empty(), env.users.user1.keys);
 					await putEntry(deleteEntry.entryWithPayload, 200);
 				});
 			});
@@ -792,7 +855,7 @@ describe(pushEndpoint, () => {
 
 		describe("PUT update Member", () => {
 			test("200", async () => {
-				const { member } = await createMember(env.users.user1.keys.publicKey);
+				const { member } = await createMember(env.users.user1.keys);
 
 				member.assign({
 					pronouns: "she/they",
@@ -800,21 +863,21 @@ describe(pushEndpoint, () => {
 					isArchived: true,
 					archivedReason: "a reason for archival",
 				});
-				const updateEntries = await member.flushDirtyEntries();
+				const updateEntries = await member.flushDirtyEntries(env.users.user1.keys);
 				await putEntries(updateEntries.map((entry) => entry.entryWithPayload));
 
 				await checkEntriesAreServed(updateEntries);
 			});
 
-			test("update member of another user fails 403", async () => {
-				const { member, entries } = await createMember(env.users.user1.keys.publicKey);
-				const expectedEntries = entries.map((entry) => entry.entryMaybeWithPayload);
+			test("update member of another user fails 400", async () => {
+				const { member, entries } = await createMember(env.users.user1.keys);
+				const expectedEntries = entries.map((entry) => entry.entryWithPayload);
 
 				member.set("name", "a new name");
-				const updateEntries = await member.flushDirtyEntries();
+				const updateEntries = await member.flushDirtyEntries(env.users.user2.keys);
 				await putEntries(
 					updateEntries.map((entry) => entry.entryWithPayload),
-					403,
+					400,
 					env.users.user2,
 				);
 
@@ -826,13 +889,13 @@ describe(pushEndpoint, () => {
 				const { member } = await createAndDeleteMember();
 				member.set("name", "a new name");
 
-				const entries = await member.flushDirtyEntries();
+				const entries = await member.flushDirtyEntries(env.users.user1.keys);
 				await putEntries(entries.map((entry) => entry.entryWithPayload));
 				await checkEntriesAreNotServed(entries);
 			});
 
 			testImage(async (image) => {
-				const { member } = await createMember(env.users.user1.keys.publicKey);
+				const { member } = await createMember(env.users.user1.keys);
 
 				if (image && typeof image !== "string") {
 					member.set("image", readFile(image.filePath));
@@ -840,7 +903,7 @@ describe(pushEndpoint, () => {
 					member.set("image", image === null ? undefined : image);
 				}
 
-				return (await member.flushDirtyEntries())[0];
+				return (await member.flushDirtyEntries(env.users.user1.keys))[0];
 			});
 		});
 
@@ -849,7 +912,7 @@ describe(pushEndpoint, () => {
 			const bigData = randomValues.toString("hex");
 			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
 			const { member, entries } = await createMember(
-				env.users.user1.keys.publicKey,
+				env.users.user1.keys,
 				undefined,
 				bigData,
 			);
@@ -861,7 +924,7 @@ describe(pushEndpoint, () => {
 
 			member.set("image", undefined);
 
-			const deleteImageEntry = (await member.flushDirtyEntries())[0];
+			const deleteImageEntry = (await member.flushDirtyEntries(env.users.user1.keys))[0];
 
 			await testPayloadIsDeletedFromS3(originalImageEntry, async () => {
 				await putEntry(deleteImageEntry.entryWithPayload, 200);
@@ -876,14 +939,17 @@ describe(pushEndpoint, () => {
 				entries,
 			}: {
 				user: TestEnvUser;
-				entries: EntryWithPayload[];
+				entries: AuthorisedEntryWithPayload[];
 			}) => Promise<void>,
 		) {
 			const user = env.users.user1;
-			const subspaceId = env.users.user1.keys.publicKey;
 			const { member: memberToDelete } = makeMember(user.keys.publicKey);
 
-			await putEntries(await timeModelEntries(memberToDelete, 0n), undefined, user);
+			await putEntries(
+				await timeModelEntries(memberToDelete, 0n, user.keys),
+				undefined,
+				user,
+			);
 
 			const members = [
 				makeMember(user.keys.publicKey),
@@ -891,9 +957,9 @@ describe(pushEndpoint, () => {
 				makeMember(user.keys.publicKey),
 			];
 
-			const entries: EntryWithPayload[] = [
-				...(await timeModelEntries(members[0].member, 1n)),
-				...(await timeModelEntries(members[1].member, 2n)),
+			const entries: AuthorisedEntryWithPayload[] = [
+				...(await timeModelEntries(members[0].member, 1n, user.keys)),
+				...(await timeModelEntries(members[1].member, 2n, user.keys)),
 				await EntryWrapper.create(
 					OPENSELVES_NAMESPACE_ID,
 					user.keys.publicKey,
@@ -902,30 +968,39 @@ describe(pushEndpoint, () => {
 					),
 					3n,
 					ByteString.fromUtf8("a new description"),
+					user.keys,
 				),
-				...(await timeModelEntries(members[2].member, 4n)),
+				...(await timeModelEntries(members[2].member, 4n, user.keys)),
 				await EntryWrapper.create(
 					OPENSELVES_NAMESPACE_ID,
 					user.keys.publicKey,
 					Path.fromString(Path.toString(members[0].member.getPathRoot()) + "/pronouns"),
 					5n,
 					ByteString.fromUtf8("iel/ellui"),
+					user.keys,
 				),
-				await memberToDelete.makeDeleteEntry(6n),
+				await memberToDelete.makeDeleteEntry(user.keys, 6n),
 			].map((entry) => (entry instanceof EntryWrapper ? entry.entryWithPayload : entry));
 			members[2].member.assign({
 				pronouns: "they/them",
 				isArchived: true,
 				archivedReason: "a reason",
 			});
-			entries.push(...(await timeModelEntries(members[2].member, 7n)));
+			entries.push(...(await timeModelEntries(members[2].member, 7n, user.keys)));
 
 			await callback({ user, entries });
 
-			const response = await getSyncFrom("", subspaceId, user);
-			assert(Array.isArray(response.entries));
+			const response = await getSyncFrom("", user);
+			assert(response.entries);
+
 			// 3 members times 8 fields plus one deleted member
-			assert.strictEqual(response.entries.length, 3 * 8 + 1);
+			const expectedEntryCount = 3 * 8 + 1;
+
+			const store = new MemoryStore(OPENSELVES_NAMESPACE_ID);
+			await store.ingest(entries);
+			assert.strictEqual(store.getEntries().length, expectedEntryCount);
+
+			assert.strictEqual(response.entries.length, expectedEntryCount);
 		}
 
 		test("PUT create, update and delete members all at once 200", async () => {
@@ -945,9 +1020,9 @@ describe(pushEndpoint, () => {
 
 		async function setupEntryMatrix() {
 			const member = makeMember(env.users.user1.keys.publicKey);
-			await putEntries(await timeModelEntries(member.member, 0n));
+			await putEntries(await timeModelEntries(member.member, 0n, env.users.user1.keys));
 
-			const client1Entries: EntryWithPayload[] = [];
+			const client1Entries: AuthorisedEntryWithPayload[] = [];
 			member.member.assign({
 				name: "1",
 				pronouns: "1",
@@ -955,24 +1030,32 @@ describe(pushEndpoint, () => {
 				isArchived: true,
 				archivedReason: "1",
 			});
-			client1Entries.push(...(await timeModelEntries(member.member, 1n)));
+			client1Entries.push(
+				...(await timeModelEntries(member.member, 1n, env.users.user1.keys)),
+			);
 			member.member.assign({
 				description: "3",
 				archivedReason: "3",
 			});
-			client1Entries.push(...(await timeModelEntries(member.member, 3n)));
+			client1Entries.push(
+				...(await timeModelEntries(member.member, 3n, env.users.user1.keys)),
+			);
 
-			const client2Entries: EntryWithPayload[] = [];
+			const client2Entries: AuthorisedEntryWithPayload[] = [];
 			member.member.assign({
 				pronouns: "2",
 				description: "2",
 				archivedReason: "2",
 			});
-			client2Entries.push(...(await timeModelEntries(member.member, 2n)));
+			client2Entries.push(
+				...(await timeModelEntries(member.member, 2n, env.users.user1.keys)),
+			);
 			member.member.assign({
 				archivedReason: "4",
 			});
-			client2Entries.push(...(await timeModelEntries(member.member, 4n)));
+			client2Entries.push(
+				...(await timeModelEntries(member.member, 4n, env.users.user1.keys)),
+			);
 
 			return { member, client1Entries, client2Entries };
 		}
@@ -1017,23 +1100,23 @@ describe(pushEndpoint, () => {
 		});
 
 		test("create front", async () => {
-			await createFront(env.users.user1.keys.publicKey);
+			await createFront(env.users.user1.keys);
 		});
 
 		test("update front", async () => {
-			const { front } = await createFront(env.users.user1.keys.publicKey);
+			const { front } = await createFront(env.users.user1.keys);
 			front.assign({
 				note: "hi",
 				endedAt: new Date(),
 			});
-			const entries = await front.flushDirtyEntries();
+			const entries = await front.flushDirtyEntries(env.users.user1.keys);
 			await putEntries(entries.map((entry) => entry.entryWithPayload));
 			await checkEntriesAreServed(entries);
 		});
 
 		test("delete front", async () => {
-			const { front, entries } = await createFront(env.users.user1.keys.publicKey);
-			const deleteEntry = await front.makeDeleteEntry();
+			const { front, entries } = await createFront(env.users.user1.keys);
+			const deleteEntry = await front.makeDeleteEntry(env.users.user1.keys);
 			await putEntry(deleteEntry.entryWithPayload);
 			await checkEntriesAreServed([deleteEntry]);
 			await checkEntriesAreNotServed(entries);

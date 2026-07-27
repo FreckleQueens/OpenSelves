@@ -14,6 +14,7 @@ export interface ConfigData {
 	ALLOWED_ORIGINS: string[];
 
 	JWT_SECRET: string;
+	AUTH_CHALLENGE_DURATION: string;
 	ACCESS_TOKEN_DURATION: number;
 	REFRESH_TOKEN_DURATION: number;
 	REFRESH_TOKEN_SHORT_DURATION: number;
@@ -89,6 +90,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set JWT_SECRET environment variable to secure random string",
 		"any.required": "Please set JWT_SECRET environment variable to secure random string",
 	}),
+	AUTH_CHALLENGE_DURATION: Joi.number().positive().min(1).max(60).default(60),
 	ACCESS_TOKEN_DURATION: Joi.number()
 		.positive()
 		.less(Joi.ref("REFRESH_TOKEN_DURATION"))

@@ -1,5 +1,5 @@
 import { ByteString } from "./ByteString.js";
-import type { DropDecodeSingleStep, DropDecodeStep } from "./Drop.js";
+import type { DropDecodeMultiStep, DropDecodeSingleStep, DropDecodeStep } from "./Drop.js";
 import { PathComponent } from "./PathComponent.js";
 import { UInt64 } from "./UInt64.js";
 import { Willow25 } from "./Willow25.js";
@@ -55,6 +55,10 @@ export class Path extends Array<PathComponent> {
 		);
 	}
 
+	public static relates(a: Path, b: Path) {
+		return Path.extends(a, b) || Path.extends(b, a);
+	}
+
 	public static copy(path: Path): Path {
 		return path.map((component) => PathComponent.copy(component));
 	}
@@ -107,7 +111,9 @@ export class Path extends Array<PathComponent> {
 		return undefined;
 	}
 
-	// https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePath
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePath
+	 */
 	public static encodePath(path: Path): ByteString {
 		const componentLengthSum = UInt64.encodeToVariable(
 			path.reduce(
@@ -141,99 +147,88 @@ export class Path extends Array<PathComponent> {
 		const path: Path = [];
 		let componentCount: UInt64;
 
-		const decodeLastComponentStep: DropDecodeSingleStep = {
-			name: "decodeLastComponentStep",
-			consumedBytes: 0,
-			decode(bytes) {
-				if (Number(componentCount) > 0) {
-					path.push(bytes);
-				}
-				callback(path);
-			},
-		};
-
-		const componentLengthSumAdditionalBytesStep: DropDecodeStep = {
-			name: "componentLengthSumAdditionalBytesStep",
-			consumedBytes: 0,
-			decode(bytes) {
-				if (bytes.length > 0) {
-					const result = UInt64.decodeVariableAdditionalBytes(bytes);
-
-					if (result.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
+		const componentLengthSumAdditionalBytesStep =
+			UInt64.decodeUint64VariableAdditionalBytesStep(
+				"component length sum",
+				(componentLengthSum) => {
+					if (componentLengthSum.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
 						throw new Error(
 							"Path total length is too big! max=" +
 								Willow25.MAX_PATH_LENGTH +
 								", got " +
-								result.valueOf(),
+								componentLengthSum.valueOf(),
 						);
 					}
 
-					decodeLastComponentStep.consumedBytes = Number(result);
+					decodeLastComponentStep.consumedBytes = Number(componentLengthSum);
+				},
+			);
+
+		const componentCountAdditionalBytesStep = UInt64.decodeUint64VariableAdditionalBytesStep(
+			"component count",
+			(result) => {
+				componentCount = result;
+
+				if (componentCount.valueOf() > Willow25.MAX_COMPONENT_COUNT) {
+					throw new Error(
+						"Component count for path is too big! max=" +
+							Willow25.MAX_COMPONENT_COUNT +
+							", got " +
+							componentCount.valueOf(),
+					);
+				}
+
+				const intermediateComponentCount = Number(componentCount) - 1;
+				if (intermediateComponentCount > 0) {
+					decodeIntermediateComponentsStep.steps.push(
+						...Array(intermediateComponentCount)
+							.fill(0)
+							.reduce<DropDecodeStep[]>((previousValue) => {
+								const readComponentStep: DropDecodeStep = {
+									name: "readComponentStep",
+									consumedBytes: 0,
+									decode(bytes) {
+										path.push(bytes);
+									},
+								};
+
+								return [
+									...previousValue,
+									...UInt64.decodeUint64Variable8((result: UInt64) => {
+										if (result.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
+											throw new Error(
+												"Path component length is too big! max=" +
+													Willow25.MAX_COMPONENT_LENGTH +
+													", got " +
+													result.valueOf(),
+											);
+										}
+
+										const consumedBytes = Number(result);
+										readComponentStep.consumedBytes = consumedBytes;
+										decodeLastComponentStep.consumedBytes -= consumedBytes;
+									}),
+									readComponentStep,
+								];
+							}, []),
+					);
 				}
 			},
+		);
+
+		const decodeIntermediateComponentsStep: DropDecodeMultiStep = {
+			name: "decode intermediate components",
+			steps: [],
 		};
 
-		const decodeComponent = () => {
-			const readComponentStep: DropDecodeStep = {
-				name: "readComponentStep",
-				consumedBytes: 0,
-				decode(bytes) {
-					path.push(bytes);
-				},
-			};
-
-			return [
-				...UInt64.decodeUint64Variable8((result: UInt64) => {
-					if (result.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
-						throw new Error(
-							"Path component length is too big! max=" +
-								Willow25.MAX_COMPONENT_LENGTH +
-								", got " +
-								result.valueOf(),
-						);
-					}
-
-					const consumedBytes = Number(result);
-					readComponentStep.consumedBytes = consumedBytes;
-					decodeLastComponentStep.consumedBytes -= consumedBytes;
-				}),
-				readComponentStep,
-			] satisfies DropDecodeStep[];
-		};
-
-		const decodeIntermediateComponentsSteps: DropDecodeStep[] = [];
-
-		const onComponentCount = (input: UInt64) => {
-			componentCount = input;
-
-			if (componentCount.valueOf() > Willow25.MAX_COMPONENT_COUNT) {
-				throw new Error(
-					"Component count for path is too big! max=" +
-						Willow25.MAX_COMPONENT_COUNT +
-						", got " +
-						componentCount.valueOf(),
-				);
-			}
-
-			const intermediateComponentCount = Number(componentCount) - 1;
-			if (intermediateComponentCount > 0) {
-				decodeIntermediateComponentsSteps.push(
-					...Array(intermediateComponentCount)
-						.fill(0)
-						.reduce<DropDecodeStep[]>(
-							(previousValue) => [...previousValue, ...decodeComponent()],
-							[],
-						),
-				);
-			}
-		};
-		const componentCountAdditionalBytesStep: DropDecodeStep = {
-			name: "componentCountAdditionalBytesStep",
+		const decodeLastComponentStep: DropDecodeSingleStep = {
+			name: "decodeLastComponentStep",
 			consumedBytes: 0,
 			decode(bytes) {
-				if (bytes.length > 0) {
-					onComponentCount(UInt64.decodeVariableAdditionalBytes(bytes));
+				if (componentCount.valueOf() > 0) {
+					path.push(bytes);
 				}
+				callback(path);
 			},
 		};
 
@@ -243,38 +238,69 @@ export class Path extends Array<PathComponent> {
 				name: "path header byte",
 				consumedBytes: 1,
 				decode(bytes) {
-					const componentLengthSumTag = bytes[0] >> 4;
-					const componentLengthSumAdditionalBytesLength =
-						UInt64.decodeVariableBytesLength(componentLengthSumTag, 4);
-					componentLengthSumAdditionalBytesStep.consumedBytes =
-						componentLengthSumAdditionalBytesLength;
-					if (componentLengthSumAdditionalBytesLength === 0) {
-						decodeLastComponentStep.consumedBytes = componentLengthSumTag;
-					}
-
-					const componentCountTag = bytes[0] & 0b1111;
-					const componentCountAdditionalBytesLength = UInt64.decodeVariableBytesLength(
-						componentCountTag,
+					UInt64.decodeUint64VariableTagSetup(
+						bytes[0] >> 4,
 						4,
+						componentLengthSumAdditionalBytesStep,
 					);
-					componentCountAdditionalBytesStep.consumedBytes =
-						componentCountAdditionalBytesLength;
-					if (componentCountAdditionalBytesLength === 0) {
-						onComponentCount(BigInt(componentCountTag));
-					}
+
+					UInt64.decodeUint64VariableTagSetup(
+						bytes[0] & 0b1111,
+						4,
+						componentCountAdditionalBytesStep,
+					);
 				},
 			},
 			componentLengthSumAdditionalBytesStep,
 			componentCountAdditionalBytesStep,
-			{
-				name: "decode intermediate components",
-				steps: decodeIntermediateComponentsSteps,
-			},
+			decodeIntermediateComponentsStep,
 			decodeLastComponentStep,
 		];
 	}
 
-	// https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePathRelativePath
+	public static decodePathRaw(input: ByteString): {
+		path: Path;
+		consumedBytes: number;
+	} {
+		let consumedBytes = 0;
+
+		const headerByte = input[0];
+		consumedBytes++;
+
+		const { value: componentLengthSum, consumedBytes: componentLengthSumConsumedBytes } =
+			UInt64.decodeVariable(headerByte, 4, 0, input.slice(consumedBytes));
+		consumedBytes += componentLengthSumConsumedBytes;
+
+		const { value: componentCount, consumedBytes: componentCountConsumedBytes } =
+			UInt64.decodeVariable(headerByte, 4, 4, input.slice(consumedBytes));
+		consumedBytes += componentCountConsumedBytes;
+
+		const path: Path = [];
+		let componentConsumedBytes = 0;
+		for (let i = 0; i < componentCount.valueOf() - 1n; i++) {
+			const { value: componentLength, consumedBytes: componentLengthConsumedBytes } =
+				UInt64.decodeVariable8(input.slice(consumedBytes));
+			consumedBytes += componentLengthConsumedBytes;
+			path.push(input.slice(consumedBytes, consumedBytes + Number(componentLength)));
+			consumedBytes += Number(componentLength);
+			componentConsumedBytes += Number(componentLength);
+		}
+
+		if (componentCount.valueOf() > 0) {
+			const lastComponentLength = Number(componentLengthSum) - componentConsumedBytes;
+			path.push(input.slice(consumedBytes, consumedBytes + lastComponentLength));
+			consumedBytes += lastComponentLength;
+		}
+
+		return {
+			path,
+			consumedBytes,
+		};
+	}
+
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePathRelativePath
+	 */
 	public static encodePathRelativePath(val: Path, rel: Path): ByteString {
 		const lcp = Path.getLongestCommonPrefix(val, rel);
 
@@ -302,5 +328,49 @@ export class Path extends Array<PathComponent> {
 				]);
 			}),
 		];
+	}
+
+	public static decodePathRelativePathRaw(
+		input: ByteString,
+		rel: Path,
+	): {
+		path: Path;
+		consumedBytes: number;
+	} {
+		let consumedBytes = 0;
+		const { value: pathLongestCommonPrefixLength, consumedBytes: lcplConsumedBytes } =
+			UInt64.decodeVariable8(input);
+		consumedBytes += lcplConsumedBytes;
+
+		const { path, consumedBytes: pathConsumedBytes } = Path.decodePathRaw(
+			input.slice(consumedBytes),
+		);
+		consumedBytes += pathConsumedBytes;
+		return {
+			path: [...rel.slice(0, Number(pathLongestCommonPrefixLength)), ...path],
+			consumedBytes,
+		};
+	}
+
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#EncodePathExtendsPath
+	 */
+	public static encodePathExtendsPath(val: Path, rel: Path): ByteString {
+		if (!Path.extends(val, rel)) {
+			throw new Error(
+				"Cannot encode path extends path relative to a path that it doesn't extend",
+			);
+		}
+
+		return Path.encodePath(Path.difference(rel, val));
+	}
+
+	public static decodePathExtendsPath(
+		rel: Path,
+		callback: (result: Path) => void,
+	): DropDecodeStep[] {
+		return Path.decodePath((path) => {
+			callback([...rel, ...path]);
+		});
 	}
 }

@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { ByteString } from "openselves-common/willow";
 
-const payloadStorageEnum = pgEnum("entryPayloadStorage", ["s3"]);
+export const payloadStorageEnum = pgEnum("entryPayloadStorage", ["s3"]);
 export const entries = camelCase.table(
 	"entries",
 	{
@@ -26,6 +26,8 @@ export const entries = camelCase.table(
 
 		payload: bytea().$type<ByteString>(),
 		payloadStorage: payloadStorageEnum(),
+
+		authorisationToken: bytea().notNull().$type<ByteString>(),
 
 		updatedAt: timestamp({
 			mode: "string",

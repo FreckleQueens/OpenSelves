@@ -1,5 +1,5 @@
 import type { Entry } from "./Entry.js";
-import { Store } from "./Store.js";
+import { Store } from "./extension/Store.js";
 
 export class MemoryStore<T extends Entry, Context = void> extends Store<T, Context> {
 	private _entries: T[] = [];

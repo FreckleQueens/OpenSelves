@@ -63,7 +63,7 @@
 		if (!frontObj) {
 			throw new Error("Front not loaded");
 		}
-		await idbStore.area(subspaceId).saveDataModel(frontObj);
+		await idbStore.area(subspaceId).saveDataModel(frontObj, Profile.getCurrentProfile());
 		return true;
 	}
 
@@ -72,7 +72,13 @@
 			throw new Error("Front not loaded");
 		}
 
-		await idbStore.ingest([(await frontObj.makePermanentDeleteEntry()).entryWithPayload]);
+		await idbStore.ingest([
+			(
+				await frontObj.makePermanentDeleteEntry(
+					Profile.getCurrentProfile().getSignDataForSubspaceId(frontObj.subspaceId),
+				)
+			).entryWithPayload,
+		]);
 	}
 </script>
 

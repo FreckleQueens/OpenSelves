@@ -20,7 +20,7 @@ export class Front extends EntryDataModel<typeof FrontSchema> {
 		return "front";
 	}
 
-	constructor(subspaceId: SubspaceId, from: FrontCreate | EntryWrapper[]) {
+	public constructor(subspaceId: SubspaceId, from: FrontCreate | EntryWrapper[]) {
 		super(FrontSchema, subspaceId, from);
 	}
 }

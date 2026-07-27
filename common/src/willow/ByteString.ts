@@ -2,6 +2,14 @@ export class ByteString extends Uint8Array<ArrayBuffer> {
 	private static textEncoder = new TextEncoder();
 	private static textDecoder = new TextDecoder();
 
+	public static empty(): ByteString {
+		return new Uint8Array(0);
+	}
+
+	public static of(...elements: number[]): ByteString {
+		return Uint8Array.of(...elements);
+	}
+
 	public static fromUtf8(input: string): ByteString {
 		return this.textEncoder.encode(input);
 	}

@@ -1,9 +1,28 @@
 import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
-import { Ed25519Sk, SubspaceId } from "openselves-common/willow";
+import { Capability, Ed25519Sk, SubspaceId } from "openselves-common/willow";
 
 export type KnownSubspaceStore = "knownSubspaces";
 export const KNOWN_SUBSPACE_STORE_NAME: KnownSubspaceStore = "knownSubspaces";
-export type KnownSubspace = { profileId: string; subspaceId: SubspaceId; secretKey?: Ed25519Sk };
+export class KnownSubspace {
+	public static is(value: unknown): value is KnownSubspace {
+		return !!(
+			value &&
+			typeof value === "object" &&
+			typeof value["profileId"] === "string" &&
+			SubspaceId.is(value["subspaceId"]) &&
+			(value["secretKey"] === undefined || Ed25519Sk.is(value["secretKey"])) &&
+			(value["capabilities"] === undefined ||
+				(Array.isArray(value["capabilities"]) &&
+					value["capabilities"].every((val) => Capability.is(val))))
+		);
+	}
+	public constructor(
+		public profileId: string,
+		public subspaceId: SubspaceId,
+		public secretKey?: Ed25519Sk,
+		public capabilities?: Capability[],
+	) {}
+}
 
 export class IDBKnownSubspace {
 	public constructor(private readonly idb: IDB) {}

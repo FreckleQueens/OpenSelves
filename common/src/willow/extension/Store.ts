@@ -1,11 +1,11 @@
 import { createId } from "@paralleldrive/cuid2";
 
-import { Area } from "./Area.js";
-import { Entry } from "./Entry.js";
-import { NamespaceId } from "./NamespaceId.js";
-import { Path } from "./Path.js";
-import { SubspaceId } from "./SubspaceId.js";
-import type { Timestamp } from "./Timestamp.js";
+import { Entry } from "../Entry.js";
+import { NamespaceId } from "../NamespaceId.js";
+import { Path } from "../Path.js";
+import { SubspaceId } from "../SubspaceId.js";
+import type { Timestamp } from "../Timestamp.js";
+import { StoreArea } from "./StoreArea.js";
 
 export abstract class Store<T extends Entry, Context = void> {
 	constructor(public readonly namespaceId: NamespaceId) {}
@@ -72,8 +72,8 @@ export abstract class Store<T extends Entry, Context = void> {
 		subspaceId: SubspaceId | undefined = undefined,
 		path: Path = [],
 		timesStart: Timestamp = 0n,
-		timesEnd: Timestamp | "open" = "open",
-	): Area<T, Context> {
-		return new Area(this, subspaceId, path, timesStart, timesEnd);
+		timesEnd: Timestamp | undefined = undefined,
+	): StoreArea<T, Context> {
+		return new StoreArea(this, subspaceId, path, timesStart, timesEnd);
 	}
 }

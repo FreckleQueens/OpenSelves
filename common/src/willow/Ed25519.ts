@@ -16,7 +16,17 @@ export class Ed25519 {
 	}
 
 	public static async sign(secretKey: Ed25519Sk, payload: ByteString): Promise<Ed25519Signature> {
-		const key = await crypto.subtle.importKey("raw", secretKey, "Ed25519", false, ["sign"]);
+		const key = await crypto.subtle.importKey(
+			"pkcs8",
+			ByteString.of(
+				// This is a pkcs8 header containing the "sign" usage
+				...[48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32],
+				...secretKey,
+			),
+			"Ed25519",
+			false,
+			["sign"],
+		);
 		return new Uint8Array(await crypto.subtle.sign("Ed25519", key, payload));
 	}
 

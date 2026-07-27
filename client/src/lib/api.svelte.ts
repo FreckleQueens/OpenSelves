@@ -20,7 +20,7 @@ import {
 	readStream,
 } from "openselves-common";
 import { isValidSchemaStatic } from "openselves-common/schema";
-import { ByteString, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { ByteString, Ed25519, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
 
 // TODO: make this file a static class `Api`
 
@@ -268,31 +268,61 @@ export async function openSession(profile: Profile): Promise<boolean> {
 		return false;
 	}
 
+	if (profile.ownSubspaces.length > 1) {
+		console.warn("Opening sessions for more than one owned subspace is not supported.");
+		return false;
+	}
+
 	if (!profile.isApiReachable() && !(await profile.checkApiReachable())) {
 		console.warn("Api is unreachable");
 		return false;
 	}
 
+	const subspace = profile.ownSubspaces[0];
+
 	const apiUrl = profile.api.url;
-	let result;
+	let captchaResult;
 	try {
-		result = await solveCaptcha(apiUrl);
+		captchaResult = await solveCaptcha(apiUrl);
 	} catch (e) {
 		console.warn("solveCaptcha threw error", e);
 		return false;
 	}
 
-	if (!result.challenge || !result.solution) {
-		console.warn("Couldn't solve captcha", result);
+	if (!captchaResult.challenge || !captchaResult.solution) {
+		console.warn("Couldn't solve captcha", captchaResult);
 		return false;
 	}
+
+	const challengeResponse = await call(`/auth/challenge`, {
+		method: "POST",
+		data: {
+			userKey: subspace.subspaceId.toBase64(),
+			captcha: captchaResult,
+		},
+		isUnauthenticated: true,
+	});
+
+	const challengeResponseBody = challengeResponse?.responseBody;
+	if (!challengeResponseBody) {
+		console.warn("Couldn't get challenge", challengeResponse);
+		return false;
+	}
+
+	const challenge = challengeResponseBody["challenge"];
+	if (typeof challenge !== "string") {
+		console.warn("Server gave invalid /auth/challenge response", challengeResponseBody);
+		return false;
+	}
+
+	const signature = await Ed25519.sign(subspace.secretKey, ByteString.fromUtf8(challenge));
 
 	const loginResponse = await call(`/auth/login`, {
 		method: "POST",
 		data: {
-			subspaceIds: profile.ownSubspaces.map((subspace) => subspace.subspaceId.toBase64()),
+			challenge,
+			signature: signature.toBase64(),
 			persistSession: false,
-			captcha: result,
 		},
 		isUnauthenticated: true,
 	});

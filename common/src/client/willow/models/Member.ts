@@ -21,7 +21,7 @@ export class Member extends EntryDataModel<typeof MemberSchema> {
 		return "member";
 	}
 
-	constructor(subspaceId: SubspaceId, from: MemberCreate | EntryWrapper[]) {
+	public constructor(subspaceId: SubspaceId, from: MemberCreate | EntryWrapper[]) {
 		super(MemberSchema, subspaceId, from);
 	}
 }

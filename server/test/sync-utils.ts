@@ -2,7 +2,18 @@ import * as fs from "node:fs";
 import assert from "node:assert";
 import { readStream } from "openselves-common";
 import { Member } from "openselves-common/client";
-import { ByteString, Drop, type EntryWithPayload, SubspaceId } from "openselves-common/willow";
+import {
+	AuthorisedEntryWithPayload,
+	Capability,
+	CapabilityAccessMode,
+	Drop,
+	Entry,
+	EntryWrapper,
+	OPENSELVES_NAMESPACE_ID,
+	Path,
+	type SubspaceId,
+	UserPublicKey,
+} from "openselves-common/willow";
 
 import type { UserAuthData } from "./TestQueryBuilder.js";
 import type { TestEnvUser, TestEnvWithUsers } from "./utils.js";
@@ -21,7 +32,7 @@ export type FileRef = { filePath: string };
 
 export async function putEntry(
 	env: TestEnvWithUsers,
-	entry: EntryWithPayload,
+	entry: AuthorisedEntryWithPayload,
 	expectCode: number = 200,
 	user: TestEnvUser = env.users.user1,
 ) {
@@ -30,7 +41,7 @@ export async function putEntry(
 
 export async function putEntries(
 	env: TestEnvWithUsers,
-	entries: EntryWithPayload[],
+	entries: AuthorisedEntryWithPayload[],
 	expectCode: number = 200,
 	user: TestEnvUser = env.users.user1,
 ) {
@@ -86,8 +97,11 @@ export function makeMember(
 export async function getSyncFrom(
 	env: TestEnvWithUsers,
 	timestamp: string,
-	subspaceId: ByteString = env.users.user1.keys.publicKey,
-	user: UserAuthData = env.users.user1,
+	user: UserAuthData & {
+		keys: {
+			publicKey: UserPublicKey;
+		};
+	} = env.users.user1,
 	expectStatus: number = 200,
 ): Promise<{
 	response: {
@@ -95,7 +109,7 @@ export async function getSyncFrom(
 		body: object | Response["body"];
 	};
 	timestamp?: string;
-	entries?: EntryWithPayload[];
+	entries?: AuthorisedEntryWithPayload[];
 }> {
 	const query = env.request
 		.post(pullEndpoint)
@@ -103,7 +117,16 @@ export async function getSyncFrom(
 		.accept("application/octet-stream", expectStatus === 200)
 		.send({
 			timestamp: timestamp,
-			subspaceIds: [subspaceId.toBase64()],
+			capabilities: [
+				Capability.encode(
+					Capability.create(
+						CapabilityAccessMode.READ,
+						OPENSELVES_NAMESPACE_ID,
+						user.keys.publicKey,
+						[],
+					),
+				).toBase64(),
+			],
 		})
 		.expect(expectStatus);
 	const response = expectStatus === 200 ? await query.execute() : await query.json();
@@ -121,11 +144,73 @@ export async function getSyncFrom(
 	assert(typeof responseTimestamp === "string");
 
 	assert(response.body);
-	const entries: EntryWithPayload[] = await readStream(response.body.pipeThrough(Drop.decoder()));
+	const entries: AuthorisedEntryWithPayload[] = await readStream(
+		response.body.pipeThrough(await Drop.decoder()),
+	);
 
 	return {
 		response,
 		timestamp: responseTimestamp,
 		entries,
 	};
+}
+
+export async function checkEntriesAreServed(
+	env: TestEnvWithUsers,
+	entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
+	user: UserAuthData & {
+		keys: {
+			publicKey: UserPublicKey;
+		};
+	} = env.users.user1,
+) {
+	assert(entries.length > 0);
+
+	const response = await getSyncFrom(env, "", user);
+
+	assert(response.entries);
+	assert(response.entries.length > 0);
+
+	const actualEntries = (
+		await Promise.all(response.entries.map((entry: unknown) => EntryWrapper.load(entry)))
+	).map((entry) => entry.entryMaybeWithPayload);
+
+	const expectedEntries = entries.map((entry) =>
+		entry instanceof EntryWrapper ? entry.entryWithPayload : entry,
+	);
+	for (const expectedEntry of expectedEntries) {
+		const actualEntry = actualEntries.find((entry) =>
+			Path.equals(entry.path, expectedEntry.path),
+		);
+		assert(actualEntry);
+		assert.deepStrictEqual(actualEntry, expectedEntry);
+	}
+}
+
+export async function checkEntriesAreNotServed(
+	env: TestEnvWithUsers,
+	entries: (EntryWrapper | Entry | AuthorisedEntryWithPayload)[],
+	user: UserAuthData & {
+		keys: {
+			publicKey: UserPublicKey;
+		};
+	} = env.users.user1,
+) {
+	const response = await getSyncFrom(env, "", user);
+	assert(response.entries);
+
+	const actualEntries = await Promise.all(
+		response.entries.map((entry: unknown) => EntryWrapper.load(entry)),
+	);
+
+	for (const expectedEntry of entries) {
+		for (const actualEntry of actualEntries) {
+			assert.notDeepStrictEqual(
+				actualEntry.entryWithPayload,
+				expectedEntry instanceof EntryWrapper
+					? expectedEntry.entryWithPayload
+					: expectedEntry,
+			);
+		}
+	}
 }

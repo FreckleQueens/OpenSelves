@@ -10,11 +10,16 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { createId } from "@paralleldrive/cuid2";
 import type { Request, Response } from "express";
 import { MISSING_REFRESH_TOKEN_COOKIE, SESSION_EXPIRED_ERROR } from "openselves-common";
+import { ByteString, Ed25519 } from "openselves-common/willow";
 
 import { Captcha } from "../captcha/decorators/captcha.decorator.js";
 import { type ConfigData } from "../config.data.js";
+import type { ChallengeData } from "./data/challenge.data.js";
+import { GetChallengeDto } from "./data/get-challenge.dto.js";
 import { LoginDto } from "./data/login.dto.js";
 import { Public } from "./decorators/public.decorator.js";
 import { SessionService } from "./session/session.service.js";
@@ -24,19 +29,53 @@ export class AuthController {
 	constructor(
 		private readonly configService: ConfigService<ConfigData>,
 		private readonly sessionService: SessionService,
+		private readonly jwtService: JwtService,
 	) {}
+
+	@Public()
+	@Post("challenge")
+	@HttpCode(HttpStatus.OK)
+	@Captcha()
+	public async getChallenge(@Body() getChallengeDto: GetChallengeDto) {
+		return {
+			challenge: await this.jwtService.signAsync<ChallengeData>(
+				{
+					uniqueId: createId(),
+					timestampMs: Date.now(),
+					userKey: getChallengeDto.userKey.toBase64(),
+				},
+				{
+					expiresIn: this.configService.getOrThrow("AUTH_CHALLENGE_DURATION", {
+						infer: true,
+					}),
+				},
+			),
+		};
+	}
 
 	@Public()
 	@Post("login")
 	@HttpCode(HttpStatus.OK)
-	@Captcha()
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
-		// !!DO NOT MERGE WITHOUT THIS!! TODO: verify write access to subspaceId (needs tests)
+		let challengePayload: ChallengeData;
+		try {
+			challengePayload = await this.jwtService.verifyAsync<ChallengeData>(loginDto.challenge);
+		} catch (e) {
+			throw new UnauthorizedException("Invalid challenge payload", { cause: e });
+		}
 
-		const session = await this.sessionService.createSession(
-			loginDto.subspaceIds,
-			!!loginDto.persistSession,
-		);
+		const userKey = ByteString.fromBase64(challengePayload.userKey);
+		if (
+			!(await Ed25519.verify(
+				userKey,
+				loginDto.signature,
+				ByteString.fromUtf8(loginDto.challenge),
+			))
+		) {
+			throw new UnauthorizedException("Invalid signature", { cause: loginDto.signature });
+		}
+
+		const session = await this.sessionService.createSession(userKey, !!loginDto.persistSession);
 		const accessToken = await this.sessionService.makeAccessToken(session);
 		this.setAuthCookies(accessToken, session.token, session.persist, response);
 		return {};

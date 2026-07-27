@@ -7,7 +7,13 @@ import assert from "node:assert";
 import { after, afterEach, before, beforeEach } from "node:test";
 import { API_VERSION } from "openselves-common";
 import { isValidSchemaStatic } from "openselves-common/schema";
-import { Ed25519, type Ed25519KeyPair } from "openselves-common/willow";
+import {
+	ByteString,
+	Ed25519,
+	type Ed25519KeyPair,
+	Ed25519Sk,
+	UserPublicKey,
+} from "openselves-common/willow";
 
 import { challengeSchema } from "../src/captcha/captcha-type-helpers.js";
 import { CaptchaService } from "../src/captcha/captcha.service.js";
@@ -21,7 +27,7 @@ export type Captcha = {
 	solution: Solution;
 };
 
-type CreateUsersEnv = {
+type BaseEnv = {
 	db: DB;
 	registrationPassword: string;
 	get request(): TestQueryBuilder;
@@ -40,9 +46,18 @@ export type TestEnv = {
 	app: NestExpressApplication;
 	urlBase: string;
 	configService: ConfigService<ConfigData>;
-} & CreateUsersEnv;
+} & BaseEnv;
 export type TestEnvWithUsers = TestEnv & {
 	users: TestEnvUsers;
+	getAuthChallenge(user?: { keys: { publicKey: UserPublicKey } }): Promise<string>;
+	getValidAuthLoginParameters(
+		withCaptcha?: boolean,
+		user?: { keys: Ed25519KeyPair },
+	): Promise<{
+		challenge: string;
+		signature: string;
+		captcha?: Captcha;
+	}>;
 };
 
 async function waitForServerToComeOnline(urlBase: string) {
@@ -74,22 +89,23 @@ async function waitForServerToComeOnline(urlBase: string) {
 	}
 }
 
-export async function createAndLoginUser(env: CreateUsersEnv): Promise<TestEnvUser> {
+export async function createAndLoginUser(env: BaseEnv): Promise<TestEnvUser> {
 	const keys = await Ed25519.generateKey();
 	const password = "12345678";
 	const response = await env.request
 		.post("/auth/login")
-		.send({
-			subspaceIds: [keys.publicKey.toBase64()],
-			captcha: await solveCaptcha(env),
-		})
+		.send(
+			await getValidAuthLoginParameters(env, true, {
+				keys,
+			}),
+		)
 		.expect(200)
 		.execute();
 	const cookies = convertResponseCookiesToRequestCookies(response);
 	return { cookies, keys: keys, password };
 }
 
-async function createUsers(env: CreateUsersEnv): Promise<TestEnvUsers> {
+async function createUsers(env: BaseEnv): Promise<TestEnvUsers> {
 	const user1 = await createAndLoginUser(env);
 	const user2 = await createAndLoginUser(env);
 	return { user1, user2 };
@@ -117,7 +133,7 @@ export function setupTestSuite(
 		});
 		await app.init();
 
-		const createUsersEnv: CreateUsersEnv = {
+		const createUsersEnv: BaseEnv = {
 			db: app.get(DB),
 			registrationPassword,
 			get request() {
@@ -159,6 +175,7 @@ export function setupTestSuiteWithUsers(
 	let env: TestEnvWithUsers;
 
 	setupTestSuite(async (sourceEnv) => {
+		const users = await createUsers(sourceEnv);
 		env = {
 			...sourceEnv,
 			get request() {
@@ -167,7 +184,13 @@ export function setupTestSuiteWithUsers(
 			get rawRequest() {
 				return sourceEnv.rawRequest;
 			},
-			users: await createUsers(sourceEnv),
+			users,
+			async getAuthChallenge(user = users.user1) {
+				return await getAuthChallenge(sourceEnv, user);
+			},
+			async getValidAuthLoginParameters(withCaptcha = true, user = users.user1) {
+				return await getValidAuthLoginParameters(sourceEnv, withCaptcha, user);
+			},
 		};
 		await envCallback(env);
 	}, setCaptchaToEasyMode);
@@ -188,6 +211,54 @@ export function setupTestSuiteWithUsers(
 			queueService.resetFailedJobs();
 		}
 	});
+}
+
+async function getAuthChallenge(
+	env: BaseEnv,
+	user: {
+		keys: {
+			publicKey: UserPublicKey;
+		};
+	},
+) {
+	const response = await env.request
+		.post("/auth/challenge")
+		.send({
+			userKey: user.keys.publicKey.toBase64(),
+			captcha: await solveCaptcha(env),
+		})
+		.expect(200)
+		.json();
+
+	assert("challenge" in response.body);
+	assert(typeof response.body.challenge === "string");
+
+	return response.body.challenge;
+}
+
+async function getValidAuthLoginParameters(
+	env: BaseEnv,
+	withCaptcha: boolean,
+	user: {
+		keys: {
+			publicKey: UserPublicKey;
+			secretKey: Ed25519Sk;
+		};
+	},
+) {
+	const challenge = await getAuthChallenge(env, user);
+	const output: { challenge: string; signature: string; captcha?: Captcha } = {
+		challenge,
+		signature: (
+			await Ed25519.sign(user.keys.secretKey, ByteString.fromUtf8(challenge))
+		).toBase64(),
+	};
+	if (withCaptcha) {
+		const captcha = await solveCaptcha(env);
+		assert(captcha);
+		output.captcha = captcha;
+	}
+	return output;
 }
 
 export async function waitFor(timeInMs: number) {
@@ -220,7 +291,7 @@ export function extractCookie(cookieName: string, cookies: string) {
 }
 
 export async function solveCaptcha(
-	env: CreateUsersEnv,
+	env: BaseEnv,
 	action?: string,
 	actionValue?: string,
 	expectedCode: number = 200,

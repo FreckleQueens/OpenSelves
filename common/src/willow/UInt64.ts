@@ -1,5 +1,5 @@
 import { ByteString } from "./ByteString.js";
-import type { DropDecodeStep } from "./Drop.js";
+import type { DropDecodeSingleStep, DropDecodeStep } from "./Drop.js";
 
 export class UInt64 extends BigInt {
 	public static readonly MAX_VALUE = 18446744073709551615n;
@@ -42,10 +42,10 @@ export class UInt64 extends BigInt {
 		}
 
 		const n = input.valueOf();
-		if (n <= 2 ** tagWidth - 5) {
+		if (n < 2 ** tagWidth - 4) {
 			return {
 				tag: Number(n),
-				additionalBytes: new Uint8Array(0),
+				additionalBytes: ByteString.empty(),
 			};
 		}
 
@@ -82,6 +82,106 @@ export class UInt64 extends BigInt {
 		return ByteString.concat(new Uint8Array([parts.tag]), parts.additionalBytes);
 	}
 
+	public static decodeVariable8(input: ByteString): {
+		value: UInt64;
+		consumedBytes: number;
+	} {
+		let consumedBytes = 0;
+
+		const tag = input[0];
+		consumedBytes++;
+		let value: UInt64 = BigInt(tag);
+
+		const variableLength = UInt64.decodeVariableBytesLength(tag, 8);
+		if (variableLength > 0) {
+			if (input.length < consumedBytes + variableLength) {
+				throw new Error(
+					"Decode variable 8 needed " +
+						variableLength +
+						" + 1 bytes, but input only has " +
+						input.length,
+					{ cause: input },
+				);
+			}
+			const variableBytes = input.slice(consumedBytes, consumedBytes + variableLength);
+			consumedBytes += variableLength;
+			value = UInt64.decodeVariableAdditionalBytes(variableBytes);
+		}
+
+		return {
+			value,
+			consumedBytes,
+		};
+	}
+
+	public static encodeVariable(
+		val: UInt64,
+		headerByte: number,
+		tagWidth: number,
+		bitBigEndianPosition: number,
+	): {
+		headerByte: number;
+		additionalBytes: ByteString;
+	} {
+		if (tagWidth < 2 || tagWidth > 8) {
+			throw new Error("tagWidth must be between 2 and 8 included", {
+				cause: tagWidth,
+			});
+		}
+
+		if (bitBigEndianPosition < 0 || bitBigEndianPosition > 7) {
+			throw new Error("bitBigEndianPosition must be between 0 and 7 included", {
+				cause: bitBigEndianPosition,
+			});
+		}
+
+		const { tag, additionalBytes } = UInt64.encodeToVariable(val, tagWidth);
+
+		const headerResult = headerByte | (tag << (8 - (bitBigEndianPosition + tagWidth)));
+
+		return {
+			headerByte: headerResult,
+			additionalBytes,
+		};
+	}
+
+	public static decodeVariable(
+		headerByte: number,
+		tagWidth: number,
+		bitBigEndianPosition: number,
+		additionalBytes: ByteString,
+	): {
+		value: UInt64;
+		consumedBytes: number;
+	} {
+		if (tagWidth < 2 || tagWidth > 8) {
+			throw new Error("tagWidth must be between 2 and 8 included", {
+				cause: tagWidth,
+			});
+		}
+
+		if (bitBigEndianPosition < 0 || bitBigEndianPosition > 7) {
+			throw new Error("bitBigEndianPosition must be between 0 and 7 included", {
+				cause: bitBigEndianPosition,
+			});
+		}
+
+		const mask = 2 ** tagWidth - 1;
+		const tag = (headerByte >> (8 - (bitBigEndianPosition + tagWidth))) & mask;
+		let value: UInt64 = BigInt(tag);
+
+		const variableLength = UInt64.decodeVariableBytesLength(tag, tagWidth);
+
+		if (variableLength > 0) {
+			value = UInt64.decodeVariableAdditionalBytes(additionalBytes.slice(0, variableLength));
+		}
+
+		return {
+			value,
+			consumedBytes: variableLength,
+		};
+	}
+
 	public static decodeVariableBytesLength(tag: number, tagWidth: number) {
 		switch (2 ** tagWidth - tag) {
 			case 1:
@@ -103,6 +203,37 @@ export class UInt64 extends BigInt {
 				previousValue | (BigInt(currentValue) << BigInt(index * 8)),
 			0n,
 		);
+	}
+
+	public static decodeUint64VariableTagSetup(
+		tag: number,
+		tagWidth: number,
+		additionalBytesStep: DropDecodeSingleStep & {
+			tag: number;
+		},
+	) {
+		additionalBytesStep.consumedBytes = this.decodeVariableBytesLength(tag, tagWidth);
+		additionalBytesStep.tag = tag;
+	}
+
+	public static decodeUint64VariableAdditionalBytesStep(
+		name: string,
+		callback: (result: UInt64) => void,
+	): DropDecodeSingleStep & {
+		tag: number;
+	} {
+		return {
+			name: "Decode " + name + " uint64 additional bytes",
+			consumedBytes: 0,
+			tag: NaN,
+			decode(bytes) {
+				callback(
+					bytes.length === 0
+						? BigInt(this.tag)
+						: UInt64.decodeVariableAdditionalBytes(bytes),
+				);
+			},
+		};
 	}
 
 	public static decodeUint64Variable8(callback: (result: UInt64) => void): DropDecodeStep[] {

@@ -1,3 +1,4 @@
+CREATE TYPE "entryPayloadStorage" AS ENUM('s3');--> statement-breakpoint
 CREATE TABLE "entries" (
 	"subspaceId" bytea,
 	"path" bytea[],
@@ -6,6 +7,7 @@ CREATE TABLE "entries" (
 	"payloadDigest" bytea NOT NULL,
 	"payload" bytea,
 	"payloadStorage" "entryPayloadStorage",
+	"authorisationToken" bytea NOT NULL,
 	"updatedAt" timestamp DEFAULT current_timestamp NOT NULL,
 	CONSTRAINT "entries_pkey" PRIMARY KEY("subspaceId","path")
 );
@@ -23,7 +25,7 @@ CREATE TABLE "jobs" (
 --> statement-breakpoint
 CREATE TABLE "sessions" (
 	"token" text PRIMARY KEY UNIQUE,
-	"subspaceIds" bytea[] NOT NULL,
+	"userKey" bytea NOT NULL,
 	"persist" boolean DEFAULT false NOT NULL,
 	"createdAt" timestamp DEFAULT current_timestamp NOT NULL,
 	"updatedAt" timestamp DEFAULT current_timestamp NOT NULL

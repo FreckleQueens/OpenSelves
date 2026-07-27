@@ -17,9 +17,12 @@ import {
 	isValidSchemaStatic,
 } from "openselves-common/schema";
 import {
+	type AuthorisedEntryWithPayload,
+	Capability,
+	CapabilityAccessMode,
+	CapabilitySignData,
 	Ed25519,
 	Ed25519Sk,
-	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
 	SubspaceId,
 } from "openselves-common/willow";
@@ -114,7 +117,7 @@ export class Profile {
 			],
 			async (tx) => {
 				// Delete entries
-				const profileEntries: EntryWithPayload[] = [];
+				const profileEntries: AuthorisedEntryWithPayload[] = [];
 				for (const { subspaceId, secretKey } of profile.knownSubspaces) {
 					if (
 						secretKey ||
@@ -351,6 +354,31 @@ export class Profile {
 		await Profile.loadProfilesData();
 	}
 
+	public getReadCapabilities(): Capability[] {
+		return this._knownSubspaces
+			.map((subspace) => {
+				const caps: Capability[] = [];
+
+				if (subspace.capabilities) {
+					caps.push(...subspace.capabilities);
+				}
+
+				if (subspace.secretKey) {
+					caps.push(
+						Capability.create(
+							CapabilityAccessMode.READ,
+							OPENSELVES_NAMESPACE_ID,
+							subspace.subspaceId,
+							[],
+						),
+					);
+				}
+
+				return caps;
+			})
+			.flat();
+	}
+
 	public async save(alsoSaveKnownSubspaces: boolean = false) {
 		const idb = IDB.getInstance();
 		await idb.transaction([PROFILE_STORE_NAME, KNOWN_SUBSPACE_STORE_NAME], async (tx) => {
@@ -375,6 +403,21 @@ export class Profile {
 		);
 		linkEl.setAttribute("download", this.data.name + ".openselves-profile.json");
 		linkEl.click();
+	}
+
+	public getSignDataForSubspaceId(subspaceId: SubspaceId): CapabilitySignData {
+		const subspace = this.ownSubspaces.find((subspace) =>
+			SubspaceId.equals(subspace.subspaceId, subspaceId),
+		);
+		if (!subspace) {
+			throw new Error("No sign data for subspaceId known in current profile", {
+				cause: subspaceId,
+			});
+		}
+
+		return {
+			secretKey: subspace.secretKey,
+		};
 	}
 
 	private isOwnSubspace(knownSubspace: KnownSubspace): knownSubspace is OwnSubspace {

@@ -108,7 +108,7 @@
 		const front = new Front(subspaceId, {
 			memberId: memberId,
 		});
-		await store.area(subspaceId).saveDataModel(front);
+		await store.area(subspaceId).saveDataModel(front, Profile.getCurrentProfile());
 	}
 
 	async function endFront(frontId: string) {
@@ -117,7 +117,7 @@
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("endedAt", new Date());
-		await store.area(subspaceId).saveDataModel(front);
+		await store.area(subspaceId).saveDataModel(front, Profile.getCurrentProfile());
 	}
 
 	async function endAllFronts() {
@@ -134,7 +134,7 @@
 			throw new Error("Front not found for id " + frontId);
 		}
 		front.set("note", value ? value : undefined);
-		await store.area(subspaceId).saveDataModel(front);
+		await store.area(subspaceId).saveDataModel(front, Profile.getCurrentProfile());
 	}
 </script>
 

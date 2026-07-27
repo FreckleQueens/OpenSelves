@@ -13,12 +13,14 @@ import {
 import type { Request, Response } from "express";
 import { Writable } from "node:stream";
 import {
-	type ByteString,
+	type AuthorisedEntryWithPayload,
+	ByteString,
+	Capability,
+	CapabilityAccessMode,
 	Drop,
-	type EntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
-	SubspaceId,
 	Timestamp,
+	UserPublicKey,
 } from "openselves-common/willow";
 
 import { PullDto } from "./data/pull.dto.js";
@@ -69,32 +71,64 @@ export class SyncController {
 			}
 		}
 
-		for (const base64SubspaceId of request.accessTokenPayload.subspaceIds) {
-			const subspaceId = SubspaceId.fromBase64(base64SubspaceId);
-			if (!this.syncService.hasReadWriteAccess(request.accessTokenPayload, subspaceId)) {
-				throw new ForbiddenException(
-					"Tried to read entries of an unauthorized subspaceId",
-					{ cause: subspaceId.toHex() },
-				);
+		const validCapabilities: Capability[] = [];
+		for (const encodedCap of pullDto.capabilities) {
+			let decodedCap: Capability;
+			try {
+				const { capability } = Capability.decode(encodedCap);
+				decodedCap = capability;
+			} catch {
+				throw new BadRequestException("Capability couldn't be decoded", {
+					cause: encodedCap,
+				});
 			}
+
+			if (!(await Capability.isValid(decodedCap))) {
+				throw new BadRequestException("Invalid capability", {
+					cause: decodedCap,
+				});
+			}
+
+			if (decodedCap.inner.accessMode !== CapabilityAccessMode.READ) {
+				throw new BadRequestException("Invalid capability access mode READ", {
+					cause: decodedCap,
+				});
+			}
+
+			const receiver = Capability.getReceiver(decodedCap);
+			if (
+				!UserPublicKey.equals(
+					receiver,
+					UserPublicKey.fromBase64(request.accessTokenPayload.userKey),
+				)
+			) {
+				throw new ForbiddenException("Invalid capability receiver", {
+					cause: receiver,
+				});
+			}
+
+			validCapabilities.push(decodedCap);
 		}
 
 		const { entries, timestamp } = await this.syncService.getEntriesFrom(
-			pullDto.subspaceIds,
+			validCapabilities,
 			pullDto.timestamp,
 		);
 
-		const sanitizedEntries: EntryWithPayload[] = entries.map((entry) => {
-			return {
-				namespaceId: OPENSELVES_NAMESPACE_ID,
-				subspaceId: entry.subspaceId,
-				path: entry.path,
-				timestamp: entry.timestamp,
-				payloadLength: entry.payloadLength,
-				payloadDigest: entry.payloadDigest,
-				payload: entry.payload,
-			};
-		});
+		const sanitizedEntries: AuthorisedEntryWithPayload[] = entries.map(
+			(uncleanEntry): AuthorisedEntryWithPayload => {
+				return {
+					namespaceId: OPENSELVES_NAMESPACE_ID,
+					subspaceId: uncleanEntry.subspaceId,
+					path: uncleanEntry.path,
+					timestamp: uncleanEntry.timestamp,
+					payloadLength: uncleanEntry.payloadLength,
+					payloadDigest: uncleanEntry.payloadDigest,
+					authorisationToken: uncleanEntry.authorisationToken,
+					payload: uncleanEntry.payload,
+				};
+			},
+		);
 
 		response.statusCode = 200;
 		response.setHeader("X-OpenSelves-Pull-Timestamp", timestamp);

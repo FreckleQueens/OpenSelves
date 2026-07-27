@@ -1,36 +1,41 @@
 import { IDB } from "$lib/idb";
 import type { IDBStore, IDBStoreContext } from "$lib/idb/IDBStore";
+import { Profile } from "$lib/idb/profiles";
 import type {
 	AnyEntryDataModel,
 	EntryDataModel,
 	EntryDataModelSchema,
 } from "openselves-common/client";
 import {
-	Area,
-	type EntryWithPayload,
+	type AuthorisedEntryWithPayload,
 	EntryWrapper,
 	type Path,
+	StoreArea,
 	type SubspaceId,
+	type Timestamp,
 } from "openselves-common/willow";
 
-export class IDBArea extends Area<EntryWithPayload, IDBStoreContext, IDBStore> {
+export class IDBArea extends StoreArea<AuthorisedEntryWithPayload, IDBStoreContext, IDBStore> {
 	public constructor(
 		store: IDBStore,
 		public readonly subspaceId: SubspaceId,
 		path: Path,
-		timesStart: bigint,
-		timesEnd: bigint | "open",
+		timesStart: Timestamp,
+		timesEnd: Timestamp | undefined,
 	) {
 		super(store, subspaceId, path, timesStart, timesEnd);
 	}
 
-	public async saveDataModel(model: AnyEntryDataModel, ctx?: IDBStoreContext) {
-		await model.flushDirtyEntries(async (entries) => {
-			await this.ingest(
-				entries.map((entry) => entry.entryWithPayload),
-				ctx,
-			);
-		});
+	public async saveDataModel(model: AnyEntryDataModel, profile: Profile, ctx?: IDBStoreContext) {
+		await model.flushDirtyEntries(
+			profile.getSignDataForSubspaceId(model.subspaceId),
+			async (entries) => {
+				await this.ingest(
+					entries.map((entry) => entry.entryWithPayload),
+					ctx,
+				);
+			},
+		);
 	}
 
 	public async loadDataModel<
@@ -47,7 +52,7 @@ export class IDBArea extends Area<EntryWithPayload, IDBStoreContext, IDBStore> {
 				await IDB.getInstance().entries.getByPathPrefix(
 					this.store.namespaceId,
 					this.subspaceId,
-					this.path,
+					this.area.path,
 					ctx?.tx,
 				)
 			).map((entry) => EntryWrapper.load(entry)),
@@ -55,7 +60,7 @@ export class IDBArea extends Area<EntryWithPayload, IDBStoreContext, IDBStore> {
 		return entries.length > 0 ? new model(this.subspaceId, entries) : undefined;
 	}
 
-	public subscribe(callback: (entry: EntryWithPayload) => Promise<void> | void) {
-		return this.store.subscribe(callback, this);
+	public subscribe(callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void) {
+		return this.store.subscribe(callback, this.area);
 	}
 }

@@ -5,12 +5,13 @@ import { PAYLOAD_STORE_NAME, type PayloadStore } from "$lib/idb/IDBPayload";
 import { type EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
 import {
 	Area,
-	type EntryWithPayload,
+	type AuthorisedEntryWithPayload,
 	EntryWrapper,
 	MemoryStore,
 	NamespaceId,
 	Path,
 	type SubspaceId,
+	type Timestamp,
 } from "openselves-common/willow";
 
 export type IDBStoreContext = {
@@ -19,11 +20,11 @@ export type IDBStoreContext = {
 };
 
 export type EntrySubscription = {
-	callback: (entry: EntryWithPayload) => Promise<void> | void;
-	area?: Area<EntryWithPayload, IDBStoreContext, IDBStore>;
+	callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void;
+	area?: Area;
 };
 
-export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
+export class IDBStore extends MemoryStore<AuthorisedEntryWithPayload, IDBStoreContext> {
 	private static readonly instances: Map<string, IDBStore> = new Map();
 
 	public static getInstance(namespaceId: NamespaceId): IDBStore {
@@ -43,7 +44,7 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	private readonly subscriptions = new Set<EntrySubscription>();
 	private readonly pendingSubscriptionUpdates: {
 		subscription: EntrySubscription;
-		entryToAdd: EntryWithPayload;
+		entryToAdd: AuthorisedEntryWithPayload;
 	}[] = [];
 	private isInitialized: boolean = false;
 
@@ -65,9 +66,9 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	public async ingest(
-		entries: EntryWithPayload[],
+		entries: AuthorisedEntryWithPayload[],
 		ctx: IDBStoreContext = {},
-	): Promise<EntryWithPayload[]> {
+	): Promise<AuthorisedEntryWithPayload[]> {
 		if (!this.isInitialized) {
 			await this.init(ctx);
 		}
@@ -80,7 +81,7 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		);
 
 		let subscriptionUpdate:
-			| { subscription: EntrySubscription; entryToAdd: EntryWithPayload }
+			| { subscription: EntrySubscription; entryToAdd: AuthorisedEntryWithPayload }
 			| undefined;
 		do {
 			subscriptionUpdate = this.pendingSubscriptionUpdates.shift();
@@ -94,8 +95,8 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	protected async addRemoveEntries(
-		entryToAdd: EntryWithPayload,
-		entriesToRemove: EntryWithPayload[],
+		entryToAdd: AuthorisedEntryWithPayload,
+		entriesToRemove: AuthorisedEntryWithPayload[],
 		ctx: IDBStoreContext = {},
 	): Promise<void> {
 		if (ctx.tx) {
@@ -110,7 +111,7 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		await super.addRemoveEntries(entryToAdd, entriesToRemove);
 
 		for (const subscription of this.subscriptions.values()) {
-			if (!subscription.area || subscription.area.includesEntry(entryToAdd)) {
+			if (!subscription.area || Area.includesEntry(subscription.area, entryToAdd)) {
 				this.pendingSubscriptionUpdates.push({
 					subscription,
 					entryToAdd,
@@ -120,8 +121,8 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	public subscribe(
-		callback: (entry: EntryWithPayload) => Promise<void> | void,
-		area?: Area<EntryWithPayload, IDBStoreContext, IDBStore>,
+		callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void,
+		area?: Area,
 	) {
 		const subscription: EntrySubscription = {
 			callback,
@@ -136,8 +137,8 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	public area(
 		subspaceId: SubspaceId,
 		path: Path = Path.EMPTY,
-		timesStart: bigint = 0n,
-		timesEnd: bigint | "open" = "open",
+		timesStart: Timestamp = 0n,
+		timesEnd: Timestamp | undefined = undefined,
 	): IDBArea {
 		return new IDBArea(this, subspaceId, path, timesStart, timesEnd);
 	}

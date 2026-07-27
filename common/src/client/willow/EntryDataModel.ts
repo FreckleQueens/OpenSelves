@@ -15,7 +15,7 @@ import type { KeyOfSchema, SchemaCreate, SchemaStatic, SchemaType } from "../../
 import { Path } from "../../willow/Path.js";
 import { PathComponent, UInt64 } from "../../willow/index.js";
 import { EntryWrapper, SubspaceId, Timestamp } from "../../willow/index.js";
-import { OPENSELVES_NAMESPACE_ID } from "../../willow/index.js";
+import { type CapabilitySignData, OPENSELVES_NAMESPACE_ID } from "../../willow/index.js";
 import {
 	deserializeValueFromPayload,
 	serializeValueToPayload,
@@ -238,6 +238,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	}
 
 	public async flushDirtyEntries(
+		signData: CapabilitySignData,
 		callback?: (entries: EntryWrapper[]) => Promise<void>,
 	): Promise<EntryWrapper[]> {
 		const mutations = [...this.pendingEntryMutations];
@@ -250,7 +251,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 				const payload = serializeValueToPayload(this.schema, key, value);
 				let entry = this.entries[key];
 				if (entry) {
-					await entry.setPayload(payload, timestamp);
+					await entry.setPayload(payload, signData, timestamp);
 				} else {
 					entry = this.entries[key] = await EntryWrapper.create(
 						OPENSELVES_NAMESPACE_ID,
@@ -258,6 +259,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 						[...this.getPathRoot(), PathComponent.fromString(key)],
 						timestamp,
 						payload,
+						signData,
 					);
 				}
 				dirtyEntries.add(entry);
@@ -279,17 +281,21 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		return Object.values(this.entries);
 	}
 
-	public async makeDeleteEntry(timestamp: Timestamp = Timestamp.now()): Promise<EntryWrapper> {
+	public async makeDeleteEntry(
+		signData: CapabilitySignData,
+		timestamp: Timestamp = Timestamp.now(),
+	): Promise<EntryWrapper> {
 		return await EntryWrapper.create(
 			OPENSELVES_NAMESPACE_ID,
 			this.subspaceId,
 			this.getPathRoot(),
 			timestamp,
 			serializeValueToPayloadUnsafe(""),
+			signData,
 		);
 	}
 
-	public async makePermanentDeleteEntry(): Promise<EntryWrapper> {
-		return this.makeDeleteEntry(UInt64.MAX_VALUE);
+	public async makePermanentDeleteEntry(signData: CapabilitySignData): Promise<EntryWrapper> {
+		return this.makeDeleteEntry(signData, UInt64.MAX_VALUE);
 	}
 }

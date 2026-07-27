@@ -1,4 +1,6 @@
 export * from "./extension/index.js";
+export * from "./meadowcap/index.js";
+export * from "./private/index.js";
 export * from "./Area.js";
 export * from "./ByteString.js";
 export * from "./Drop.js";
@@ -9,8 +11,8 @@ export * from "./NamespaceId.js";
 export * from "./Path.js";
 export * from "./PathComponent.js";
 export * from "./PayloadDigest.js";
-export * from "./Store.js";
 export * from "./SubspaceId.js";
+export * from "./TimeRange.js";
 export * from "./Timestamp.js";
 export * from "./UInt64.js";
 export * from "./Willow25.js";

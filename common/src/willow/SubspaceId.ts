@@ -5,7 +5,22 @@ export class SubspaceId extends Ed25519Pk {
 	public static encode(subspaceId: SubspaceId): ByteString {
 		return subspaceId;
 	}
-	public static decode(input: ByteString): SubspaceId {
-		return input;
+
+	public static decode(input: ByteString): {
+		subspaceId: SubspaceId;
+		consumedBytes: number;
+	} {
+		if (input.length < SubspaceId.LENGTH) {
+			throw new Error(
+				"input is too short, needs " + SubspaceId.LENGTH + " bytes, got " + input.length,
+				{
+					cause: input,
+				},
+			);
+		}
+		return {
+			subspaceId: input.slice(0, SubspaceId.LENGTH),
+			consumedBytes: SubspaceId.LENGTH,
+		};
 	}
 }

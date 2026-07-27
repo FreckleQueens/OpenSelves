@@ -5,12 +5,16 @@ import { Path } from "./Path.js";
 import { PayloadDigest } from "./PayloadDigest.js";
 import { SubspaceId } from "./SubspaceId.js";
 import { UInt64 } from "./UInt64.js";
-import { EntryWithPayload } from "./extension/index.js";
+import { AuthorisedEntryWithPayload } from "./extension/index.js";
+import { AuthorisationToken, AuthorisedEntry } from "./meadowcap/index.js";
 
 export type DropDecodeSingleStep = {
 	name: string;
 	consumedBytes: number;
-	decode: (bytes: ByteString, decodedEntry: Partial<EntryWithPayload>) => number | undefined;
+	decode: (
+		bytes: ByteString,
+		decodedEntry: Partial<AuthorisedEntryWithPayload>,
+	) => number | undefined;
 	repeat?: number;
 };
 export type DropDecodeMultiStep = {
@@ -22,11 +26,13 @@ export type DropDecodeStep = DropDecodeSingleStep | DropDecodeMultiStep;
 
 /**
  * https://willowprotocol.org/specs/drop-format/index.html
- * TODO: implement authorisation (meadowcap)
  * TODO: setup unit tests against https://github.com/worm-blossom/willow_test_vectors
+ * TODO: make every encode method in the whole package return a ByteString array (no useless concat operation)
+ * TODO: make decode operations return Promise<DECODED_OBJECT> and take in some kind of bytestring provider
+ *  -> this provider transparently consumes bytes. for header bytes, only consume a byte when arriving at the last bit
  */
 export class Drop {
-	public static encodeHeaderByte(previousEntry: Entry, entry: EntryWithPayload) {
+	public static encodeHeaderByte(previousEntry: Entry, entry: Entry) {
 		const hasNamespaceId = !NamespaceId.equals(entry.namespaceId, previousEntry.namespaceId);
 		const hasSubspaceId = !SubspaceId.equals(entry.subspaceId, previousEntry.subspaceId);
 		const timestamp = UInt64.encodeToVariable(entry.timestamp, 2);
@@ -71,11 +77,13 @@ export class Drop {
 		return { hasNamespaceId, hasSubspaceId, timestampTag, timestampAdditionalBytesLength };
 	}
 
-	// https://willowprotocol.org/specs/drop-format/index.html#drop_format_desc
-	public static encoder(): TransformStream<EntryWithPayload, ByteString> {
-		let previousEntry: Entry = Entry.default();
+	/**
+	 * https://willowprotocol.org/specs/drop-format/index.html#drop_format_desc
+	 */
+	public static encoder(): TransformStream<AuthorisedEntryWithPayload, ByteString> {
+		let previousEntry: AuthorisedEntry = AuthorisedEntry.default();
 
-		return new TransformStream<EntryWithPayload, ByteString>({
+		return new TransformStream<AuthorisedEntryWithPayload, ByteString>({
 			transform(entry, controller) {
 				const { hasNamespaceId, hasSubspaceId, timestampAdditionalBytes, headerByte } =
 					Drop.encodeHeaderByte(previousEntry, entry);
@@ -92,7 +100,12 @@ export class Drop {
 				controller.enqueue(timestampAdditionalBytes);
 				controller.enqueue(UInt64.encodeToVariable8(entry.payloadLength));
 
-				// TODO: EncodeAuthorisationToken here
+				controller.enqueue(
+					AuthorisationToken.encodeAuthorisationTokenRelative(entry.authorisationToken, {
+						authorisedEntry: previousEntry,
+						entry: entry,
+					}),
+				);
 
 				controller.enqueue(PayloadDigest.encode(entry.payloadDigest));
 				controller.enqueue(entry.payload);
@@ -107,8 +120,8 @@ export class Drop {
 	}
 
 	public static decodeDropEntry(
-		previousEntry: EntryWithPayload,
-		decodedEntry: Partial<EntryWithPayload>,
+		previousEntry: AuthorisedEntryWithPayload,
+		decodedEntry: Partial<AuthorisedEntryWithPayload>,
 	): DropDecodeStep[] {
 		const steps: DropDecodeStep[] = [];
 
@@ -121,11 +134,7 @@ export class Drop {
 					return;
 				}
 
-				const namespaceId = NamespaceId.decode(bytes);
-				if (namespaceId.length !== NamespaceId.LENGTH) {
-					throw new Error("Invalid namespaceId length");
-				}
-				decodedEntry.namespaceId = namespaceId;
+				decodedEntry.namespaceId = NamespaceId.decode(bytes).namespaceId;
 			},
 		};
 		const subspaceIdStep: DropDecodeStep = {
@@ -137,7 +146,7 @@ export class Drop {
 					return;
 				}
 
-				const subspaceId = SubspaceId.decode(bytes);
+				const subspaceId = SubspaceId.decode(bytes).subspaceId;
 				if (subspaceId.length !== SubspaceId.LENGTH) {
 					throw new Error("Invalid subspaceId length");
 				}
@@ -213,7 +222,40 @@ export class Drop {
 			}),
 		);
 
-		// TODO: DecodeAuthorisationToken here
+		const decodeAuthorisationTokenStep: DropDecodeMultiStep = {
+			name: "decode authorisation token",
+			steps: [],
+		};
+		steps.push(
+			{
+				name: "prepare entry for authorisation token decoding",
+				consumedBytes: 0,
+				decode(bytes, decodedEntry) {
+					const entry = {
+						...decodedEntry,
+						payloadDigest: PayloadDigest.of(),
+					};
+					if (!Entry.is(entry)) {
+						throw new Error("decodedEntry.entry not fully decoded", {
+							cause: decodedEntry,
+						});
+					}
+
+					const { payloadDigest, ...entryWithoutPayloadDigest } = entry;
+					decodeAuthorisationTokenStep.steps =
+						AuthorisationToken.decodeAuthorisationTokenRelative(
+							{
+								authorisedEntry: previousEntry,
+								entry: entryWithoutPayloadDigest,
+							},
+							(result) => {
+								decodedEntry.authorisationToken = result;
+							},
+						);
+				},
+			},
+			decodeAuthorisationTokenStep,
+		);
 
 		steps.push({
 			name: "decode payload digest",
@@ -228,10 +270,12 @@ export class Drop {
 		return steps;
 	}
 
-	public static decoder(): TransformStream<ByteString, EntryWithPayload> {
-		let decodedEntry: Partial<EntryWithPayload> = {};
+	public static async decoder(): Promise<
+		TransformStream<ByteString, AuthorisedEntryWithPayload>
+	> {
+		let decodedEntry: Partial<AuthorisedEntryWithPayload> = {};
 		let decodeEntrySteps: DropDecodeStep[] = Drop.decodeDropEntry(
-			EntryWithPayload.default(),
+			AuthorisedEntryWithPayload.default(),
 			decodedEntry,
 		);
 		const stepStack: DropDecodeStep[] = [];
@@ -240,12 +284,15 @@ export class Drop {
 		let stepBytes: ByteString;
 		let stepBytesIndex: number;
 
-		function advance() {
-			let returnEntry: EntryWithPayload | undefined;
+		async function advance() {
+			let returnEntry: AuthorisedEntryWithPayload | undefined;
 			if (stepStack.length === 0) {
 				if (decodeEntrySteps.length === 0) {
 					const finalEntry = decodedEntry;
-					if (!EntryWithPayload.is(finalEntry) || !EntryWithPayload.isValid(finalEntry)) {
+					if (
+						!AuthorisedEntryWithPayload.is(finalEntry) ||
+						!(await AuthorisedEntryWithPayload.isValid(finalEntry))
+					) {
 						throw new Error("Got invalid entry");
 					}
 					returnEntry = finalEntry;
@@ -269,9 +316,9 @@ export class Drop {
 
 			return returnEntry;
 		}
-		advance();
+		await advance();
 
-		function decode(): EntryWithPayload | "end" | void {
+		async function decode(): Promise<AuthorisedEntryWithPayload | "end" | void> {
 			if (!("steps" in currentStep)) {
 				const decodeResult = currentStep.decode(stepBytes, decodedEntry);
 				if (typeof decodeResult === "number") {
@@ -299,8 +346,8 @@ export class Drop {
 			return advance();
 		}
 
-		return new TransformStream<ByteString, EntryWithPayload>({
-			transform(chunk, controller) {
+		return new TransformStream<ByteString, AuthorisedEntryWithPayload>({
+			async transform(chunk, controller) {
 				if (chunk.length === 0) {
 					return;
 				}
@@ -317,7 +364,7 @@ export class Drop {
 					stepBytesIndex += slice.length;
 
 					if (stepBytesIndex === consumedBytes) {
-						const result = decode();
+						const result = await decode();
 						if (result === "end") {
 							return;
 						} else if (result) {
