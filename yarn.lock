@@ -2562,9 +2562,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sveltejs/kit@npm:^2.68.0":
-  version: 2.68.0
-  resolution: "@sveltejs/kit@npm:2.68.0"
+"@sveltejs/kit@npm:^2.69.1":
+  version: 2.69.1
+  resolution: "@sveltejs/kit@npm:2.69.1"
   dependencies:
     "@standard-schema/spec": "npm:^1.0.0"
     "@sveltejs/acorn-typescript": "npm:^1.0.9"
@@ -2591,7 +2591,7 @@ __metadata:
       optional: true
   bin:
     svelte-kit: svelte-kit.js
-  checksum: 10c0/4fc9f4d63f3cd04ef6a8b41342bda54f047342bf8b8ddb164800f321e60e13651b09c17ea17256886b24de8d8ccb50c982368eeb6711e42e25a1270f44329dc2
+  checksum: 10c0/12b146417f85c9e171e186db04e41570129cd22d6bb938a15c35cc175fea7c5963978970ebe2986105b41393ad10ae23ca619c97a67b27039c84af638f1cd597
   languageName: node
   linkType: hard
 
@@ -6926,7 +6926,7 @@ __metadata:
     "@capacitor/cli": "npm:^8.4.1"
     "@capacitor/core": "npm:^8.4.1"
     "@paralleldrive/cuid2": "npm:^3.3.0"
-    "@sveltejs/kit": "npm:^2.68.0"
+    "@sveltejs/kit": "npm:^2.69.1"
     "@sveltejs/vite-plugin-svelte": "npm:^7.1.2"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     "@types/estree": "npm:^1.0.9"
@@ -6972,7 +6972,7 @@ __metadata:
     "@iconify-json/material-symbols-light": "npm:^1.2.81"
     "@iconify-json/mdi": "npm:^1.2.3"
     "@sveltejs/adapter-static": "npm:^3.0.10"
-    "@sveltejs/kit": "npm:^2.68.0"
+    "@sveltejs/kit": "npm:^2.69.1"
     "@sveltejs/package": "npm:^2.5.8"
     "@sveltejs/vite-plugin-svelte": "npm:^7.1.2"
     "@tailwindcss/vite": "npm:^4.3.1"
@@ -7063,7 +7063,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "openselves-www@workspace:www"
   dependencies:
-    "@sveltejs/kit": "npm:^2.68.0"
+    "@sveltejs/kit": "npm:^2.69.1"
     "@sveltejs/vite-plugin-svelte": "npm:^7.1.2"
     "@trivago/prettier-plugin-sort-imports": "npm:^6.0.2"
     eslint: "npm:^10.5.0"
