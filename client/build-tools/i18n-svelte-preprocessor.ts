@@ -91,7 +91,7 @@ function walk(
 }
 
 function checkKeysAreTranslated(i18nKeys: string[]) {
-	const translationDir = "src/lib/i18n/locales";
+	const translationDir = resolve(import.meta.dirname, "../src/lib/i18n/locales");
 	const missingKeys: Record<string, string[]> = {};
 	for (const locale of supportedLocales) {
 		if (locale === DEFAULT_LOCALE) continue;
