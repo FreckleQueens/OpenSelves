@@ -120,6 +120,7 @@
 			document.startViewTransition(async () => {
 				resolve();
 				await navigation.complete;
+				openMenu = false;
 			});
 		});
 	});
