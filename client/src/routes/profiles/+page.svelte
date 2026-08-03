@@ -107,7 +107,7 @@
 	</Block>
 
 	<Block>
-		<Button tonal onclick={goToCreateProfile}>
+		<Button tonal onclick={goToCreateProfile} id="create-profile-button">
 			<PlusIcon button before />
 			Create a new profile
 		</Button>

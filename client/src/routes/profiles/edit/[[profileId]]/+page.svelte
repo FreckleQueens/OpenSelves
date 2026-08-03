@@ -65,18 +65,19 @@
 	}
 
 	async function onSave() {
+		const data = {
+			id: profileData.id,
+			name: profileData.name,
+			api: apiUrl
+				? {
+						url: apiUrl,
+					}
+				: undefined,
+		};
 		if (isCreate) {
-			await Profile.create(profileData);
+			await Profile.create(data);
 		} else {
-			await Profile.update({
-				id: profileData.id,
-				name: profileData.name,
-				api: apiUrl
-					? {
-							url: apiUrl,
-						}
-					: undefined,
-			});
+			await Profile.update(data);
 		}
 		return true;
 	}

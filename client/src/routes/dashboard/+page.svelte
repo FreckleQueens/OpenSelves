@@ -28,11 +28,12 @@
 			.sort(sortBy((front) => front.memberName)),
 	);
 	let pageContent: HTMLDivElement | undefined = $state();
+	let loading = $derived(!members.loaded || !fronts.loaded);
 
 	requireCurrentProfile();
 </script>
 
-<AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD}>
+<AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD} {loading}>
 	<a href={resolve("/members")}>
 		<BlockTitle medium>Currently fronting</BlockTitle>
 		<Block id="current-fronting-members" class="pt-2 pb-2">

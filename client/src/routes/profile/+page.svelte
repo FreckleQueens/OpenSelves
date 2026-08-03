@@ -137,7 +137,7 @@
 				<DeleteIcon button before />
 				Wipe
 			</DialogButton>
-			<DialogButton strong onclick={() => doLogout(false)}>
+			<DialogButton id="logout-keep-data-button" strong onclick={() => doLogout(false)}>
 				<SaveIcon button before />
 				Keep
 			</DialogButton>

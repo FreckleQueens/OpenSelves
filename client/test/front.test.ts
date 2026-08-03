@@ -24,19 +24,19 @@ describe("Front", () => {
 	}
 
 	test("create front", async () => {
-		await ctx.registerAndLoginUser();
+		await ctx.createProfileAndLogin();
 		const member = await ctx.createMember();
 		await createFront(member);
 	});
 
 	test("create front then delete member", async () => {
-		await ctx.registerAndLoginUser();
+		await ctx.createProfileAndLogin();
 		const member = await ctx.createMember();
 		await createFront(member);
 
 		await ctx.goto("/members");
 		await ctx.locator(`${ctx.getMemberEntrySelector(member)} .member-card`).click();
-		await ctx.waitForNavigation(/^\/members\/edit\/.+$/g);
+		await ctx.waitForNavigation(/^\/members\/[0-9a-f]{64}\/edit\/.+$/g);
 		await ctx.locator("#settings-tab-button").click();
 		await ctx.locator("#delete-record-button").click();
 		await ctx.clickOnOpeningDialogButtonWithId("delete-record-confirm-button");
@@ -50,7 +50,7 @@ describe("Front", () => {
 	});
 
 	test("end front", async () => {
-		await ctx.registerAndLoginUser();
+		await ctx.createProfileAndLogin();
 		const member = await ctx.createMember();
 		await createFront(member);
 

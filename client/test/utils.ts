@@ -220,6 +220,7 @@ export class PuppeteerContext {
 		url: string,
 		skipIfAlreadyThere: boolean = false,
 		waitForPageContent: boolean = true,
+		expectOk: boolean = true,
 	) {
 		let response: HTTPResponse | null | undefined;
 		if (!skipIfAlreadyThere || this.page.url() !== url) {
@@ -233,9 +234,15 @@ export class PuppeteerContext {
 			});
 			response = await this.page.goto(fullUrl);
 		}
+
 		if (waitForPageContent) {
 			await this.waitForPageContent();
 		}
+
+		if (response) {
+			assert.strictEqual(response.ok(), expectOk);
+		}
+
 		return response;
 	}
 
@@ -340,6 +347,13 @@ export class PuppeteerContext {
 		]);
 	}
 
+	public async expectPageContains(content: string) {
+		return await this.locator("body")
+			// @ts-expect-error this is authorized
+			.filter(`el => el.innerHTML.indexOf(${JSON.stringify(content)}) >= 0`)
+			.wait();
+	}
+
 	public async clickOnOpeningDialogButtonWithId(buttonId: string, timeout: number = 5000) {
 		await this.waitForTransition(`.k-dialog:has(button#${buttonId})`, timeout);
 		await this.locator(`.k-dialog button#${buttonId}`).setTimeout(timeout).click();
@@ -376,15 +390,11 @@ export class PuppeteerContext {
 		});
 	}
 
-	public async registerAndLoginUser() {
-		const email = createId() + "@example.com";
-		const password = "12345678";
+	public async createProfileAndLogin() {
+		await this.goto("/profiles");
 
-		await this.goto("/auth");
-
-		await this.locator(".k-segmented button:nth-child(2)")
-			.filter((el) => el.textContent.trim() === "Register")
-			.click();
+		await this.locator("#create-profile-button").click();
+		await this.waitForNavigation("/profiles/edit");
 
 		const form = this.within(".app-page-content form");
 		const saveButton = this.locator("#save-record-button");
@@ -411,33 +421,14 @@ export class PuppeteerContext {
 		return this.within(`.profile-card[data-profile-name=${profileName}]`);
 	}
 
-	public async logout() {
-		await this.goto("/account", true);
+	public async logout(keepData: boolean = true) {
+		await this.goto("/profile", true);
 
 		await this.locator("#logout-button").click();
-		await this.locator("#logout-wipe-data-button").click();
+		await this.locator(
+			keepData ? "#logout-keep-data-button" : "#logout-wipe-data-button",
+		).click();
 		await this.waitForNavigation("/land?user_logged_out=1");
-	}
-
-	public async verifyEmail(email: string, expectEmailCount?: number, useEmailIndex?: number) {
-		await this.goto("/account", true);
-
-		await this.page.waitForSelector("#email-status.ready.unverified", {
-			timeout: 3000,
-		});
-
-		const link = await this.getEmailLink(email, expectEmailCount, useEmailIndex);
-		assert(link.indexOf("/verify-email/") >= 0);
-		const gotoResponse = await this.goto(link, undefined, false);
-		assert(gotoResponse);
-		assert(gotoResponse.ok());
-		await this.clickOnOpeningDialogButtonWithId("success-continue-button");
-		await this.waitForNavigation("/dashboard?verified_email=1");
-
-		await this.goto("/account");
-		await this.page.waitForSelector("#email-status.ready.verified", {
-			timeout: 3000,
-		});
 	}
 
 	public async createMember() {
@@ -450,6 +441,7 @@ export class PuppeteerContext {
 		await this.locator("#open-fab-menu-button").click();
 		await this.locator("#create-member-button").click();
 
+		await this.waitForNavigation(/^\/members\/[0-9a-f]{64}\/edit$/g);
 		await this.locator('input[name="name"]').fill(member.name);
 		await this.locator('input[name="pronouns"]').fill(member.pronouns);
 		await this.locator('textarea[name="description"]').fill(member.description);
@@ -459,75 +451,4 @@ export class PuppeteerContext {
 
 		return member;
 	}
-
-	public async getEmailLink(
-		emailAddress: string,
-		expectEmailCount: number = 1,
-		useEmailIndex: number = 0,
-		timeout: number = 5000,
-	) {
-		const query = new URLSearchParams({
-			query: `to:"${emailAddress}"`,
-		});
-		const searchUrl = `http://localhost:8025/api/v1/search?${query.toString()}`;
-
-		let messageId: string | undefined;
-		await this.ctx.waitFor(
-			async () => {
-				const search = await fetchUrl(searchUrl, true);
-				const messages = search["messages"];
-				assert(messages);
-				assert(Array.isArray(messages));
-				assert.strictEqual(messages.length, expectEmailCount);
-
-				const sortedMessages = messages.sort((a, b) =>
-					a["Created"] < b["Created"] ? -1 : a["Created"] > b["Created"] ? 1 : 0,
-				);
-				messageId = sortedMessages[useEmailIndex]["ID"];
-			},
-			{
-				timeout,
-			},
-		);
-
-		assert(messageId);
-
-		const viewUrl = `http://localhost:8025/view/${messageId}.txt`;
-		const body = await fetchUrl(viewUrl, false);
-		assert(typeof body === "string");
-
-		const lines = body.split("\n");
-		const verificationLink = lines.find((line) => line.startsWith("http"));
-		assert(verificationLink);
-		return verificationLink;
-	}
-}
-
-async function fetchUrl(url: string, parseJson: boolean): Promise<object | string> {
-	const response = await fetch(url);
-
-	if (!response) {
-		throw new Error(`No response from mailpit api for url ${url}`);
-	}
-
-	if (!response.ok) {
-		throw new Error(`Fetch returned non ok status ${response.status} for url ${url}`, {
-			cause: response,
-		});
-	}
-
-	let body: unknown;
-	if (parseJson) {
-		try {
-			body = await response.json();
-		} catch {
-			throw new Error(`Couldn't parse response body as json for url ${url}`, {
-				cause: response,
-			});
-		}
-	} else {
-		body = await response.text();
-	}
-	assert(body);
-	return body;
 }
