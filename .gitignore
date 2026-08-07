@@ -3,4 +3,5 @@
 /node_modules
 /.yarn
 /.direnv
+/.vscode
 simply-plural-export.json
