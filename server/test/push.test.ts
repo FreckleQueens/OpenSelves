@@ -205,6 +205,21 @@ describe(pushEndpoint, () => {
 		assert(error instanceof NoSuchKey);
 	}
 
+	async function testEntryNotInS3(entry: Entry) {
+		const s3Service = env.app.get(S3Service);
+
+		let getObjectResult: GetObjectCommandOutput | undefined;
+		let error: unknown;
+		try {
+			getObjectResult = await s3Service.getObject(entry.payloadDigest.toBase64());
+		} catch (e) {
+			error = e;
+		}
+		assert(!getObjectResult);
+		assert(error);
+		assert(error instanceof NoSuchKey);
+	}
+
 	setupTestSuiteWithUsers(
 		(testEnv) => {
 			env = testEnv;
@@ -931,7 +946,35 @@ describe(pushEndpoint, () => {
 			});
 		});
 
-		// TODO: test payload is not uploaded to s3 if entry is pruned on upsert or if it's deleted on post-upsert prune
+		test("payload is not uploaded to s3 if entry is prefix-pruned from existing entries in db", async () => {
+			const randomValues = crypto.getRandomValues(Buffer.alloc(5000));
+			const bigData = randomValues.toString("hex");
+			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
+
+			const keys = env.users.user1.keys;
+			const { member } = makeMember(keys.publicKey, undefined, bigData);
+			const entries = await member.flushDirtyEntries(keys);
+
+			const originalImageEntry = entries.find((entry) =>
+				Path.endsWith(entry.path, Path.fromString("/image")),
+			)?.entryMaybeWithPayload;
+			assert(originalImageEntry);
+
+			const newPayload = ByteString.fromUtf8("smol");
+			const newImageEntry: AuthorisedEntryWithPayload = {
+				...(await AuthorisedEntry.create(
+					await Entry.setPayload(originalImageEntry, newPayload),
+					keys,
+				)),
+				payload: newPayload,
+			};
+
+			// Insert the newest entry first
+			await putEntry(newImageEntry);
+			await putEntries(entries.map((entry) => entry.entryWithPayload));
+
+			await testEntryNotInS3(originalImageEntry);
+		});
 
 		async function testPuttingALotOfEntries(
 			callback: ({
