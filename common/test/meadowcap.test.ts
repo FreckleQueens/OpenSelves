@@ -88,7 +88,9 @@ describe("meadowcap", () => {
 		test("isAuthorisedWrite returns false with signature of entry with the wrong payload", async () => {
 			const { subspace, authorisedEntry } = await makeValidAuthorisedEntry();
 			const wrongPayload = ByteString.fromUtf8("wrong payload");
-			const wrongPayloadEntry = await Entry.setPayload(authorisedEntry, wrongPayload, null);
+			const wrongPayloadEntry = await Entry.setPayload(authorisedEntry, wrongPayload, {
+				timestamp: null,
+			});
 			authorisedEntry.authorisationToken.signature = await Ed25519.sign(
 				subspace.secretKey,
 				Entry.encodeEntry(wrongPayloadEntry),

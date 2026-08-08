@@ -13,8 +13,8 @@ import {
 } from "../../schema/index.js";
 import type { KeyOfSchema, SchemaCreate, SchemaStatic, SchemaType } from "../../schema/types.js";
 import { Path } from "../../willow/Path.js";
-import { PathComponent, UInt64 } from "../../willow/index.js";
-import { EntryWrapper, SubspaceId, Timestamp } from "../../willow/index.js";
+import { AuthorisedEntryWithPayload, PathComponent, UInt64 } from "../../willow/index.js";
+import { SubspaceId, Timestamp } from "../../willow/index.js";
 import { type CapabilitySignData, OPENSELVES_NAMESPACE_ID } from "../../willow/index.js";
 import {
 	deserializeValueFromPayload,
@@ -43,7 +43,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 
 	public readonly class: typeof EntryDataModel;
 	private readonly _data: Record<string, AnyFieldTypesValue> = {};
-	private readonly entries: Record<string, EntryWrapper> = {};
+	private readonly entries: Record<string, AuthorisedEntryWithPayload> = {};
 	private readonly pendingEntryMutations: [Timestamp, KeyOfSchema<Schema>, AnyFieldTypesValue][] =
 		[];
 	private readonly isConstructed: boolean;
@@ -51,13 +51,13 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	/**
 	 * @param schema
 	 * @param subspaceId
-	 * @param from `SchemaCreate<Schema>` means create a new DataModel. `EntryWrapper[]` means load
+	 * @param from `SchemaCreate<Schema>` means create a new DataModel. `AuthorisedEntryWithPayload[]` means load
 	 * from existing DataModel.
 	 */
 	protected constructor(
 		public readonly schema: Schema,
 		public readonly subspaceId: SubspaceId,
-		from: SchemaCreate<Schema> | EntryWrapper[],
+		from: SchemaCreate<Schema> | AuthorisedEntryWithPayload[],
 	) {
 		this.class = this.constructor as typeof EntryDataModel;
 
@@ -80,7 +80,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 					throw new Error("Gave an entry of wrong record", {
 						cause: {
 							pathRoot,
-							entry: entry.entryMaybeWithPayload,
+							entry: entry,
 						},
 					});
 				}
@@ -97,8 +97,8 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 					throw new Error("Got two entries with same key", {
 						cause: {
 							key,
-							entry1: this.entries[key].entry,
-							entry2: entry.entry,
+							entry1: this.entries[key],
+							entry2: entry,
 						},
 					});
 				}
@@ -239,21 +239,28 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 
 	public async flushDirtyEntries(
 		signData: CapabilitySignData,
-		callback?: (entries: EntryWrapper[]) => Promise<void>,
-	): Promise<EntryWrapper[]> {
+		callback?: (entries: AuthorisedEntryWithPayload[]) => Promise<void>,
+	): Promise<AuthorisedEntryWithPayload[]> {
 		const mutations = [...this.pendingEntryMutations];
 		this.pendingEntryMutations.splice(0);
 
-		let dirtyEntries: Set<EntryWrapper>;
+		let dirtyEntries: Set<AuthorisedEntryWithPayload>;
 		try {
-			dirtyEntries = new Set<EntryWrapper>();
+			dirtyEntries = new Set<AuthorisedEntryWithPayload>();
 			for (const [timestamp, key, value] of mutations) {
 				const payload = serializeValueToPayload(this.schema, key, value);
 				let entry = this.entries[key];
 				if (entry) {
-					await entry.setPayload(payload, signData, timestamp);
+					entry = this.entries[key] = await AuthorisedEntryWithPayload.setPayload(
+						entry,
+						payload,
+						{
+							signData,
+							timestamp,
+						},
+					);
 				} else {
-					entry = this.entries[key] = await EntryWrapper.create(
+					entry = this.entries[key] = await AuthorisedEntryWithPayload.create(
 						OPENSELVES_NAMESPACE_ID,
 						this.subspaceId,
 						[...this.getPathRoot(), PathComponent.fromString(key)],
@@ -274,7 +281,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		return [...dirtyEntries];
 	}
 
-	public getEntries(): EntryWrapper[] {
+	public getEntries(): AuthorisedEntryWithPayload[] {
 		if (this.isDirty()) {
 			throw new Error("DataModel is dirty. Must call flushDirtyEntries() first.");
 		}
@@ -284,8 +291,8 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	public async makeDeleteEntry(
 		signData: CapabilitySignData,
 		timestamp: Timestamp = Timestamp.now(),
-	): Promise<EntryWrapper> {
-		return await EntryWrapper.create(
+	): Promise<AuthorisedEntryWithPayload> {
+		return await AuthorisedEntryWithPayload.create(
 			OPENSELVES_NAMESPACE_ID,
 			this.subspaceId,
 			this.getPathRoot(),
@@ -295,7 +302,9 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		);
 	}
 
-	public async makePermanentDeleteEntry(signData: CapabilitySignData): Promise<EntryWrapper> {
+	public async makePermanentDeleteEntry(
+		signData: CapabilitySignData,
+	): Promise<AuthorisedEntryWithPayload> {
 		return this.makeDeleteEntry(signData, UInt64.MAX_VALUE);
 	}
 }

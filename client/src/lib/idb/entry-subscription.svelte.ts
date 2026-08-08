@@ -3,10 +3,9 @@ import { Profile } from "$lib/idb/profiles";
 import { EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
 import { type SchemaStatic, isValidSchemaKey } from "openselves-common/schema";
 import {
-	EntryWrapper,
+	AuthorisedEntryWithPayload,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
-	PayloadDigest,
 	SubspaceId,
 } from "openselves-common/willow";
 import { PathComponent } from "openselves-common/willow";
@@ -26,7 +25,7 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(
 	model: {
 		new (
 			subspaceId: SubspaceId,
-			from: SchemaStatic<Schema> | EntryWrapper[],
+			from: SchemaStatic<Schema> | AuthorisedEntryWithPayload[],
 		): EntryDataModel<Schema>;
 		getModelKey(): string;
 	},
@@ -69,47 +68,28 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(
 		const unsubscribes = subspaceIds.map((subspaceId) =>
 			IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
 				.area(subspaceId, modelPathPrefix)
-				.subscribe(async (entry) => {
-					const modelIdComponent = entry.path[1];
-					const modelId = PathComponent.toString(entry.path[1]);
+				.subscribe(async (newEntry) => {
+					const modelIdComponent = newEntry.path[1];
+					const modelId = PathComponent.toString(newEntry.path[1]);
 					const modelPath: Path = [...modelPathPrefix, modelIdComponent];
-					const storeEntries = store.area(subspaceId, modelPath).getEntries();
-					if (Path.equals(entry.path, modelPath) && storeEntries.length === 0) {
+					const existingEntries = store.area(subspaceId, modelPath).getEntries();
+
+					const isDeleteEntry = Path.equals(newEntry.path, modelPath);
+
+					if (isDeleteEntry && existingEntries.length === 0) {
+						// Model was deleted
 						dataModels = dataModels.filter((model) => model.get("id") !== modelId);
-					} else {
-						const newEntries: EntryWrapper[] = [];
-						if (entry.payloadLength.valueOf() > 0n) {
-							newEntries.push(await EntryWrapper.load(entry));
-						}
+						return;
+					}
 
-						const loadedModel = dataModels.find((model) => model.get("id") === modelId);
-						if (loadedModel) {
-							dataModels = dataModels.filter((model) => model !== loadedModel);
-							const loadedEntries = loadedModel.getEntries();
-							for (const storeEntry of storeEntries) {
-								if (
-									storeEntry.payloadLength === 0n ||
-									Path.equals(storeEntry.path, entry.path)
-								) {
-									continue;
-								}
+					// Remove previous model
+					dataModels = dataModels.filter((model) => model.get("id") !== modelId);
 
-								const loadedEntry = loadedEntries.find(
-									(loadedEntry) =>
-										Path.equals(loadedEntry.path, storeEntry.path) &&
-										PayloadDigest.equals(
-											loadedEntry.payloadDigest,
-											storeEntry.payloadDigest,
-										),
-								);
-								newEntries.push(
-									loadedEntry ? loadedEntry : await EntryWrapper.load(storeEntry),
-								);
-							}
-						}
-						if (newEntries.length > 0) {
-							dataModels.push(new model(subspaceId, newEntries));
-						}
+					const newModelEntries: AuthorisedEntryWithPayload[] = existingEntries
+						// Skip delete entries
+						.filter((entry) => !Path.equals(entry.path, modelPath));
+					if (newModelEntries.length > 0) {
+						dataModels.push(new model(subspaceId, newModelEntries));
 					}
 				}),
 		);
@@ -120,14 +100,13 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(
 			.map((subspaceId) => store.area(subspaceId, modelPathPrefix).getEntries())
 			.flat();
 
-		const entries = await Promise.all(initialEntries.map((entry) => EntryWrapper.load(entry)));
 		dataModels = [
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
-			...new Set(entries.map((entry) => entry.subspaceId.toBase64())),
+			...new Set(initialEntries.map((entry) => entry.subspaceId.toBase64())),
 		]
 			.map((base64Subspace) => {
 				const subspaceId = SubspaceId.fromBase64(base64Subspace);
-				const subspaceEntries = entries.filter((entry) =>
+				const subspaceEntries = initialEntries.filter((entry) =>
 					SubspaceId.equals(entry.subspaceId, subspaceId),
 				);
 				return [

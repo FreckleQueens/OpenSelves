@@ -3,11 +3,11 @@ import type { Entry } from "../Entry.js";
 import { Path } from "../Path.js";
 import { SubspaceId } from "../SubspaceId.js";
 import type { Timestamp } from "../Timestamp.js";
-import { Store } from "./Store.js";
+import { type BaseStoreContext, Store } from "./Store.js";
 
 export class StoreArea<
 	T extends Entry,
-	Context = void,
+	Context extends BaseStoreContext = BaseStoreContext,
 	S extends Store<T, Context> = Store<T, Context>,
 > {
 	public readonly area: Area;

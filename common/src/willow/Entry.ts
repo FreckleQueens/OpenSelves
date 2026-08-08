@@ -22,12 +22,12 @@ export class Entry {
 		);
 	}
 
-	public static isValid(entry: Entry): boolean {
-		return (
+	public static isValid(entry: Entry): Promise<boolean> {
+		return Promise.resolve(
 			Path.isValid(entry.path) &&
-			Timestamp.isValid(entry.timestamp) &&
-			UInt64.isValid(entry.payloadLength) &&
-			PayloadDigest.isValid(entry.payloadDigest)
+				Timestamp.isValid(entry.timestamp) &&
+				UInt64.isValid(entry.payloadLength) &&
+				PayloadDigest.isValid(entry.payloadDigest),
 		);
 	}
 
@@ -65,14 +65,17 @@ export class Entry {
 	public static async setPayload(
 		entry: Entry,
 		payload: ByteString,
-		timestamp: Timestamp | null = Timestamp.now(),
+		options?: { timestamp?: Timestamp | null },
 	): Promise<Entry> {
 		const newEntry = Entry.copy(entry);
 		newEntry.payloadLength = BigInt(payload.length);
 		newEntry.payloadDigest = await PayloadDigest.hash(payload);
+
+		const timestamp = options?.timestamp;
 		if (timestamp !== null) {
-			newEntry.timestamp = timestamp;
+			newEntry.timestamp = timestamp === undefined ? Timestamp.now() : timestamp;
 		}
+
 		return newEntry;
 	}
 

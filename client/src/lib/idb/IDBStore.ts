@@ -5,8 +5,8 @@ import { PAYLOAD_STORE_NAME, type PayloadStore } from "$lib/idb/IDBPayload";
 import { type EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
 import {
 	Area,
-	type AuthorisedEntryWithPayload,
-	EntryWrapper,
+	AuthorisedEntryWithPayload,
+	type BaseStoreContext,
 	MemoryStore,
 	NamespaceId,
 	Path,
@@ -14,7 +14,7 @@ import {
 	type Timestamp,
 } from "openselves-common/willow";
 
-export type IDBStoreContext = {
+export type IDBStoreContext = BaseStoreContext & {
 	tx?: IDBTransactionWrapper<EntryStore | PayloadStore>;
 	dontMarkSavedEntriesForSync?: boolean;
 };
@@ -69,9 +69,21 @@ export class IDBStore extends MemoryStore<AuthorisedEntryWithPayload, IDBStoreCo
 		entries: AuthorisedEntryWithPayload[],
 		ctx: IDBStoreContext = {},
 	): Promise<AuthorisedEntryWithPayload[]> {
+		if (ctx.tx && !ctx.areEntriesAlreadyVerified) {
+			throw new Error(
+				"Entries must be verified beforehand when calling ingest inside a pre-existing transaction",
+			);
+		}
+
 		if (!this.isInitialized) {
 			await this.init(ctx);
 		}
+
+		if (!ctx.tx && !ctx.areEntriesAlreadyVerified) {
+			await this.verifyEntries(entries, ctx);
+			ctx.areEntriesAlreadyVerified = true;
+		}
+
 		const survivingEntries = await IDB.getInstance().transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
@@ -120,6 +132,10 @@ export class IDBStore extends MemoryStore<AuthorisedEntryWithPayload, IDBStoreCo
 		}
 	}
 
+	protected override async isEntryValid(entry: AuthorisedEntryWithPayload): Promise<boolean> {
+		return AuthorisedEntryWithPayload.isValid(entry);
+	}
+
 	public subscribe(
 		callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void,
 		area?: Area,
@@ -148,7 +164,7 @@ export class IDBStore extends MemoryStore<AuthorisedEntryWithPayload, IDBStoreCo
 		Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
 	>(
 		model: {
-			new (subspaceId: SubspaceId, from: EntryWrapper[]): Model;
+			new (subspaceId: SubspaceId, from: AuthorisedEntryWithPayload[]): Model;
 			getModelKey(): string;
 		},
 		subspaceId: SubspaceId,

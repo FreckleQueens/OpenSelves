@@ -8,7 +8,6 @@ import {
 	ByteString,
 	Capability,
 	CapabilityAccessMode,
-	EntryWrapper,
 	NamespaceId,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
@@ -51,9 +50,9 @@ describe("/sync/pull", () => {
 
 	let members1: Member[];
 	let deletedMember1: Member;
-	const entries1: EntryWrapper[] = [];
+	const entries1: AuthorisedEntryWithPayload[] = [];
 	let members2: Member[];
-	const entries2: EntryWrapper[] = [];
+	const entries2: AuthorisedEntryWithPayload[] = [];
 	setupTestSuiteWithUsers((testEnv) => {
 		env = testEnv;
 	});
@@ -124,8 +123,8 @@ describe("/sync/pull", () => {
 					payloadDigest: entry.payloadDigest,
 					payload: entry.payload !== undefined ? entry.payload : null,
 					authorisationToken: AuthorisationToken.encodeAuthorisationTokenEntryRelative(
-						entry.entry.authorisationToken,
-						entry.entry,
+						entry.authorisationToken,
+						entry,
 					),
 				}),
 			)
@@ -198,7 +197,7 @@ describe("/sync/pull", () => {
 				);
 				const expectedEntry = entries1.findLast((entry) =>
 					Path.equals(entry.path, actualEntry.path),
-				)?.entryWithPayload;
+				);
 				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}
 		});
@@ -213,7 +212,7 @@ describe("/sync/pull", () => {
 			for (const actualEntry of entries) {
 				const expectedEntry = entries1.findLast((entry) =>
 					Path.equals(entry.path, actualEntry.path),
-				)?.entryWithPayload;
+				);
 				assert(expectedEntry);
 				assert.deepStrictEqual(actualEntry, expectedEntry);
 			}

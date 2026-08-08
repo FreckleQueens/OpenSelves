@@ -73,11 +73,9 @@
 		}
 
 		await idbStore.ingest([
-			(
-				await frontObj.makePermanentDeleteEntry(
-					Profile.getCurrentProfile().getSignDataForSubspaceId(frontObj.subspaceId),
-				)
-			).entryWithPayload,
+			await frontObj.makePermanentDeleteEntry(
+				Profile.getCurrentProfile().getSignDataForSubspaceId(frontObj.subspaceId),
+			),
 		]);
 	}
 </script>

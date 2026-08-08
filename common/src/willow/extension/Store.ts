@@ -7,7 +7,8 @@ import { SubspaceId } from "../SubspaceId.js";
 import type { Timestamp } from "../Timestamp.js";
 import { StoreArea } from "./StoreArea.js";
 
-export abstract class Store<T extends Entry, Context = void> {
+export type BaseStoreContext = { areEntriesAlreadyVerified?: boolean };
+export abstract class Store<T extends Entry, Context extends BaseStoreContext = BaseStoreContext> {
 	constructor(public readonly namespaceId: NamespaceId) {}
 
 	public abstract getEntries(context?: Context): T[];
@@ -24,6 +25,8 @@ export abstract class Store<T extends Entry, Context = void> {
 	public async ingest(entries: T[], context?: Context): Promise<T[]> {
 		const mark = `ingest.${createId()}`;
 		performance.mark(mark);
+
+		await this.verifyEntries(entries, context);
 
 		const ingestedEntries: T[] = [];
 
@@ -75,5 +78,22 @@ export abstract class Store<T extends Entry, Context = void> {
 		timesEnd: Timestamp | undefined = undefined,
 	): StoreArea<T, Context> {
 		return new StoreArea(this, subspaceId, path, timesStart, timesEnd);
+	}
+
+	protected async isEntryValid(entry: T): Promise<boolean> {
+		return Entry.isValid(entry);
+	}
+
+	protected async verifyEntries(entries: T[], context?: Context) {
+		if (
+			!context?.areEntriesAlreadyVerified &&
+			!(
+				await Promise.all(entries.map((entryToIngest) => this.isEntryValid(entryToIngest)))
+			).every((isValid) => isValid)
+		) {
+			throw new Error("Tried to ingest invalid entries", {
+				cause: entries,
+			});
+		}
 	}
 }

@@ -1,13 +1,19 @@
 import { Area } from "../Area.js";
+import type { ByteString } from "../ByteString.js";
 import { Ed25519 } from "../Ed25519.js";
 import { Entry } from "../Entry.js";
 import { NamespaceId } from "../NamespaceId.js";
+import type { Path } from "../Path.js";
+import type { PayloadDigest } from "../PayloadDigest.js";
+import type { SubspaceId } from "../SubspaceId.js";
+import { Timestamp } from "../Timestamp.js";
+import type { UInt64 } from "../UInt64.js";
 import { Willow25 } from "../Willow25.js";
 import { AuthorisationToken } from "./AuthorisationToken.js";
 import { Capability, CapabilityAccessMode } from "./Capability.js";
 import type { CapabilitySignData } from "./CapabilitySignData.js";
 
-export class AuthorisedEntry implements Entry {
+export class AuthorisedEntry extends Entry {
 	public static is(value: unknown): value is AuthorisedEntry {
 		return !!(
 			Entry.is(value) &&
@@ -16,8 +22,8 @@ export class AuthorisedEntry implements Entry {
 		);
 	}
 
-	public static async isValid(value: AuthorisedEntry): Promise<boolean> {
-		return Entry.isValid(value) && AuthorisedEntry.isAuthorisedWrite(value);
+	public static override async isValid(value: AuthorisedEntry): Promise<boolean> {
+		return (await super.isValid(value)) && (await AuthorisedEntry.isAuthorisedWrite(value));
 	}
 
 	public static copy(authorisedEntry: AuthorisedEntry): AuthorisedEntry {
@@ -63,6 +69,20 @@ export class AuthorisedEntry implements Entry {
 		};
 	}
 
+	public static override async setPayload(
+		entry: Entry,
+		payload: ByteString,
+		options: {
+			timestamp?: Timestamp | null;
+			signData: CapabilitySignData;
+		},
+	): Promise<AuthorisedEntry> {
+		return await this.signEntry(
+			await super.setPayload(entry, payload, options),
+			options.signData,
+		);
+	}
+
 	/**
 	 * https://willowprotocol.org/specs/meadowcap/index.html#meadowcap_is_authorised_write
 	 * TODO: test this thoroughly
@@ -83,13 +103,14 @@ export class AuthorisedEntry implements Entry {
 	}
 
 	public constructor(
-		entry: Entry,
+		namespaceId: NamespaceId,
+		subspaceId: SubspaceId,
+		path: Path,
+		timestamp: Timestamp,
+		payloadLength: UInt64,
+		payloadDigest: PayloadDigest,
 		public authorisationToken: AuthorisationToken,
-		public namespaceId = entry.namespaceId,
-		public subspaceId = entry.subspaceId,
-		public path = entry.path,
-		public timestamp = entry.timestamp,
-		public payloadLength = entry.payloadLength,
-		public payloadDigest = entry.payloadDigest,
-	) {}
+	) {
+		super(namespaceId, subspaceId, path, timestamp, payloadLength, payloadDigest);
+	}
 }

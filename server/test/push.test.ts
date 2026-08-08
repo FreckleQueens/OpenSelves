@@ -11,7 +11,6 @@ import {
 	CapabilitySignData,
 	type Ed25519KeyPair,
 	Entry,
-	EntryWrapper,
 	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
 	OPENSELVES_NAMESPACE_ID,
@@ -45,8 +44,7 @@ async function timeModelEntries(
 	signData: CapabilitySignData,
 ): Promise<AuthorisedEntryWithPayload[]> {
 	return Promise.all(
-		(await model.flushDirtyEntries(signData)).map(async (entryWrapper) => {
-			const entry = entryWrapper.entryWithPayload;
+		(await model.flushDirtyEntries(signData)).map((entry) => {
 			entry.timestamp = timestamp;
 			return AuthorisedEntryWithPayload.signEntry(entry, signData);
 		}),
@@ -70,12 +68,12 @@ describe(pushEndpoint, () => {
 		originalGetSyncFrom(env, timestamp, user);
 
 	const checkEntriesAreServed = (
-		entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
+		entries: AuthorisedEntryWithPayload[],
 		user: TestEnvUser = env.users.user1,
 	) => originalCheckEntriesAreServed(env, entries, user);
 
 	const checkEntriesAreNotServed = (
-		entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
+		entries: AuthorisedEntryWithPayload[],
 		user: TestEnvUser = env.users.user1,
 	) => originalCheckEntriesAreNotServed(env, entries, user);
 
@@ -97,7 +95,7 @@ describe(pushEndpoint, () => {
 	) {
 		const { member } = makeMember(keys.publicKey, date, image);
 		const entries = await member.flushDirtyEntries(keys);
-		const response = await putEntries(entries.map((entry) => entry.entryWithPayload));
+		const response = await putEntries(entries);
 		const responseBody = response.body;
 		assert(responseBody);
 		assert(typeof responseBody === "object");
@@ -108,7 +106,7 @@ describe(pushEndpoint, () => {
 	async function createAndDeleteMember(keys: Ed25519KeyPair = env.users.user1.keys) {
 		const { member, entries } = await createMember(keys);
 		const deleteEntry = await member.makePermanentDeleteEntry(keys);
-		const response = await putEntry(deleteEntry.entryWithPayload);
+		const response = await putEntry(deleteEntry);
 		return { member, createEntries: entries, deleteEntry, response };
 	}
 
@@ -116,7 +114,7 @@ describe(pushEndpoint, () => {
 		const { member, entries: memberEntries } = await createMember(keys);
 		const { front } = makeFront(member, new Date());
 		const entries = await front.flushDirtyEntries(keys);
-		const response = await putEntries(entries.map((entry) => entry.entryWithPayload));
+		const response = await putEntries(entries);
 		const responseBody = response.body;
 		assert(responseBody);
 		assert(typeof responseBody === "object");
@@ -126,7 +124,7 @@ describe(pushEndpoint, () => {
 	}
 
 	function testImage(
-		testFn: (image: string | FileRef | null | undefined) => Promise<EntryWrapper>,
+		testFn: (image: string | FileRef | null | undefined) => Promise<AuthorisedEntryWithPayload>,
 	) {
 		describe("image", () => {
 			for (const { testName, image, expectCode, isServed } of [
@@ -171,7 +169,7 @@ describe(pushEndpoint, () => {
 			]) {
 				test(testName, async () => {
 					const entry = await testFn(image);
-					await putEntry(entry.entryWithPayload, expectCode, undefined);
+					await putEntry(entry, expectCode, undefined);
 
 					if (isServed) {
 						await checkEntriesAreServed([entry]);
@@ -631,8 +629,7 @@ describe(pushEndpoint, () => {
 			for (const testCase of testCases) {
 				test(testCase.name, async () => {
 					const { member } = makeMember(env.users.user1.keys.publicKey);
-					const entry = (await member.flushDirtyEntries(env.users.user1.keys))[0]
-						.entryWithPayload;
+					const entry = (await member.flushDirtyEntries(env.users.user1.keys))[0];
 					assert(AuthorisedEntryWithPayload.is(entry));
 
 					await testCase.forgeEntry(
@@ -660,7 +657,7 @@ describe(pushEndpoint, () => {
 		test("Putting an entry twice only has an effect the first time", async () => {
 			const { member } = makeMember(env.users.user1.keys.publicKey);
 			const entries = await member.flushDirtyEntries(env.users.user1.keys);
-			const unrelatedEntry = await EntryWrapper.create(
+			const unrelatedEntry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + createId()),
@@ -669,22 +666,22 @@ describe(pushEndpoint, () => {
 				env.users.user1.keys,
 			);
 
-			await putEntries([...entries, unrelatedEntry].map((entry) => entry.entryWithPayload));
+			await putEntries([...entries, unrelatedEntry]);
 			await checkEntriesAreServed([...entries, unrelatedEntry]);
 
 			const memberDeleteEntry = await member.makePermanentDeleteEntry(env.users.user1.keys);
-			await putEntry(memberDeleteEntry.entryWithPayload);
+			await putEntry(memberDeleteEntry);
 			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
 			await checkEntriesAreNotServed(entries);
 
-			await putEntry(memberDeleteEntry.entryWithPayload);
+			await putEntry(memberDeleteEntry);
 			await checkEntriesAreServed([memberDeleteEntry, unrelatedEntry]);
 			await checkEntriesAreNotServed(entries);
 		});
 
 		test("Putting an entry that is superseded by another entry of the same path has no effect", async () => {
 			const root = createId();
-			const entry = await EntryWrapper.create(
+			const entry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root + "/a"),
@@ -692,7 +689,7 @@ describe(pushEndpoint, () => {
 				ByteString.fromUtf8("hi"),
 				env.users.user1.keys,
 			);
-			const supersedingEntry = await EntryWrapper.create(
+			const supersedingEntry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root + "/a"),
@@ -701,17 +698,17 @@ describe(pushEndpoint, () => {
 				env.users.user1.keys,
 			);
 
-			await putEntry(supersedingEntry.entryWithPayload);
+			await putEntry(supersedingEntry);
 			await checkEntriesAreServed([supersedingEntry]);
 
-			await putEntry(entry.entryWithPayload);
+			await putEntry(entry);
 			await checkEntriesAreNotServed([entry]);
 			await checkEntriesAreServed([supersedingEntry]);
 		});
 
 		test("Putting an entry that is superseded by another entry of a prefixing path has no effect", async () => {
 			const root = createId();
-			const entry = await EntryWrapper.create(
+			const entry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root + "/child"),
@@ -719,7 +716,7 @@ describe(pushEndpoint, () => {
 				ByteString.fromUtf8("hi"),
 				env.users.user1.keys,
 			);
-			const supersedingEntry = await EntryWrapper.create(
+			const supersedingEntry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root),
@@ -728,17 +725,17 @@ describe(pushEndpoint, () => {
 				env.users.user1.keys,
 			);
 
-			await putEntry(supersedingEntry.entryWithPayload);
+			await putEntry(supersedingEntry);
 			await checkEntriesAreServed([supersedingEntry]);
 
-			await putEntry(entry.entryWithPayload);
+			await putEntry(entry);
 			await checkEntriesAreNotServed([entry]);
 			await checkEntriesAreServed([supersedingEntry]);
 		});
 
 		test("Putting an entry older than another entry it prefixes after the latter keeps both entries", async () => {
 			const root = createId();
-			const parentEntry = await EntryWrapper.create(
+			const parentEntry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root),
@@ -746,7 +743,7 @@ describe(pushEndpoint, () => {
 				ByteString.fromUtf8("hi"),
 				env.users.user1.keys,
 			);
-			const childEntry = await EntryWrapper.create(
+			const childEntry = await AuthorisedEntryWithPayload.create(
 				OPENSELVES_NAMESPACE_ID,
 				env.users.user1.keys.publicKey,
 				Path.fromString("/test/" + root + "/child"),
@@ -755,10 +752,10 @@ describe(pushEndpoint, () => {
 				env.users.user1.keys,
 			);
 
-			await putEntry(childEntry.entryWithPayload);
+			await putEntry(childEntry);
 			await checkEntriesAreServed([childEntry]);
 
-			await putEntry(parentEntry.entryWithPayload);
+			await putEntry(parentEntry);
 			await checkEntriesAreServed([parentEntry, childEntry]);
 		});
 
@@ -767,7 +764,7 @@ describe(pushEndpoint, () => {
 				const { member } = makeMember(env.users.user1.keys.publicKey);
 
 				const entries = await member.flushDirtyEntries(env.users.user1.keys);
-				await putEntries(entries.map((entry) => entry.entryWithPayload));
+				await putEntries(entries);
 				await checkEntriesAreServed(entries);
 			});
 
@@ -780,7 +777,7 @@ describe(pushEndpoint, () => {
 				);
 
 				const entries = await member.flushDirtyEntries(env.users.user1.keys);
-				await putEntries(entries.map((entry) => entry.entryWithPayload));
+				await putEntries(entries);
 				await checkEntriesAreServed(entries);
 			});
 
@@ -811,16 +808,14 @@ describe(pushEndpoint, () => {
 			test("delete member twice succeeds 200", async () => {
 				const { member } = await createAndDeleteMember();
 
-				await putEntry(
-					(await member.makePermanentDeleteEntry(env.users.user1.keys)).entryWithPayload,
-				);
+				await putEntry(await member.makePermanentDeleteEntry(env.users.user1.keys));
 			});
 
 			test("delete member of another user fails 400", async () => {
 				const { member, entries } = await createMember(env.users.user1.keys);
 
 				const deleteEntry = await member.makeDeleteEntry(env.users.user2.keys);
-				await putEntry(deleteEntry.entryWithPayload, 400, env.users.user2);
+				await putEntry(deleteEntry, 400, env.users.user2);
 
 				// Check member was not deleted
 				await checkEntriesAreServed(entries);
@@ -840,10 +835,7 @@ describe(pushEndpoint, () => {
 				assert(imageEntry);
 
 				await testPayloadIsDeletedFromS3(imageEntry, async () => {
-					await putEntry(
-						(await member.makeDeleteEntry(env.users.user1.keys)).entryWithPayload,
-						200,
-					);
+					await putEntry(await member.makeDeleteEntry(env.users.user1.keys), 200);
 				});
 			});
 
@@ -861,9 +853,14 @@ describe(pushEndpoint, () => {
 				assert(imageEntry);
 
 				await testPayloadIsDeletedFromS3(imageEntry, async () => {
-					const deleteEntry = await EntryWrapper.load(imageEntry.entryWithPayload);
-					await deleteEntry.setPayload(ByteString.empty(), env.users.user1.keys);
-					await putEntry(deleteEntry.entryWithPayload, 200);
+					const deleteImageEntry = await AuthorisedEntryWithPayload.setPayload(
+						imageEntry,
+						ByteString.empty(),
+						{
+							signData: env.users.user1.keys,
+						},
+					);
+					await putEntry(deleteImageEntry, 200);
 				});
 			});
 		});
@@ -879,22 +876,19 @@ describe(pushEndpoint, () => {
 					archivedReason: "a reason for archival",
 				});
 				const updateEntries = await member.flushDirtyEntries(env.users.user1.keys);
-				await putEntries(updateEntries.map((entry) => entry.entryWithPayload));
+				await putEntries(updateEntries);
 
 				await checkEntriesAreServed(updateEntries);
 			});
 
 			test("update member of another user fails 400", async () => {
-				const { member, entries } = await createMember(env.users.user1.keys);
-				const expectedEntries = entries.map((entry) => entry.entryWithPayload);
+				const { member, entries: expectedEntries } = await createMember(
+					env.users.user1.keys,
+				);
 
 				member.set("name", "a new name");
 				const updateEntries = await member.flushDirtyEntries(env.users.user2.keys);
-				await putEntries(
-					updateEntries.map((entry) => entry.entryWithPayload),
-					400,
-					env.users.user2,
-				);
+				await putEntries(updateEntries, 400, env.users.user2);
 
 				await checkEntriesAreServed(expectedEntries);
 				await checkEntriesAreNotServed(updateEntries);
@@ -905,7 +899,7 @@ describe(pushEndpoint, () => {
 				member.set("name", "a new name");
 
 				const entries = await member.flushDirtyEntries(env.users.user1.keys);
-				await putEntries(entries.map((entry) => entry.entryWithPayload));
+				await putEntries(entries);
 				await checkEntriesAreNotServed(entries);
 			});
 
@@ -934,7 +928,7 @@ describe(pushEndpoint, () => {
 
 			const originalImageEntry = entries.find((entry) =>
 				Path.endsWith(entry.path, Path.fromString("/image")),
-			)?.entryMaybeWithPayload;
+			);
 			assert(originalImageEntry);
 
 			member.set("image", undefined);
@@ -942,7 +936,7 @@ describe(pushEndpoint, () => {
 			const deleteImageEntry = (await member.flushDirtyEntries(env.users.user1.keys))[0];
 
 			await testPayloadIsDeletedFromS3(originalImageEntry, async () => {
-				await putEntry(deleteImageEntry.entryWithPayload, 200);
+				await putEntry(deleteImageEntry, 200);
 			});
 		});
 
@@ -957,21 +951,18 @@ describe(pushEndpoint, () => {
 
 			const originalImageEntry = entries.find((entry) =>
 				Path.endsWith(entry.path, Path.fromString("/image")),
-			)?.entryMaybeWithPayload;
+			);
 			assert(originalImageEntry);
 
 			const newPayload = ByteString.fromUtf8("smol");
-			const newImageEntry: AuthorisedEntryWithPayload = {
-				...(await AuthorisedEntry.create(
-					await Entry.setPayload(originalImageEntry, newPayload),
-					keys,
-				)),
-				payload: newPayload,
-			};
+			const newImageEntry: AuthorisedEntryWithPayload =
+				await AuthorisedEntryWithPayload.setPayload(originalImageEntry, newPayload, {
+					signData: keys,
+				});
 
 			// Insert the newest entry first
 			await putEntry(newImageEntry);
-			await putEntries(entries.map((entry) => entry.entryWithPayload));
+			await putEntries(entries);
 
 			await testEntryNotInS3(originalImageEntry);
 		});
@@ -1003,7 +994,7 @@ describe(pushEndpoint, () => {
 			const entries: AuthorisedEntryWithPayload[] = [
 				...(await timeModelEntries(members[0].member, 1n, user.keys)),
 				...(await timeModelEntries(members[1].member, 2n, user.keys)),
-				await EntryWrapper.create(
+				await AuthorisedEntryWithPayload.create(
 					OPENSELVES_NAMESPACE_ID,
 					user.keys.publicKey,
 					Path.fromString(
@@ -1014,7 +1005,7 @@ describe(pushEndpoint, () => {
 					user.keys,
 				),
 				...(await timeModelEntries(members[2].member, 4n, user.keys)),
-				await EntryWrapper.create(
+				await AuthorisedEntryWithPayload.create(
 					OPENSELVES_NAMESPACE_ID,
 					user.keys.publicKey,
 					Path.fromString(Path.toString(members[0].member.getPathRoot()) + "/pronouns"),
@@ -1023,7 +1014,7 @@ describe(pushEndpoint, () => {
 					user.keys,
 				),
 				await memberToDelete.makeDeleteEntry(user.keys, 6n),
-			].map((entry) => (entry instanceof EntryWrapper ? entry.entryWithPayload : entry));
+			];
 			members[2].member.assign({
 				pronouns: "they/them",
 				isArchived: true,
@@ -1107,10 +1098,8 @@ describe(pushEndpoint, () => {
 			const response = await getSyncFrom("");
 			assert(Array.isArray(response.entries));
 
-			const entries = await Promise.all(
-				response.entries
-					.filter((entry) => Path.extends(entry.path, member.getPathRoot()))
-					.map((entry) => EntryWrapper.load(entry, entry.payload)),
+			const entries = response.entries.filter((entry) =>
+				Path.extends(entry.path, member.getPathRoot()),
 			);
 			const reconstructedMember = new Member(member.subspaceId, entries);
 
@@ -1153,14 +1142,14 @@ describe(pushEndpoint, () => {
 				endedAt: new Date(),
 			});
 			const entries = await front.flushDirtyEntries(env.users.user1.keys);
-			await putEntries(entries.map((entry) => entry.entryWithPayload));
+			await putEntries(entries);
 			await checkEntriesAreServed(entries);
 		});
 
 		test("delete front", async () => {
 			const { front, entries } = await createFront(env.users.user1.keys);
 			const deleteEntry = await front.makeDeleteEntry(env.users.user1.keys);
-			await putEntry(deleteEntry.entryWithPayload);
+			await putEntry(deleteEntry);
 			await checkEntriesAreServed([deleteEntry]);
 			await checkEntriesAreNotServed(entries);
 		});

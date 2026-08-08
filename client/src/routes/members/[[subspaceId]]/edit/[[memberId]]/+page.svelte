@@ -152,11 +152,9 @@
 
 		await idbStore.ingest(
 			[
-				(
-					await memberObj.makePermanentDeleteEntry(
-						profile.getSignDataForSubspaceId(memberObj.subspaceId),
-					)
-				).entryWithPayload,
+				await memberObj.makePermanentDeleteEntry(
+					profile.getSignDataForSubspaceId(memberObj.subspaceId),
+				),
 			],
 			undefined,
 		);

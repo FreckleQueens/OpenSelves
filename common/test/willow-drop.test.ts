@@ -10,7 +10,6 @@ import {
 	type DropDecodeSingleStep,
 	type DropDecodeStep,
 	Ed25519,
-	EntryWrapper,
 	NamespaceId,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
@@ -50,27 +49,23 @@ function execSimpleDecodeSteps(encoded: ByteString, steps: DropDecodeStep[]) {
 describe("Willow drop format", () => {
 	test("Encode and decode header byte", async () => {
 		const keys1 = await Ed25519.generateKey();
-		const previousEntry = (
-			await EntryWrapper.create(
-				OPENSELVES_NAMESPACE_ID,
-				keys1.publicKey,
-				Path.fromString("/aa/bbb/cccc"),
-				1234n,
-				ByteString.fromUtf8("hello"),
-				keys1,
-			)
-		).entryWithPayload;
+		const previousEntry = await AuthorisedEntryWithPayload.create(
+			OPENSELVES_NAMESPACE_ID,
+			keys1.publicKey,
+			Path.fromString("/aa/bbb/cccc"),
+			1234n,
+			ByteString.fromUtf8("hello"),
+			keys1,
+		);
 		const keys2 = await Ed25519.generateKey();
-		const entry = (
-			await EntryWrapper.create(
-				OPENSELVES_NAMESPACE_ID,
-				keys2.publicKey,
-				Path.fromString("/aa/bbb/cccc/ddddd"),
-				1235n,
-				ByteString.fromUtf8("bye"),
-				keys2,
-			)
-		).entryWithPayload;
+		const entry = await AuthorisedEntryWithPayload.create(
+			OPENSELVES_NAMESPACE_ID,
+			keys2.publicKey,
+			Path.fromString("/aa/bbb/cccc/ddddd"),
+			1235n,
+			ByteString.fromUtf8("bye"),
+			keys2,
+		);
 		const encoded = Drop.encodeHeaderByte(previousEntry, entry);
 		const decoded = Drop.decodeHeaderByte(encoded.headerByte);
 		assert.strictEqual(decoded.hasNamespaceId, encoded.hasNamespaceId);
@@ -172,18 +167,16 @@ describe("Willow drop format", () => {
 
 	test("Full encode then decode", async () => {
 		const keys = await Ed25519.generateKey();
-		const entries: AuthorisedEntryWithPayload[] = (
-			await Promise.all([
-				EntryWrapper.create(
-					OPENSELVES_NAMESPACE_ID,
-					keys.publicKey,
-					Path.fromString("/aa/bbb/cccc"),
-					1234n,
-					ByteString.fromUtf8("hello"),
-					keys,
-				),
-			])
-		).map((entry) => entry.entryWithPayload);
+		const entries: AuthorisedEntryWithPayload[] = await Promise.all([
+			AuthorisedEntryWithPayload.create(
+				OPENSELVES_NAMESPACE_ID,
+				keys.publicKey,
+				Path.fromString("/aa/bbb/cccc"),
+				1234n,
+				ByteString.fromUtf8("hello"),
+				keys,
+			),
+		]);
 		const encoder = Drop.encoder();
 		const decoder = await Drop.decoder();
 

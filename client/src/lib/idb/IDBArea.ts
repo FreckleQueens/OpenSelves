@@ -7,8 +7,7 @@ import type {
 	EntryDataModelSchema,
 } from "openselves-common/client";
 import {
-	type AuthorisedEntryWithPayload,
-	EntryWrapper,
+	AuthorisedEntryWithPayload,
 	type Path,
 	StoreArea,
 	type SubspaceId,
@@ -30,10 +29,7 @@ export class IDBArea extends StoreArea<AuthorisedEntryWithPayload, IDBStoreConte
 		await model.flushDirtyEntries(
 			profile.getSignDataForSubspaceId(model.subspaceId),
 			async (entries) => {
-				await this.ingest(
-					entries.map((entry) => entry.entryWithPayload),
-					ctx,
-				);
+				await this.ingest(entries, ctx);
 			},
 		);
 	}
@@ -43,19 +39,15 @@ export class IDBArea extends StoreArea<AuthorisedEntryWithPayload, IDBStoreConte
 		Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
 	>(
 		model: {
-			new (subspaceId: SubspaceId, from: EntryWrapper[]): Model;
+			new (subspaceId: SubspaceId, from: AuthorisedEntryWithPayload[]): Model;
 		},
 		ctx?: IDBStoreContext,
 	) {
-		const entries = await Promise.all(
-			(
-				await IDB.getInstance().entries.getByPathPrefix(
-					this.store.namespaceId,
-					this.subspaceId,
-					this.area.path,
-					ctx?.tx,
-				)
-			).map((entry) => EntryWrapper.load(entry)),
+		const entries = await IDB.getInstance().entries.getByPathPrefix(
+			this.store.namespaceId,
+			this.subspaceId,
+			this.area.path,
+			ctx?.tx,
 		);
 		return entries.length > 0 ? new model(this.subspaceId, entries) : undefined;
 	}

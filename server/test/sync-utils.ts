@@ -7,8 +7,6 @@ import {
 	Capability,
 	CapabilityAccessMode,
 	Drop,
-	Entry,
-	EntryWrapper,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
 	type SubspaceId,
@@ -148,6 +146,10 @@ export async function getSyncFrom(
 		response.body.pipeThrough(await Drop.decoder()),
 	);
 
+	for (const entry of entries) {
+		assert(await AuthorisedEntryWithPayload.isValid(entry));
+	}
+
 	return {
 		response,
 		timestamp: responseTimestamp,
@@ -157,27 +159,21 @@ export async function getSyncFrom(
 
 export async function checkEntriesAreServed(
 	env: TestEnvWithUsers,
-	entries: (EntryWrapper | AuthorisedEntryWithPayload)[],
+	expectedEntries: AuthorisedEntryWithPayload[],
 	user: UserAuthData & {
 		keys: {
 			publicKey: UserPublicKey;
 		};
 	} = env.users.user1,
 ) {
-	assert(entries.length > 0);
+	assert(expectedEntries.length > 0);
 
 	const response = await getSyncFrom(env, "", user);
 
 	assert(response.entries);
 	assert(response.entries.length > 0);
 
-	const actualEntries = (
-		await Promise.all(response.entries.map((entry: unknown) => EntryWrapper.load(entry)))
-	).map((entry) => entry.entryMaybeWithPayload);
-
-	const expectedEntries = entries.map((entry) =>
-		entry instanceof EntryWrapper ? entry.entryWithPayload : entry,
-	);
+	const actualEntries = response.entries;
 	for (const expectedEntry of expectedEntries) {
 		const actualEntry = actualEntries.find((entry) =>
 			Path.equals(entry.path, expectedEntry.path),
@@ -189,7 +185,7 @@ export async function checkEntriesAreServed(
 
 export async function checkEntriesAreNotServed(
 	env: TestEnvWithUsers,
-	entries: (EntryWrapper | Entry | AuthorisedEntryWithPayload)[],
+	entries: AuthorisedEntryWithPayload[],
 	user: UserAuthData & {
 		keys: {
 			publicKey: UserPublicKey;
@@ -199,18 +195,10 @@ export async function checkEntriesAreNotServed(
 	const response = await getSyncFrom(env, "", user);
 	assert(response.entries);
 
-	const actualEntries = await Promise.all(
-		response.entries.map((entry: unknown) => EntryWrapper.load(entry)),
-	);
-
+	const actualEntries = response.entries;
 	for (const expectedEntry of entries) {
 		for (const actualEntry of actualEntries) {
-			assert.notDeepStrictEqual(
-				actualEntry.entryWithPayload,
-				expectedEntry instanceof EntryWrapper
-					? expectedEntry.entryWithPayload
-					: expectedEntry,
-			);
+			assert.notDeepStrictEqual(actualEntry, expectedEntry);
 		}
 	}
 }

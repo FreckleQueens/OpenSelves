@@ -1,6 +1,6 @@
 import { SchemaBuilder } from "../../../schema/index.js";
 import type { SchemaCreate, SchemaStatic, SchemaType } from "../../../schema/index.js";
-import { type EntryWrapper, SubspaceId } from "../../../willow/index.js";
+import { AuthorisedEntryWithPayload, SubspaceId } from "../../../willow/index.js";
 import { BaseSchema, EntryDataModel } from "../EntryDataModel.js";
 
 export const FrontSchema = Object.freeze({
@@ -20,7 +20,7 @@ export class Front extends EntryDataModel<typeof FrontSchema> {
 		return "front";
 	}
 
-	public constructor(subspaceId: SubspaceId, from: FrontCreate | EntryWrapper[]) {
+	public constructor(subspaceId: SubspaceId, from: FrontCreate | AuthorisedEntryWithPayload[]) {
 		super(FrontSchema, subspaceId, from);
 	}
 }
