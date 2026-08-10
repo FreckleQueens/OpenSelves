@@ -24,6 +24,17 @@ import { ByteString, Ed25519, OPENSELVES_NAMESPACE_ID } from "openselves-common/
 
 // TODO: make this file a static class `Api`
 
+export const navigatorOnlineState: {
+	online: boolean;
+} = $state({ online: navigator.onLine });
+
+window.addEventListener("online", () => {
+	navigatorOnlineState.online = true;
+});
+window.addEventListener("offline", () => {
+	navigatorOnlineState.online = false;
+});
+
 export const DEFAULT_API_URL =
 	dev || PUBLIC_TEST_ENVIRONMENT === "1" ? PUBLIC_DEFAULT_API_URL_DEV : PUBLIC_DEFAULT_API_URL;
 
@@ -400,7 +411,7 @@ export async function tryLogout(
 	if (wipeData) {
 		if (!forceWipe && SyncWorker.getInstance().hasEntriesToPush()) {
 			if (profile.isApiReachable() && Profile.hasCurrentProfile()) {
-				SyncWorker.getInstance().resume();
+				SyncWorker.getInstance().bootstrap();
 			}
 			scheduleOnlineCheck();
 			return false;
@@ -462,9 +473,6 @@ export function scheduleOnlineCheck(delay: number = 5000) {
 		try {
 			if (await profile.checkApiReachable()) {
 				reachable = true;
-				if (Profile.hasCurrentProfile()) {
-					SyncWorker.getInstance().resume();
-				}
 			}
 		} finally {
 			if (!reachable) {

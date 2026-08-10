@@ -38,6 +38,7 @@
 								onclick={async () => {
 									await goto(resolve(`/profiles/edit/${profileData.id}`));
 								}}
+								class="edit-button"
 							>
 								<EditIcon button before />
 								Edit

@@ -1,7 +1,7 @@
-import { call } from "$lib/api.svelte.js";
+import { call, navigatorOnlineState } from "$lib/api.svelte.js";
 import { IDB } from "$lib/idb";
 import { IDBStore } from "$lib/idb/IDBStore";
-import { Profile } from "$lib/idb/profiles";
+import { Profile, profilesState } from "$lib/idb/profiles";
 import { readStream } from "openselves-common";
 import {
 	type AuthorisedEntryWithPayload,
@@ -12,20 +12,16 @@ import {
 	Timestamp,
 } from "openselves-common/willow";
 
-let _running: boolean = $state(false);
 let _error: never | null = $state(null);
+const _canSync: boolean = $derived(
+	navigatorOnlineState.online &&
+		profilesState.hasCurrentProfile &&
+		profilesState.isSyncEnabled &&
+		profilesState.isApiReachable,
+);
 
-// TODO: never pause the sync process? (always check if syncing is possible for current profile)
 export class SyncWorker {
 	private static instance: SyncWorker;
-
-	public static get running() {
-		return _running;
-	}
-
-	private static set running(running: boolean) {
-		_running = running;
-	}
 
 	public static get error() {
 		return _error;
@@ -35,12 +31,16 @@ export class SyncWorker {
 		_error = error;
 	}
 
-	public static initialize(startOnline: boolean): void {
+	public static get canSync(): boolean {
+		return _canSync;
+	}
+
+	public static initialize(): void {
 		if (this.instance) {
 			throw new Error("SyncWorker already initialized");
 		}
 
-		this.instance = new SyncWorker(startOnline);
+		this.instance = new SyncWorker();
 	}
 
 	public static clearError() {
@@ -65,13 +65,8 @@ export class SyncWorker {
 
 	private shuttingDownPromise: Promise<void> | undefined = undefined;
 
-	protected constructor(running: boolean) {
-		this.running = running;
-		if (this.running) {
-			this.resume();
-		} else {
-			this.pause();
-		}
+	protected constructor() {
+		this.bootstrap();
 	}
 
 	public hasEntriesToPush() {
@@ -81,31 +76,23 @@ export class SyncWorker {
 	public setHasEntriesToPush() {
 		console.debug("entries to push notified, will try to push");
 		this._hasEntriesToPush = true;
-		if (this.running) {
-			this.scheduleSync();
-		}
+		this.scheduleSync();
 	}
 
-	public resume() {
-		console.debug("SyncWorker resumed");
-		this.running = true;
+	public bootstrap() {
+		console.debug("Starting SyncWorker...");
 		this.scheduleSync(100);
 	}
 
-	public pause() {
-		console.debug("SyncWorker paused");
-		this.running = false;
-		this.unscheduleSync();
-	}
-
 	public async shutdown(): Promise<void> {
+		console.debug("Shutting down SyncWorker...");
 		if (this.shuttingDownPromise) {
 			return this.shuttingDownPromise;
 		}
 
 		try {
 			await (this.shuttingDownPromise = (async () => {
-				this.pause();
+				this.unscheduleSync();
 				for (let attempts = 0; attempts < 3; attempts++) {
 					if (!this._hasEntriesToPush) {
 						break;
@@ -127,16 +114,8 @@ export class SyncWorker {
 		}
 	}
 
-	private get running() {
-		return SyncWorker.running;
-	}
-
-	private set running(online: boolean) {
-		SyncWorker.running = online;
-	}
-
 	private scheduleSync(delay: number = 1000) {
-		if (this.syncing || !this.running) {
+		if (this.syncing) {
 			return;
 		}
 
@@ -163,6 +142,10 @@ export class SyncWorker {
 	}
 
 	private async sync() {
+		if (!SyncWorker.canSync) {
+			return;
+		}
+
 		if (await this.push()) {
 			await this.pull();
 		} else {
@@ -171,16 +154,15 @@ export class SyncWorker {
 	}
 
 	private async push(): Promise<boolean> {
-		if (!Profile.hasCurrentProfile()) {
+		if (!SyncWorker.canSync) {
 			return false;
+		}
+
+		if (!this.hasEntriesToPush) {
+			return true;
 		}
 
 		const profile = Profile.getCurrentProfile();
-
-		if (!profile.isSyncEnabled()) {
-			return false;
-		}
-
 		const idb = IDB.getInstance();
 
 		let lastPushTimestamp: bigint = 0n;
@@ -211,8 +193,12 @@ export class SyncWorker {
 
 		const pendingEntries = await getPendingEntries();
 
+		if (!SyncWorker.canSync) {
+			return false;
+		}
+
 		if (pendingEntries.length > 0) {
-			console.debug("Entries to push:", pendingEntries);
+			console.debug("Pushing entries...", pendingEntries);
 
 			const encoder = Drop.encoder();
 			let result: { response: Response; responseBody?: Record<string, unknown> } | undefined;
@@ -251,7 +237,7 @@ export class SyncWorker {
 	}
 
 	private async pull(): Promise<void> {
-		if (!Profile.hasCurrentProfile()) {
+		if (!SyncWorker.canSync) {
 			return;
 		}
 

@@ -1,6 +1,6 @@
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { Settings } from "$lib/Settings";
-import { getApiStatus, openSession } from "$lib/api.svelte";
+import { getApiStatus } from "$lib/api.svelte";
 import { IDB } from "$lib/idb";
 import { ENTRY_STORE_NAME } from "$lib/idb/IDBEntry";
 import { KNOWN_SUBSPACE_STORE_NAME, type KnownSubspace } from "$lib/idb/IDBKnownSubspace";
@@ -8,7 +8,6 @@ import { PAYLOAD_STORE_NAME } from "$lib/idb/IDBPayload";
 import { PROFILE_STORE_NAME } from "$lib/idb/IDBProfile";
 import { SETTING_STORE_NAME } from "$lib/idb/IDBSetting";
 import { profilesState } from "$lib/idb/profiles/profiles-state.svelte.js";
-import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
 import { API_VERSION, GetStatusSchema } from "openselves-common";
 import {
 	SchemaBuilder,
@@ -26,6 +25,8 @@ import {
 	OPENSELVES_NAMESPACE_ID,
 	SubspaceId,
 } from "openselves-common/willow";
+
+import { SyncWorker } from "../sync";
 
 export type OwnSubspace = KnownSubspace & {
 	secretKey: Ed25519Sk;
@@ -70,6 +71,7 @@ export class Profile {
 		const currentProfileId = await Settings.get(Profile.CURRENT_PROFILE_ID_KEY);
 		await this.setCurrentProfile(currentProfileId || null);
 		this.currentProfileIdLoaded = true;
+		profilesState.hasCurrentProfile = this.hasCurrentProfile();
 	}
 
 	public static async loadProfilesData() {
@@ -81,18 +83,21 @@ export class Profile {
 		if (profileId === null) {
 			this.currentProfile = undefined;
 			await Settings.set(Profile.CURRENT_PROFILE_ID_KEY, undefined);
+			profilesState.hasCurrentProfile = false;
+			profilesState.isSyncEnabled = false;
+			profilesState.isApiReachable = false;
 		} else {
 			const profile = await Profile.getById(profileId);
 			await Settings.set(Profile.CURRENT_PROFILE_ID_KEY, profileId);
 			this.currentProfile = profile;
+			profilesState.hasCurrentProfile = true;
+			profilesState.isSyncEnabled = profile.isSyncEnabled();
+			profilesState.isApiReachable = profilesState.isSyncEnabled && profile.isApiReachable();
+
 			await this.dismissWarnForRemainingLocalData();
 
-			if (
-				profile.isSyncEnabled() &&
-				(await openSession(profile)) &&
-				SyncWorker.isInitialized()
-			) {
-				SyncWorker.getInstance().resume();
+			if (SyncWorker.isInitialized()) {
+				SyncWorker.getInstance().bootstrap();
 			}
 		}
 	}
@@ -182,7 +187,9 @@ export class Profile {
 		await this.loadProfilesData();
 	}
 
-	// TODO: cache profiles?
+	// TODO: get rid of profilesState, cache profiles on this class
+	//  OR
+	//  subscribe to profile model, and have a state subscribed to known subspaces model and delete this method
 	public static async getById(profileId: string): Promise<Profile> {
 		const data = profilesState.data.find((profile) => profile.id === profileId);
 		if (!data) {
@@ -331,13 +338,14 @@ export class Profile {
 	}
 
 	public async checkApiReachable() {
-		if (!this.data.api) {
+		if (!this.isSyncEnabled() || !this.data.api) {
 			throw new Error("Sync is not enabled");
 		}
 
 		console.debug("Checking for api...");
 
 		this.data.api.status = await getApiStatus(this.data.api.url);
+		profilesState.isApiReachable = this.isApiReachable();
 		await this.save();
 		return this.isApiReachable();
 	}
@@ -393,6 +401,9 @@ export class Profile {
 
 		// TODO: make this unnecessary
 		await Profile.loadProfilesData();
+
+		profilesState.isSyncEnabled = this.isSyncEnabled();
+		profilesState.isApiReachable = profilesState.isSyncEnabled && this.isApiReachable();
 	}
 
 	public async downloadRecoveryFile() {

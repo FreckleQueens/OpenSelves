@@ -13,7 +13,7 @@
 	import SettingsIcon from "$lib/components/icons/SettingsIcon.svelte";
 	import type { OSIconProps } from "$lib/components/os-icon";
 	import { activeSubscriptions } from "$lib/idb/entry-subscription.svelte";
-	import { Profile } from "$lib/idb/profiles";
+	import { profilesState } from "$lib/idb/profiles";
 	import { SyncWorker } from "$lib/idb/sync";
 	import {
 		Block,
@@ -163,9 +163,9 @@
 		<hr class="border-t-md-light-on-surface dark:border-t-md-dark-on-surface opacity-25" />
 		<Block>
 			<div class="flex items-center">
-				{#if !Profile.hasCurrentProfile()}
+				{#if !profilesState.isSyncEnabled}
 					Exclusive offline mode
-				{:else if SyncWorker.running}
+				{:else if SyncWorker.canSync}
 					Sync active (online)
 				{:else}
 					<DangerIcon before class="text-brand-red" /> Sync inactive (offline)
@@ -227,7 +227,7 @@
 		{@render bottomNav()}
 	{/if}
 
-	{#if Profile.hasCurrentProfile() && !SyncWorker.running}
+	{#if profilesState.hasCurrentProfile && profilesState.isSyncEnabled && !SyncWorker.canSync}
 		<div
 			class="p-2 pb-safe-2 justify-center flex items-center bg-md-light-surface text-md-light-on-surface dark:bg-md-dark-surface dark:text-md-dark-on-surface"
 			transition:fly={{ duration: 150, y: 16 }}

@@ -7,6 +7,8 @@ import { Profile } from "$lib/idb/profiles";
 import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
 import { API_VERSION, logPerformanceMarkDeltas } from "openselves-common";
 
+import { scheduleOnlineCheck } from "./api.svelte";
+
 if (PUBLIC_ENABLE_PERFORMANCE_LOGS === "1") {
 	logPerformanceMarkDeltas();
 }
@@ -24,20 +26,19 @@ export async function initApp() {
 	performance.mark("init.profiles");
 	await Profile.loadProfilesData();
 	await Profile.loadCurrentProfile();
+
+	if (Profile.hasCurrentProfile()) {
+		const profile = Profile.getCurrentProfile();
+		if (profile.isSyncEnabled() && !profile.isApiReachable()) {
+			scheduleOnlineCheck(0);
+		}
+	}
+
 	performance.mark("init.profiles");
 
 	// SyncWorker
 	performance.mark("init.syncworker");
-	SyncWorker.initialize(Profile.hasCurrentProfile() && navigator.onLine);
-
-	window.addEventListener("online", async () => {
-		if (Profile.hasCurrentProfile() && Profile.getCurrentProfile().isSyncEnabled()) {
-			SyncWorker.getInstance().resume();
-		}
-	});
-	window.addEventListener("offline", () => {
-		SyncWorker.getInstance().pause();
-	});
+	SyncWorker.initialize();
 	performance.mark("init.syncworker");
 
 	// i18n
