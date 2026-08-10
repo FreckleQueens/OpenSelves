@@ -64,12 +64,20 @@ async function waitForServerToComeOnline(urlBase: string) {
 	let checkInterval: NodeJS.Timeout | undefined;
 	let rejectTimeout: NodeJS.Timeout | undefined;
 	try {
+		let lastResponse: Response;
+		let lastError: unknown;
 		await Promise.race([
 			new Promise<void>((resolve, reject) => {
 				checkInterval = setInterval(() => {
 					(async () => {
-						const response = await fetch(urlBase + "/");
-						if (response.status === 406) {
+						try {
+							lastResponse = await fetch(urlBase + "/");
+						} catch (e) {
+							lastError = e;
+							return;
+						}
+
+						if (lastResponse.status === 406) {
 							resolve();
 						}
 					})().catch(reject);
@@ -78,7 +86,12 @@ async function waitForServerToComeOnline(urlBase: string) {
 			new Promise(
 				(resolve, reject) =>
 					(rejectTimeout = setTimeout(
-						() => reject(new Error("Server didn't start after 30s")),
+						() =>
+							reject(
+								new Error("Server didn't start after 30s", {
+									cause: { lastResponse, lastError },
+								}),
+							),
 						30000,
 					)),
 			),
