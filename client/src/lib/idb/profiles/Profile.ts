@@ -97,7 +97,7 @@ export class Profile {
 			await this.dismissWarnForRemainingLocalData();
 
 			if (SyncWorker.isInitialized()) {
-				SyncWorker.getInstance().bootstrap();
+				SyncWorker.bootstrap();
 			}
 		}
 	}

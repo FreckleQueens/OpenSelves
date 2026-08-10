@@ -51,12 +51,27 @@ export class SyncWorker {
 		return !!this.instance;
 	}
 
-	// TODO: make this private
-	public static getInstance(): SyncWorker {
+	private static getInstance(): SyncWorker {
 		if (!this.instance) {
 			throw new Error("SyncWorker not initialized");
 		}
 		return this.instance;
+	}
+
+	public static bootstrap() {
+		this.getInstance().bootstrap();
+	}
+
+	public static async shutdown() {
+		return this.getInstance().shutdown();
+	}
+
+	public static get hasEntriesToPush(): boolean {
+		return this.getInstance().hasEntriesToPush();
+	}
+
+	public static setHasEntriesToPush() {
+		this.getInstance().setHasEntriesToPush();
 	}
 
 	private _hasEntriesToPush: boolean = true;

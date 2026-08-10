@@ -406,14 +406,16 @@ export async function tryLogout(
 		clearTimeout(onlineCheckTimeout);
 		onlineCheckTimeout = undefined;
 	}
-	await SyncWorker.getInstance().shutdown();
+	await SyncWorker.shutdown();
 
 	if (wipeData) {
-		if (!forceWipe && SyncWorker.getInstance().hasEntriesToPush()) {
-			if (profile.isApiReachable() && Profile.hasCurrentProfile()) {
-				SyncWorker.getInstance().bootstrap();
+		if (!forceWipe && SyncWorker.hasEntriesToPush) {
+			if (
+				(profile.isApiReachable() || (await profile.checkApiReachable())) &&
+				Profile.hasCurrentProfile()
+			) {
+				SyncWorker.bootstrap();
 			}
-			scheduleOnlineCheck();
 			return false;
 		} else {
 			await Profile.wipeProfileData(profile.id);
