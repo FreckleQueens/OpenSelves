@@ -1,4 +1,4 @@
-import { call } from "$lib/api.svelte";
+import { Api } from "$lib/api.svelte";
 import type { CaptchaAction } from "$lib/components/captcha";
 import type { OSIconProps } from "$lib/components/os-icon";
 import { Profile } from "$lib/idb/profiles";
@@ -80,7 +80,7 @@ export async function submitOSForm(form: OSFormData, profile: Profile) {
 
 		let result: { response: Response; responseBody?: Record<string, unknown> } | undefined;
 		try {
-			result = await call(form.endpoint, {
+			result = await Api.call(form.endpoint, {
 				method: form.method || "POST",
 				data: form.data,
 				returnUnhandledResponses: true,

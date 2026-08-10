@@ -1,6 +1,6 @@
 import { WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY } from "$lib";
 import { Settings } from "$lib/Settings";
-import { getApiStatus } from "$lib/api.svelte";
+import { Api } from "$lib/api.svelte";
 import { IDB } from "$lib/idb";
 import { ENTRY_STORE_NAME } from "$lib/idb/IDBEntry";
 import { KNOWN_SUBSPACE_STORE_NAME, type KnownSubspace } from "$lib/idb/IDBKnownSubspace";
@@ -344,7 +344,7 @@ export class Profile {
 
 		console.debug("Checking for api...");
 
-		this.data.api.status = await getApiStatus(this.data.api.url);
+		this.data.api.status = await Api.getStatus(this.data.api.url);
 		profilesState.isApiReachable = this.isApiReachable();
 		await this.save();
 		return this.isApiReachable();

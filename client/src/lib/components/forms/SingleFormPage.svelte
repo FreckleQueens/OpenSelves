@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { scheduleOnlineCheck } from "$lib/api.svelte";
+	import { Api } from "$lib/api.svelte";
 	import ApiReachableGate from "$lib/components/ApiReachableGate.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import BackLink from "$lib/components/BackLink.svelte";
@@ -37,7 +37,7 @@
 
 	$effect(() => {
 		if (loaded) {
-			scheduleOnlineCheck(0);
+			Api.scheduleOnlineCheck(0);
 		}
 	});
 </script>

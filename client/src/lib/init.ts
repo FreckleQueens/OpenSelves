@@ -7,7 +7,7 @@ import { Profile } from "$lib/idb/profiles";
 import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
 import { API_VERSION, logPerformanceMarkDeltas } from "openselves-common";
 
-import { scheduleOnlineCheck } from "./api.svelte";
+import { Api } from "./api.svelte";
 
 if (PUBLIC_ENABLE_PERFORMANCE_LOGS === "1") {
 	logPerformanceMarkDeltas();
@@ -30,7 +30,7 @@ export async function initApp() {
 	if (Profile.hasCurrentProfile()) {
 		const profile = Profile.getCurrentProfile();
 		if (profile.isSyncEnabled() && !profile.isApiReachable()) {
-			scheduleOnlineCheck(0);
+			Api.scheduleOnlineCheck(0);
 		}
 	}
 

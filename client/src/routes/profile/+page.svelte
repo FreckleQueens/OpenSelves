@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { MenuItem } from "$lib";
-	import { tryLogout } from "$lib/api.svelte";
+	import { Api } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import DatumCard from "$lib/components/DatumCard.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
@@ -44,7 +44,7 @@
 
 		let loggedOut: boolean;
 		try {
-			loggedOut = await tryLogout(profile, wipeData, forceWipe);
+			loggedOut = await Api.tryLogout(profile, wipeData, forceWipe);
 		} catch (e) {
 			throw new Error("Couldn't logout", { cause: e });
 		}

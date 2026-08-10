@@ -1,4 +1,4 @@
-import { call, navigatorOnlineState } from "$lib/api.svelte.js";
+import { Api, navigatorOnlineState } from "$lib/api.svelte.js";
 import { IDB } from "$lib/idb";
 import { IDBStore } from "$lib/idb/IDBStore";
 import { Profile, profilesState } from "$lib/idb/profiles";
@@ -226,7 +226,7 @@ export class SyncWorker {
 						}
 						await writer.close();
 					})(),
-					call("/sync/push", {
+					Api.call("/sync/push", {
 						method: "PUT",
 						data: encoder.readable,
 					}),
@@ -264,7 +264,7 @@ export class SyncWorker {
 		}
 
 		const lastPullTimestamp = profile.pullTimestamp || "";
-		const result = await call("/sync/pull", {
+		const result = await Api.call("/sync/pull", {
 			method: "POST",
 			data: {
 				timestamp: lastPullTimestamp,

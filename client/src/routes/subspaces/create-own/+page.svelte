@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { openSession } from "$lib/api.svelte";
+	import { Api } from "$lib/api.svelte";
 	import AppPage from "$lib/components/AppPage.svelte";
 	import ContinueIcon from "$lib/components/icons/ContinueIcon.svelte";
 	import DangerIcon from "$lib/components/icons/DangerIcon.svelte";
@@ -46,7 +46,7 @@
 		isOpeningSession = true;
 		try {
 			if (profile && profile.isSyncEnabled()) {
-				await openSession(profile);
+				await Api.openSession(profile);
 			}
 		} finally {
 			await gotoHomeRoute({ subspace_setup_finish: "1" });
