@@ -184,7 +184,7 @@ export class Profile {
 			await Settings.delete(WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY);
 		}
 
-		await this.loadProfilesData();
+		profilesState.data = profilesState.data.filter((data) => data.id !== profileId);
 	}
 
 	// TODO: get rid of profilesState, cache profiles on this class
@@ -359,7 +359,6 @@ export class Profile {
 		};
 		this._knownSubspaces.push(subspace);
 		await IDB.getInstance().knownSubspaces.put(subspace);
-		await Profile.loadProfilesData();
 	}
 
 	public getReadCapabilities(): Capability[] {
@@ -399,8 +398,8 @@ export class Profile {
 			}
 		});
 
-		// TODO: make this unnecessary
-		await Profile.loadProfilesData();
+		profilesState.data = profilesState.data.filter((data) => data.id !== this.data.id);
+		profilesState.data.push(this.data);
 
 		profilesState.isSyncEnabled = this.isSyncEnabled();
 		profilesState.isApiReachable = profilesState.isSyncEnabled && this.isApiReachable();
