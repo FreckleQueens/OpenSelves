@@ -1,16 +1,16 @@
 import {
 	type AnyFieldTypesValue,
-	type BooleanFieldType,
-	type DateFieldType,
+	BooleanFieldType,
+	DateFieldType,
 	type FieldType,
 	type FieldTypeValue,
 	type FieldTypes,
-	type NumberFieldType,
+	NumberFieldType,
 	RecordFieldType,
 	type SchemaField,
 	SchemaFieldType,
 	type SchemaType,
-	type StringFieldType,
+	StringFieldType,
 } from "./types.js";
 
 export class SchemaBuilder<
@@ -20,52 +20,16 @@ export class SchemaBuilder<
 	HasDefault extends boolean = false,
 > implements SchemaField<Field, IsOptional, IsNullable, HasDefault> {
 	public static string() {
-		return new SchemaBuilder<StringFieldType>(
-			[
-				{
-					name: "string",
-				},
-			],
-			true,
-			false,
-			false,
-		);
+		return new SchemaBuilder<StringFieldType>([StringFieldType], true, false, false);
 	}
 	public static boolean() {
-		return new SchemaBuilder<BooleanFieldType>(
-			[
-				{
-					name: "boolean",
-				},
-			],
-			true,
-			false,
-			false,
-		);
+		return new SchemaBuilder<BooleanFieldType>([BooleanFieldType], true, false, false);
 	}
 	public static number() {
-		return new SchemaBuilder<NumberFieldType>(
-			[
-				{
-					name: "number",
-				},
-			],
-			true,
-			false,
-			false,
-		);
+		return new SchemaBuilder<NumberFieldType>([NumberFieldType], true, false, false);
 	}
 	public static date() {
-		return new SchemaBuilder<DateFieldType>(
-			[
-				{
-					name: "Date",
-				},
-			],
-			true,
-			false,
-			false,
-		);
+		return new SchemaBuilder<DateFieldType>([DateFieldType], true, false, false);
 	}
 
 	public static record<ValueField extends SchemaField>(valueField: ValueField) {
