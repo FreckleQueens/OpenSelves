@@ -13,7 +13,12 @@ import {
 } from "../../schema/index.js";
 import type { KeyOfSchema, SchemaCreate, SchemaStatic, SchemaType } from "../../schema/types.js";
 import { Path } from "../../willow/Path.js";
-import { AuthorisedEntryWithPayload, PathComponent, UInt64 } from "../../willow/index.js";
+import {
+	AuthorisedEntryWithPayload,
+	ByteString,
+	PathComponent,
+	UInt64,
+} from "../../willow/index.js";
 import { SubspaceId, Timestamp } from "../../willow/index.js";
 import { type CapabilitySignData, OPENSELVES_NAMESPACE_ID } from "../../willow/index.js";
 import {
@@ -216,11 +221,9 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 			this.pendingEntryMutations.splice(this.pendingEntryMutations.indexOf(mutation), 1);
 		}
 
-		if (
-			!this.entries[key] ||
-			typeof this.entries[key].payload !== "string" ||
-			value !== deserializeValueFromPayload(this.schema, key, this.entries[key].payload)
-		) {
+		const oldValue = this.entries[key]?.payload;
+		const newValue = serializeValueToPayload(this.schema, key, value);
+		if (!ByteString.equals(oldValue, newValue)) {
 			this.pendingEntryMutations.push([timestamp, key, value]);
 		}
 
