@@ -216,7 +216,10 @@ export class IDBEntry {
 			},
 			tx,
 		);
-		SyncWorker.setHasEntriesToPush();
+
+		if (markForSync) {
+			SyncWorker.setHasEntriesToPush();
+		}
 	}
 
 	private async loadPayload(
