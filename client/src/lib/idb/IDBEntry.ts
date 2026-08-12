@@ -117,7 +117,7 @@ export class IDBEntry {
 								false,
 								true,
 							)
-						: IDBKeyRange.lowerBound([namespaceId, subspaceId, pathPrefix]),
+						: IDBKeyRange.only([namespaceId, subspaceId, pathPrefix]),
 					undefined,
 					tx,
 				);
@@ -153,11 +153,20 @@ export class IDBEntry {
 				const records = await this.idb.getByIndex(
 					ENTRY_STORE_NAME,
 					"namespaceIdSubspaceIdSavedAt",
-					IDBKeyRange.lowerBound([
-						namespaceId,
-						subspaceId,
-						Timestamp.padForLexicographicalOrder(savedAtTimestamp),
-					]),
+					IDBKeyRange.bound(
+						[
+							namespaceId,
+							subspaceId,
+							Timestamp.padForLexicographicalOrder(savedAtTimestamp),
+						],
+						[
+							namespaceId,
+							subspaceId,
+							Timestamp.padForLexicographicalOrder(Timestamp.MAX_VALUE),
+						],
+						false,
+						false,
+					),
 					undefined,
 					tx,
 				);
