@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PersonIcon from "$lib/components/icons/PersonIcon.svelte";
-	import type { MemberStatic } from "openselves-common/client";
+	import { getMemberImageUrl } from "$lib/idb/model-utils.svelte";
+	import { type MemberStatic } from "openselves-common/client";
 	import { type Snippet } from "svelte";
 
 	let {
@@ -20,7 +21,9 @@
 		showMemberColor?: boolean;
 	} = $props();
 
-	let memberImageUrl: string | undefined = $derived(member?.image);
+	// svelte-ignore state_referenced_locally
+	const memberState: { member?: MemberStatic } = $state({ member });
+	let memberImageState = $derived.by(getMemberImageUrl(memberState));
 
 	let showChildren = $state(false);
 </script>
@@ -43,9 +46,9 @@
 		}}
 		{...restProps}
 	>
-		{#if member && memberImageUrl}
+		{#if member && memberImageState.url}
 			<img
-				src={memberImageUrl}
+				src={memberImageState.url}
 				alt={t("{member.name}'s profile picture", member.name)}
 				class="w-full h-full object-cover"
 			/>

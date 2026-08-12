@@ -24,12 +24,13 @@
 	import { localeState } from "$lib/i18n/i18n";
 	import { IDBStore } from "$lib/idb/IDBStore";
 	import { proxyEntryDataModel } from "$lib/idb/entry-subscription.svelte.js";
+	import { getMemberImageUrl } from "$lib/idb/model-utils.svelte";
 	import { Profile } from "$lib/idb/profiles";
 	import { requireCurrentProfile } from "$lib/routing-utils";
 	import { filesize } from "filesize";
 	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toast, Toggle } from "konsta/svelte";
-	import { Member, type MemberStatic } from "openselves-common/client";
+	import { Member, type MemberStatic, Payload } from "openselves-common/client";
 	import {
 		ByteString,
 		MAX_IN_DB_PAYLOAD_LENGTH,
@@ -44,32 +45,76 @@
 
 	const { params }: PageProps = $props();
 
+	// TODO: profileState = $derived.by(requireCurrentProfile())
 	let profile: Profile | undefined = $state();
-
-	let memberLoaded = $state(false);
-
-	// svelte-ignore state_referenced_locally
-	let subspaceId: SubspaceId = params.subspaceId
-		? SubspaceId.fromHex(params.subspaceId)
-		: Profile.getCurrentProfile().defaultSubspace.subspaceId;
-	let memberObj: Member = $state(new Member(subspaceId, {}));
-	// svelte-ignore state_referenced_locally
-	let initialData = $state(memberObj.data);
-	let member: MemberStatic = $derived(proxyEntryDataModel(memberObj));
-
-	let isDirty = $derived(JSON.stringify(member) !== JSON.stringify(initialData));
 	let formState: FormValidationState = $state({
 		errors: {},
 		generalError: "",
 	});
 	let activeTab: "info" | "settings" = $state("info");
-	let editImageUrl = $state(false);
-	let imageFiles: FileList | undefined = $state();
-	let imageFileInputEl: HTMLInputElement | undefined = $state();
 	let deleteRecordButton: Snippet | null = $state(null);
 
+	let subspaceId: SubspaceId = $derived(
+		params.subspaceId
+			? SubspaceId.fromHex(params.subspaceId)
+			: Profile.getCurrentProfile().defaultSubspace.subspaceId,
+	);
+	let memberLoaded = $state(false);
+	let loadedMemberObj: Member | undefined = $state();
+	let memberObj: Member = $derived(loadedMemberObj || new Member(subspaceId, {}));
+
+	let member = $derived(proxyEntryDataModel(memberObj));
+
+	let initialData = $state();
+	let isDirty = $derived(JSON.stringify(member) !== JSON.stringify(initialData));
+	$effect(() => {
+		if (memberObj) {
+			initialData = memberObj.data;
+		}
+	});
+
+	// Image
+	let imageFileInputEl: HTMLInputElement | undefined = $state();
+	const memberState: { member?: MemberStatic } = $state({});
+	$effect(() => {
+		memberState.member = member;
+	});
+	let memberImageState = $derived.by(getMemberImageUrl(memberState));
+
+	let showEditImageInput = $state(false);
+	let isImageUrlInputMode = $derived(
+		!memberImageState.url || !memberImageState.url.startsWith("blob:"),
+	);
 	let showRemoteImageErrorToast: boolean = $state(false);
 	let saveRemoteImageError: string | undefined = $state();
+
+	let memberImageUrlInput: string | undefined = $state();
+
+	let imageFiles: FileList | undefined = $state();
+	let selectedFile: File | null = $derived.by(() => {
+		if (imageFiles) {
+			const file = imageFiles.item(0);
+			if (file) {
+				const maxSizeForDataUrl = (MAX_IN_DB_PAYLOAD_LENGTH * 3) / 4;
+				const maxFileSize = Math.max(
+					(profile?.isSyncEnabled() && profile.api.status?.maxUploadSize) || 0,
+					maxSizeForDataUrl,
+				);
+				if (file.size > maxFileSize) {
+					formState.errors["image"] = t(
+						"This file is too big! (max {file.size})",
+						filesize(maxFileSize, {
+							locale: localeState.locale || true,
+						}),
+					);
+					return null;
+				}
+
+				return file;
+			}
+		}
+		return null;
+	});
 
 	requireCurrentProfile().then((loadedProfile) => {
 		if (loadedProfile) {
@@ -85,8 +130,7 @@
 					if (!loadedMember) {
 						return goto(resolve("/members"));
 					}
-					memberObj = loadedMember;
-					initialData = loadedMember.data;
+					loadedMemberObj = loadedMember;
 					memberLoaded = true;
 				});
 			} else {
@@ -96,38 +140,12 @@
 	});
 
 	$effect(() => {
-		if (!imageFiles) {
-			return;
-		}
-
-		const file = imageFiles.item(0);
-		if (!file) {
-			return;
-		}
-
-		const maxSizeForDataUrl = (MAX_IN_DB_PAYLOAD_LENGTH * 3) / 4;
-		const maxFileSize = Math.max(
-			(profile?.isSyncEnabled() && profile.api.status?.maxUploadSize) || 0,
-			maxSizeForDataUrl,
-		);
-		if (file.size > maxFileSize) {
-			formState.errors["image"] = t(
-				"This file is too big! (max {file.size})",
-				filesize(maxFileSize, {
-					locale: localeState.locale || true,
-				}),
+		if (selectedFile || memberImageUrlInput !== undefined) {
+			setImage(
+				selectedFile ||
+					(memberImageUrlInput ? ByteString.fromUtf8(memberImageUrlInput) : undefined),
 			);
-			return;
 		}
-
-		file.bytes()
-			.then((bytes) => {
-				member.image = ByteString.toUtf8(bytes);
-			})
-			.catch((err) => {
-				console.error(err);
-				formState.errors["image"] = t("Error while loading file {file.name}", file.name);
-			});
 	});
 
 	async function saveMember() {
@@ -136,7 +154,7 @@
 		}
 
 		let image = member.image ? member.image : null;
-		if (image && image.startsWith("data:") && !isDataURI(image)) {
+		if (image && typeof image === "string" && image.startsWith("data:") && !isDataURI(image)) {
 			formState.errors["image"] = t("Image url must be a valid data uri");
 			return false;
 		}
@@ -160,17 +178,29 @@
 		);
 	}
 
+	async function setImage(val: ByteString | Blob | undefined) {
+		if (val) {
+			const encodedImage = await Payload.encodeByteStringOrBlob(val);
+			member.image = encodedImage.toBase64();
+		} else {
+			member.image = undefined;
+			memberImageUrlInput = "";
+			imageFiles = undefined;
+		}
+		formState.errors["image"] = "";
+	}
+
 	async function downloadRemoteImage() {
 		if (!profile) {
 			throw new Error("Profile not loaded");
 		}
 
 		const url = member.image;
-		if (!url || !isUrl(url)) {
-			throw new Error("member image is not a url");
+		if (typeof url !== "string" || !isUrl(url)) {
+			throw new Error("member image is not a url", { cause: url });
 		}
 
-		let result: string;
+		let result: Blob;
 		try {
 			const response = await fetch(url, {
 				credentials: url.startsWith(profile.api.url) ? "include" : undefined,
@@ -183,22 +213,7 @@
 					},
 				});
 			}
-			const blob = await response.blob();
-
-			const fileReader = new FileReader();
-			result = await new Promise((resolve, reject) => {
-				fileReader.onload = () => {
-					const result = fileReader.result?.toString() || "";
-					if (result) {
-						resolve(result);
-					}
-				};
-				fileReader.onerror = () => {
-					reject(fileReader.error);
-				};
-				// TODO: save as blob, load with URL.createObjectURL()
-				fileReader.readAsDataURL(blob);
-			});
+			result = await response.blob();
 			console.log(response.ok, result);
 		} catch (e) {
 			console.log("Error while saving remote image", e);
@@ -214,7 +229,7 @@
 			return;
 		}
 
-		member.image = result;
+		setImage(result);
 	}
 </script>
 
@@ -257,50 +272,58 @@
 					id="edit-image-url-button"
 					class="p-2"
 					type="button"
-					onclick={() => (editImageUrl = !editImageUrl)}
+					onclick={() => (showEditImageInput = !showEditImageInput)}
 				>
 					<EditIcon button />
 				</Button>
 			</div>
 		</MemberImage>
 
-		<List class={editImageUrl ? "" : "hidden"}>
-			{@const disabled = !!(member.image && isDataURI(member.image))}
-			<ListInput
-				type="url"
-				name="image"
-				label={t("Image url")}
-				floatingLabel
-				maxlength={MAX_IN_DB_PAYLOAD_LENGTH.toString()}
-				bind:value={member.image}
-				error={formState.errors["image"] || ""}
-				{disabled}
-				class={disabled ? "hidden" : ""}
-			>
-				{#snippet media()}
-					<ImageIcon input />
-				{/snippet}
-			</ListInput>
+		<List class={showEditImageInput ? "" : "hidden"}>
+			{@const disabled = !!(
+				member.image &&
+				typeof member.image === "string" &&
+				isDataURI(member.image)
+			)}
+			{#if isImageUrlInputMode}
+				<ListInput
+					type="url"
+					name="image"
+					label={t("Image url")}
+					floatingLabel
+					maxlength={MAX_IN_DB_PAYLOAD_LENGTH.toString()}
+					bind:value={memberImageUrlInput}
+					error={formState.errors["image"] || ""}
+					{disabled}
+					class={disabled ? "hidden" : ""}
+					clearButton={!!member.image}
+					onClear={() => setImage(undefined)}
+				>
+					{#snippet media()}
+						<ImageIcon input />
+					{/snippet}
+				</ListInput>
+			{/if}
 
 			<li class="m-4 text-center">
 				<div class:hidden={!disabled} class="text-brand-red">
 					{formState.errors["image"] || ""}
 				</div>
-				<Button
-					inline
-					tonal
-					class={"m-2" + ((member.image?.length || 0) > 0 ? "" : " hidden")}
-					type="button"
-					onclick={() => {
-						member.image = undefined;
-						formState.errors["image"] = "";
-					}}
-				>
-					<ClearIcon button before />
-					Remove image
-				</Button>
+				{#if !isImageUrlInputMode}
+					<Button
+						inline
+						tonal
+						class={"m-2" +
+							(member.image || (member.image?.length || 0) > 0 ? "" : " hidden")}
+						type="button"
+						onclick={() => setImage(undefined)}
+					>
+						<ClearIcon button before />
+						Remove image
+					</Button>
+				{/if}
 
-				{#if member.image && isUrl(member.image)}
+				{#if member.image && typeof member.image === "string" && isUrl(member.image)}
 					<Button inline tonal class="m-2" type="button" onclick={downloadRemoteImage}>
 						<DownloadIcon button before />
 						Make available offline
