@@ -28,7 +28,9 @@ export function setupPuppeteer() {
 
 	before(() => {
 		if (!fs.existsSync(TEST_FAILURE_DIR)) {
-			fs.mkdirSync(TEST_FAILURE_DIR);
+			fs.mkdirSync(TEST_FAILURE_DIR, {
+				recursive: true,
+			});
 		} else {
 			const stats = fs.statSync(TEST_FAILURE_DIR);
 			if (stats.isFile()) {
