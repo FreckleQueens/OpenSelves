@@ -78,6 +78,7 @@
 	{/if}
 
 	{#if !isCreatingSubspace && !isOpeningSession}
+		<!-- TODO: don't ask user to download recovery file when sync is disabled? -->
 		<Block class="text-lg">
 			<p class="m-4">
 				When synchronization is enabled, an encrypted copy of your data is kept on the
