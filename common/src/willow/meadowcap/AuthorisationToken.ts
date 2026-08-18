@@ -55,9 +55,7 @@ export class AuthorisationToken {
 			});
 		}
 
-		if (
-			!Area.includesEntry(CommunalCapability.getGrantedArea(val.capability.inner), rel.entry)
-		) {
+		if (!Area.includesEntry(Capability.getGrantedArea(val.capability.inner), rel.entry)) {
 			throw new Error("entry isn't included in capability's granted area", {
 				cause: {
 					val,
@@ -67,7 +65,7 @@ export class AuthorisationToken {
 		}
 
 		let encodedCapability: ByteString;
-		if (CommunalCapability.isCommunalCapability(val.capability.inner)) {
+		if (CommunalCapability.is(val.capability.inner)) {
 			encodedCapability = CommunalCapability.encodeCommunalCapabilityRelative(
 				val.capability.inner,
 				rel,
@@ -131,7 +129,7 @@ export class AuthorisationToken {
 		}
 
 		let encodedCapability: ByteString;
-		if (CommunalCapability.isCommunalCapability(val.capability.inner)) {
+		if (CommunalCapability.is(val.capability.inner)) {
 			encodedCapability = CommunalCapability.encodeCommunalCapabilityEntryRelative(
 				val.capability.inner,
 				rel,

@@ -1,4 +1,4 @@
-import type { ByteProvider } from "./ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 
 export class UInt64 extends BigInt {
@@ -27,7 +27,10 @@ export class UInt64 extends BigInt {
 		return raw >= 0 && raw <= UInt64.MAX_VALUE;
 	}
 
-	public static encodeToVariable(
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#compact_integers
+	 */
+	public static toCompactEncoding(
 		input: UInt64,
 		tagWidth: number,
 	): {
@@ -52,22 +55,23 @@ export class UInt64 extends BigInt {
 		const bytes = new Uint8Array(
 			Array(8)
 				.fill(0)
-				.map((_, index) => Number((n >> BigInt(index * 8)) & 0b1111_1111n)),
+				.map((_, index) => Number((n >> BigInt(index * 8)) & 0b1111_1111n))
+				.reverse(),
 		);
 		if (n < 256) {
 			return {
 				tag: 2 ** tagWidth - 4,
-				additionalBytes: bytes.slice(0, 1),
+				additionalBytes: bytes.slice(bytes.length - 1),
 			};
 		} else if (n < 256 ** 2) {
 			return {
 				tag: 2 ** tagWidth - 3,
-				additionalBytes: bytes.slice(0, 2),
+				additionalBytes: bytes.slice(bytes.length - 2),
 			};
 		} else if (n < 256 ** 4) {
 			return {
 				tag: 2 ** tagWidth - 2,
-				additionalBytes: bytes.slice(0, 4),
+				additionalBytes: bytes.slice(bytes.length - 4),
 			};
 		} else {
 			return {
@@ -78,7 +82,7 @@ export class UInt64 extends BigInt {
 	}
 
 	public static encodeToVariable8(input: UInt64): ByteString {
-		const parts = UInt64.encodeToVariable(input, 8);
+		const parts = UInt64.toCompactEncoding(input, 8);
 		return ByteString.concat(new Uint8Array([parts.tag]), parts.additionalBytes);
 	}
 
@@ -92,6 +96,9 @@ export class UInt64 extends BigInt {
 		}
 	}
 
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#compact_integers
+	 */
 	public static encodeVariable(
 		val: UInt64,
 		headerByte: number,
@@ -113,7 +120,7 @@ export class UInt64 extends BigInt {
 			});
 		}
 
-		const { tag, additionalBytes } = UInt64.encodeToVariable(val, tagWidth);
+		const { tag, additionalBytes } = UInt64.toCompactEncoding(val, tagWidth);
 
 		const headerResult = headerByte | (tag << (8 - (bitBigEndianPosition + tagWidth)));
 
@@ -151,6 +158,17 @@ export class UInt64 extends BigInt {
 			value = UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength));
 		}
 
+		const expectedTag = this.toCompactEncoding(value, tagWidth).tag;
+		if (tag !== expectedTag) {
+			throw new InvalidInputError("Tag is not minimal for value", {
+				cause: {
+					tag,
+					value,
+					expectedTag,
+				},
+			});
+		}
+
 		return value;
 	}
 
@@ -170,10 +188,12 @@ export class UInt64 extends BigInt {
 	}
 
 	public static decodeVariableAdditionalBytes(bytes: ByteString): UInt64 {
-		return bytes.reduce(
-			(previousValue, currentValue, index) =>
-				previousValue | (BigInt(currentValue) << BigInt(index * 8)),
-			0n,
-		);
+		return bytes
+			.reverse()
+			.reduce(
+				(previousValue, currentValue, index) =>
+					previousValue | (BigInt(currentValue) << BigInt(index * 8)),
+				0n,
+			);
 	}
 }

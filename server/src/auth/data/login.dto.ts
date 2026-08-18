@@ -1,5 +1,5 @@
 import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
-import { type ByteString, Ed25519Signature } from "openselves-common/willow";
+import { Ed25519Signature } from "openselves-common/willow";
 
 import { IsByteString } from "../../sync/data/is-byte-string.decorator.js";
 
@@ -9,7 +9,7 @@ export class LoginDto {
 	public readonly challenge!: string;
 
 	@IsByteString(Ed25519Signature.LENGTH)
-	public readonly signature!: ByteString;
+	public readonly signature!: Ed25519Signature;
 
 	@IsBoolean()
 	@IsOptional()

@@ -37,12 +37,6 @@ export class Delegation {
 		};
 	}
 
-	public static getFinalDelegation(
-		capability: CommunalCapability | OwnedCapability,
-	): Delegation | undefined {
-		return capability.delegations[capability.delegations.length - 1];
-	}
-
 	public static getLongestCommonPrefixLength(
 		a: CommunalCapability | OwnedCapability,
 		b: CommunalCapability | OwnedCapability,

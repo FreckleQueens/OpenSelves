@@ -1,0 +1,3 @@
+[submodule "common/test/willow_test_vectors"]
+	path = common/test/willow_test_vectors
+	url = https://codeberg.org/worm-blossom/willow_test_vectors.git

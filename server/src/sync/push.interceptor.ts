@@ -15,6 +15,7 @@ import {
 	type AuthorisedEntryWithPayload,
 	ByteString,
 	Drop,
+	OPENSELVES_NAMESPACE_ID,
 } from "openselves-common/willow";
 import { Observable } from "rxjs";
 
@@ -114,6 +115,14 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 					}
 					if (!req.accessTokenPayload) {
 						throw new Error("accessTokenPayload went missing");
+					}
+					if (!ByteString.equals(value.namespaceId, OPENSELVES_NAMESPACE_ID)) {
+						throw new BadRequestException("Invalid namespaceId", {
+							cause: {
+								actual: value.namespaceId,
+								expected: OPENSELVES_NAMESPACE_ID,
+							},
+						});
 					}
 					if (!(await AuthorisedEntry.isAuthorisedWrite(value))) {
 						throw new BadRequestException("Received an entry with invalid signature", {

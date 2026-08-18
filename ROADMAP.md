@@ -291,6 +291,7 @@ a short-lived one
     - [x] Migrate IndexedDB
     - [x] use `performance.timeOrigin + performance.now()` to get timestamp
     - [ ] add `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers to increase timestamp precision
+  - [x] test willow lib with vectors from official repo
 - [ ] encryption (client side)
   - [ ] make sure the password is never sent to the server (srp? opaque?)
   - [ ] use PBKDF2 to derive the KEK from the password, store it securely (idb?)

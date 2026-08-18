@@ -268,7 +268,9 @@ export class SyncWorker {
 			method: "POST",
 			data: {
 				timestamp: lastPullTimestamp,
-				capabilities: capabilities.map((cap) => Capability.encode(cap).toBase64()),
+				capabilities: await Promise.all(
+					capabilities.map(async (cap) => (await Capability.encode(cap)).toBase64()),
+				),
 			},
 		});
 

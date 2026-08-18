@@ -4,7 +4,7 @@
 		"clean": "rm -rf dist",
 		"build": "yarn build:src && yarn build:tests",
 		"build:src": "mkdir -p src/generated && cp ../package.json src/generated/rootPackage.json && yarn tsc",
-		"build:tests": "cd ../common/test && rm -rf dist && yarn tsc && cd ..",
+		"build:tests": "cd ../common/test && rm -rf dist && yarn tsc && cp -r willow_test_vectors dist/test/willow_test_vectors && cd ..",
 		"test": "yarn build && node --enable-source-maps --experimental-test-module-mocks --test test/dist/test/**/*.test.js",
 		"test:only": "yarn build && node --enable-source-maps --experimental-test-module-mocks --test-only --test test/dist/test/**/*.test.js",
 		"dev": "yarn build:src --watch",

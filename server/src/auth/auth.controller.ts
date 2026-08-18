@@ -14,7 +14,7 @@ import { JwtService } from "@nestjs/jwt";
 import { createId } from "@paralleldrive/cuid2";
 import type { Request, Response } from "express";
 import { MISSING_REFRESH_TOKEN_COOKIE, SESSION_EXPIRED_ERROR } from "openselves-common";
-import { ByteString, Ed25519 } from "openselves-common/willow";
+import { ByteString, Ed25519, UserPublicKey } from "openselves-common/willow";
 
 import { Captcha } from "../captcha/decorators/captcha.decorator.js";
 import { type ConfigData } from "../config.data.js";
@@ -64,7 +64,7 @@ export class AuthController {
 			throw new UnauthorizedException("Invalid challenge payload", { cause: e });
 		}
 
-		const userKey = ByteString.fromBase64(challengePayload.userKey);
+		const userKey = UserPublicKey.fromBase64(challengePayload.userKey);
 		if (
 			!(await Ed25519.verify(
 				userKey,

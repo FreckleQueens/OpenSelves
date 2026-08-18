@@ -340,8 +340,8 @@ export class SyncService {
 					if (!NamespaceId.equals(namespaceId, OPENSELVES_NAMESPACE_ID)) {
 						throw new Error("Got unexpected namespace");
 					}
-					const subspaceId = Capability.getGrantedSubspace(capability);
 					const area = Capability.getGrantedArea(capability);
+					const subspaceId = area.subspaceId;
 					if (!SubspaceId.equals(area.subspaceId, subspaceId)) {
 						throw new Error("Got unexpected granted area subspace");
 					}

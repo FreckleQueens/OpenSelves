@@ -9,10 +9,12 @@ import {
 	AuthorisedEntryWithPayload,
 	ByteString,
 	CapabilitySignData,
+	Ed25519,
 	type Ed25519KeyPair,
 	Entry,
 	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
+	NamespaceId,
 	OPENSELVES_NAMESPACE_ID,
 	Path,
 	PayloadDigest,
@@ -37,6 +39,15 @@ import {
 	readFile,
 } from "./sync-utils.js";
 import { type TestEnvUser, type TestEnvWithUsers, setupTestSuiteWithUsers } from "./utils.js";
+
+type ForgedEntry = Omit<
+	AuthorisedEntryWithPayload,
+	"namespaceId" | "subspaceId" | "payloadDigest"
+> & {
+	namespaceId: ByteString;
+	subspaceId: ByteString;
+	payloadDigest: ByteString;
+} & Record<string, unknown>;
 
 async function timeModelEntries(
 	model: AnyEntryDataModel,
@@ -263,16 +274,14 @@ describe(pushEndpoint, () => {
 		describe("forged and invalid entries", () => {
 			type TestCase = {
 				name: string;
-				forgeEntry: (
-					entry: AuthorisedEntryWithPayload & Record<string, unknown>,
-				) => Promise<void> | void;
+				forgeEntry: (entry: ForgedEntry) => Promise<void> | void;
 				expectCode?: number;
 				expectServe?: boolean;
 			};
 
 			async function setEntryPayloadToForged(
 				payload: ByteString,
-				entry: AuthorisedEntryWithPayload & Record<string, unknown>,
+				entry: ForgedEntry,
 				payloadDigest?: ByteString,
 				payloadLength: UInt64 = BigInt(payload.length),
 			) {
@@ -281,7 +290,7 @@ describe(pushEndpoint, () => {
 				entry.payloadDigest =
 					payloadDigest === undefined ? await PayloadDigest.hash(payload) : payloadDigest;
 				entry.authorisationToken = (
-					await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+					await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 				).authorisationToken;
 			}
 
@@ -294,23 +303,13 @@ describe(pushEndpoint, () => {
 
 				// namespaceId
 				{
-					name: "empty namespaceId 400",
-					forgeEntry: async (entry) => {
-						entry.namespaceId = entry.authorisationToken.capability.inner.namespaceKey =
-							ByteString.empty();
-						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
-						).authorisationToken;
-						assert(AuthorisedEntryWithPayload.is(entry));
-					},
-				},
-				{
 					name: "wrong namespaceId 400",
 					forgeEntry: async (entry) => {
-						entry.namespaceId = entry.authorisationToken.capability.inner.namespaceKey =
-							ByteString.fromUtf8("not the correct namespaceId");
+						entry.namespaceId = (
+							await NamespaceId.generateRandomCommunalNamespaceKeys()
+						).publicKey;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -323,36 +322,31 @@ describe(pushEndpoint, () => {
 						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
 							env.users.user1.keys.publicKey;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
 					expectCode: 200,
 				},
 				{
-					name: "empty subspaceId 400",
-					forgeEntry: (entry) => {
-						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
-							ByteString.empty();
+					name: "random subspaceId 200",
+					forgeEntry: async (entry) => {
+						const keys = await Ed25519.generateKey();
+						entry.subspaceId = keys.publicKey;
+						entry.authorisationToken = (
+							await AuthorisedEntry.signEntry(entry as Entry, keys)
+						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
-					expectCode: 400,
-				},
-				{
-					name: "invalid subspaceId 400",
-					forgeEntry: (entry) => {
-						entry.subspaceId = entry.authorisationToken.capability.inner.userKey =
-							ByteString.fromUtf8("not the correct subspaceId");
-						assert(AuthorisedEntryWithPayload.is(entry));
-					},
-					expectCode: 400,
+					expectCode: 200,
+					expectServe: false,
 				},
 				{
 					name: "authored by another user 200",
 					forgeEntry: async (entry) => {
 						entry.subspaceId = env.users.user2.keys.publicKey;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user2.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user2.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -366,7 +360,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.path = [];
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -377,7 +371,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/");
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -388,7 +382,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/hi");
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -399,7 +393,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("//hi///hello//bye/");
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -412,7 +406,7 @@ describe(pushEndpoint, () => {
 							"/" + "a".repeat(Willow25.MAX_PATH_LENGTH + 1),
 						);
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -422,7 +416,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.path = Path.fromString("/" + "a".repeat(Willow25.MAX_PATH_LENGTH));
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -435,7 +429,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now();
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -446,7 +440,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.timestamp = 0n;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -457,7 +451,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now().valueOf() + 15n * 60n * 1000_000n;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -467,7 +461,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.timestamp = Timestamp.now().valueOf() + 5n * 60n * 1000_000n;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -478,7 +472,7 @@ describe(pushEndpoint, () => {
 					forgeEntry: async (entry) => {
 						entry.timestamp = UInt64.MAX_VALUE;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -502,7 +496,7 @@ describe(pushEndpoint, () => {
 						assert.notStrictEqual(Number(forgedLength), entry.payload.length);
 						entry.payloadLength = forgedLength;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},
@@ -520,7 +514,7 @@ describe(pushEndpoint, () => {
 
 						entry.payloadDigest = forgedDigest;
 						entry.authorisationToken = (
-							await AuthorisedEntry.signEntry(entry, env.users.user1.keys)
+							await AuthorisedEntry.signEntry(entry as Entry, env.users.user1.keys)
 						).authorisationToken;
 						assert(AuthorisedEntryWithPayload.is(entry));
 					},

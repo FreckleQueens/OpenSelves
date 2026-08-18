@@ -10,7 +10,6 @@ import { AuthorisationToken, AuthorisedEntry } from "./meadowcap/index.js";
 
 /**
  * https://willowprotocol.org/specs/drop-format/index.html
- * TODO: setup unit tests against https://github.com/worm-blossom/willow_test_vectors
  * TODO: make every encode method in the whole package return a ByteString array (no useless concat operation)
  */
 export class Drop {
@@ -30,7 +29,7 @@ export class Drop {
 					entry.subspaceId,
 					previousEntry.subspaceId,
 				);
-				const timestamp = UInt64.encodeToVariable(entry.timestamp, 2);
+				const timestamp = UInt64.toCompactEncoding(entry.timestamp, 2);
 
 				let headerByte = 0b0100_0000;
 				if (hasNamespaceId) {

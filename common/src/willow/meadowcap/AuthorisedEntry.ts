@@ -85,7 +85,6 @@ export class AuthorisedEntry extends Entry {
 
 	/**
 	 * https://willowprotocol.org/specs/meadowcap/index.html#meadowcap_is_authorised_write
-	 * TODO: test this thoroughly
 	 */
 	public static async isAuthorisedWrite(val: AuthorisedEntry): Promise<boolean> {
 		const grantedArea = Capability.getGrantedArea(val.authorisationToken.capability);

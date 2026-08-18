@@ -8,13 +8,13 @@ import {
 	primaryKey,
 	timestamp,
 } from "drizzle-orm/pg-core";
-import type { ByteString } from "openselves-common/willow";
+import type { ByteString, PayloadDigest, SubspaceId } from "openselves-common/willow";
 
 export const payloadStorageEnum = pgEnum("entryPayloadStorage", ["s3"]);
 export const entries = camelCase.table(
 	"entries",
 	{
-		subspaceId: bytea().notNull().$type<ByteString>(),
+		subspaceId: bytea().notNull().$type<SubspaceId>(),
 		path: bytea().array().notNull().$type<ByteString>(),
 		timestamp: bigint({
 			mode: "bigint",
@@ -22,7 +22,7 @@ export const entries = camelCase.table(
 		payloadLength: bigint({
 			mode: "bigint",
 		}).notNull(),
-		payloadDigest: bytea().notNull().$type<ByteString>(),
+		payloadDigest: bytea().notNull().$type<PayloadDigest>(),
 
 		payload: bytea().$type<ByteString>(),
 		payloadStorage: payloadStorageEnum(),

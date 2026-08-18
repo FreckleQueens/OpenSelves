@@ -1,4 +1,4 @@
-import { type ByteProvider } from "./ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 import { PathComponent } from "./PathComponent.js";
 import { UInt64 } from "./UInt64.js";
@@ -115,14 +115,14 @@ export class Path extends Array<PathComponent> {
 	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePath
 	 */
 	public static encode(path: Path): ByteString {
-		const componentLengthSum = UInt64.encodeToVariable(
+		const componentLengthSum = UInt64.toCompactEncoding(
 			path.reduce(
 				(previousValue, currentValue) => previousValue + BigInt(currentValue.byteLength),
 				0n,
 			),
 			4,
 		);
-		const componentCount = UInt64.encodeToVariable(BigInt(path.length), 4);
+		const componentCount = UInt64.toCompactEncoding(BigInt(path.length), 4);
 
 		const header = (componentLengthSum.tag << 4) | componentCount.tag;
 
@@ -131,13 +131,12 @@ export class Path extends Array<PathComponent> {
 		parts.push(componentLengthSum.additionalBytes);
 		parts.push(componentCount.additionalBytes);
 
-		for (const component of path.slice(0, path.length - 1)) {
-			parts.push(UInt64.encodeToVariable8(BigInt(component.byteLength)));
+		for (let i = 0; i < path.length; i++) {
+			const component = path[i];
+			if (i < path.length - 1) {
+				parts.push(UInt64.encodeToVariable8(BigInt(component.byteLength)));
+			}
 			parts.push(component);
-		}
-
-		if (path.length > 0) {
-			parts.push(path[path.length - 1]);
 		}
 
 		return ByteString.concat(...parts);
@@ -149,16 +148,50 @@ export class Path extends Array<PathComponent> {
 		const componentLengthSum = await UInt64.decodeVariable(headerByte, 4, 0, provider);
 		const componentCount = await UInt64.decodeVariable(headerByte, 4, 4, provider);
 
+		if (componentCount.valueOf() === 0n && componentLengthSum.valueOf() > 0) {
+			throw new InvalidInputError(
+				"Invalid component length sum for empty path: " + componentLengthSum.valueOf(),
+			);
+		}
+
 		const path: Path = [];
 		for (let i = 0; i < componentCount.valueOf() - 1n; i++) {
 			const componentLength = await UInt64.decodeVariable8(provider);
 			path.push(await provider.read(Number(componentLength)));
 		}
 
+		const remainingBytes =
+			Number(componentLengthSum) - path.reduce((prev, cur) => prev + cur.length, 0);
+
+		if (remainingBytes < 0) {
+			throw new InvalidInputError(
+				"Got invalid componentLengthSum" +
+					componentLengthSum.valueOf() +
+					", total already decoded data length is " +
+					path.reduce((prev, cur) => prev + cur.length, 0),
+			);
+		}
+
 		if (componentCount.valueOf() > 0) {
-			const lastComponentLength =
-				Number(componentLengthSum) - path.reduce((prev, cur) => prev + cur.length, 0);
-			path.push(await provider.read(lastComponentLength));
+			path.push(await provider.read(remainingBytes));
+		}
+
+		if (path.length !== Number(componentCount)) {
+			throw new InvalidInputError(
+				"Got path of length " +
+					path.length +
+					" but componentCount was " +
+					componentCount.valueOf(),
+			);
+		}
+
+		if (!Path.isValid(path)) {
+			throw new InvalidInputError("Got invalid path", {
+				cause: {
+					length: path.length,
+					result: path,
+				},
+			});
 		}
 
 		return path;
@@ -179,11 +212,30 @@ export class Path extends Array<PathComponent> {
 	}
 
 	public static async decodePathRelativePath(rel: Path, provider: ByteProvider): Promise<Path> {
-		const pathLongestCommonPrefixLength = await UInt64.decodeVariable8(provider);
-		return [
-			...rel.slice(0, Number(pathLongestCommonPrefixLength)),
-			...(await Path.decode(provider)),
-		];
+		const lcpLength = await UInt64.decodeVariable8(provider);
+
+		const result = [...rel.slice(0, Number(lcpLength)), ...(await Path.decode(provider))];
+
+		if (!Path.isValid(result)) {
+			throw new InvalidInputError("Got invalid path", {
+				cause: {
+					length: result.length,
+					result,
+				},
+			});
+		}
+
+		const expectedLcpLength = this.getLongestCommonPrefixLength(rel, result);
+		if (expectedLcpLength !== lcpLength) {
+			throw new InvalidInputError("prefix_count is not minimal", {
+				cause: {
+					actual: lcpLength,
+					expected: expectedLcpLength,
+				},
+			});
+		}
+
+		return result;
 	}
 
 	/**
@@ -200,6 +252,17 @@ export class Path extends Array<PathComponent> {
 	}
 
 	public static async decodePathExtendsPath(rel: Path, provider: ByteProvider): Promise<Path> {
-		return [...rel, ...(await Path.decode(provider))];
+		const result = [...rel, ...(await Path.decode(provider))];
+
+		if (!Path.isValid(result)) {
+			throw new InvalidInputError("Got invalid path", {
+				cause: {
+					length: result.length,
+					result,
+				},
+			});
+		}
+
+		return result;
 	}
 }

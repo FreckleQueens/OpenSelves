@@ -1,16 +1,17 @@
 import { Area } from "../Area.js";
-import type { ByteProvider } from "../ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { NamespaceId } from "../NamespaceId.js";
-import { SubspaceId } from "../SubspaceId.js";
 import { UInt64 } from "../UInt64.js";
 import { Willow25 } from "../Willow25.js";
 import type { CapabilitySignData } from "./CapabilitySignData.js";
 import { CommunalCapability } from "./CommunalCapability.js";
 import { Delegation } from "./Delegation.js";
 import { NamespacePublicKey } from "./NamespacePublicKey.js";
+import { NamespaceSignature } from "./NamespaceSignature.js";
 import { OwnedCapability } from "./OwnedCapability.js";
 import { UserPublicKey } from "./UserPublicKey.js";
+import { UserSignature } from "./UserSignature.js";
 
 export enum CapabilityAccessMode {
 	READ,
@@ -21,30 +22,48 @@ export enum CapabilityAccessMode {
  * https://willowprotocol.org/specs/meadowcap/index.html#Capability
  */
 export class Capability {
-	public static is(value: unknown): value is Capability {
+	public static is(val: unknown): val is Capability {
 		return !!(
-			value &&
-			typeof value === "object" &&
-			"inner" in value &&
-			(CommunalCapability.is(value.inner) || OwnedCapability.is(value.inner))
+			val &&
+			typeof val === "object" &&
+			"inner" in val &&
+			(CommunalCapability.is(val.inner) || OwnedCapability.is(val.inner))
 		);
 	}
 
-	public static async isValid(capability: Capability): Promise<boolean> {
-		if (NamespaceId.isCommunal(capability.inner.namespaceKey)) {
-			return CommunalCapability.isValid(capability.inner);
+	public static isCommunal(val: Capability["inner"]): boolean {
+		return NamespaceId.isCommunal(val.namespaceKey);
+	}
+
+	public static async isValid(val: Capability | Capability["inner"]): Promise<boolean> {
+		if ("inner" in val) {
+			return this.isValid(val.inner);
+		}
+
+		if (this.isCommunal(val)) {
+			return CommunalCapability.isValid(val);
 		} else {
-			throw new Error("Checking for OwnedCapability validity is not implemented");
+			return OwnedCapability.is(val) && (await OwnedCapability.isValid(val));
 		}
 	}
 
-	public static copy(capability: Capability): Capability {
-		if (NamespaceId.isCommunal(capability.inner.namespaceKey)) {
+	public static isOwned(val: Capability["inner"]): boolean {
+		return !this.isCommunal(val);
+	}
+
+	public static copy(val: Capability): Capability {
+		if (this.isCommunal(val.inner)) {
 			return {
-				inner: CommunalCapability.copy(capability.inner),
+				inner: CommunalCapability.copy(val.inner),
 			};
 		} else {
-			throw new Error("Copying OwnedCapability is not implemented");
+			if (!OwnedCapability.is(val.inner)) {
+				throw new Error("val.inner is not an OwnedCapability", { cause: val });
+			}
+
+			return {
+				inner: OwnedCapability.copy(val.inner),
+			};
 		}
 	}
 
@@ -65,7 +84,7 @@ export class Capability {
 		userKey: UserPublicKey,
 		delegations: Delegation[],
 	): Capability {
-		let capability: CommunalCapability | OwnedCapability;
+		let capability: Capability["inner"];
 		if (NamespaceId.isCommunal(namespaceKey)) {
 			capability = {
 				accessMode,
@@ -81,28 +100,38 @@ export class Capability {
 		};
 	}
 
-	public static getGrantedArea(capability: Capability): Area {
-		if (NamespaceId.isCommunal(capability.inner.namespaceKey)) {
-			return CommunalCapability.getGrantedArea(capability.inner);
+	public static getGrantedArea(val: Capability | Capability["inner"]): Area {
+		if ("inner" in val) {
+			return this.getGrantedArea(val.inner);
+		}
+
+		const finalDelegation = this.getFinalDelegation(val);
+		if (finalDelegation) {
+			return finalDelegation.area;
 		} else {
-			throw new Error("Getting granted area for OwnedCapability is not implemented");
+			return this.isCommunal(val) ? Area.ofSubspace(val.userKey) : Area.full();
 		}
 	}
 
-	public static getReceiver(capability: Capability): UserPublicKey {
-		if (NamespaceId.isCommunal(capability.inner.namespaceKey)) {
-			return CommunalCapability.getReceiver(capability.inner);
-		} else {
-			throw new Error("Getting receiver for OwnedCapability is not implemented");
+	public static getReceiver(val: Capability | Capability["inner"]): UserPublicKey {
+		if ("inner" in val) {
+			return this.getReceiver(val.inner);
 		}
+
+		const finalDelegation = this.getFinalDelegation(val);
+		return finalDelegation ? finalDelegation.userPublicKey : val.userKey;
 	}
 
-	public static getGrantedNamespace(capability: Capability): NamespaceId {
-		return capability.inner.namespaceKey;
+	public static getGrantedNamespace(val: Capability | Capability["inner"]): NamespaceId {
+		if ("inner" in val) {
+			return this.getGrantedNamespace(val.inner);
+		}
+
+		return val.namespaceKey;
 	}
 
-	public static getGrantedSubspace(capability: Capability): SubspaceId | undefined {
-		return this.getGrantedArea(capability).subspaceId;
+	public static getFinalDelegation(val: Capability["inner"]): Delegation | undefined {
+		return val.delegations[val.delegations.length - 1];
 	}
 
 	public static async delegateCapability(
@@ -133,68 +162,118 @@ export class Capability {
 				),
 			};
 		} else {
-			throw new Error("Getting receiver for OwnedCapability is not implemented");
+			throw new Error("Delegating OwnedCapability is not implemented");
 		}
 	}
 
+	/**
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_McCapability
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodeCommunalCapability
+	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodeOwnedCapability
+	 */
 	public static encode(val: Capability): ByteString {
-		const isCommunal = NamespaceId.isCommunal(val.inner.namespaceKey);
-		if (!isCommunal) {
-			throw new Error("Encoding owned capabilities is not supported");
+		const inner = val.inner;
+		const isOwned = OwnedCapability.is(inner);
+
+		let headerByte = 0b0000_0000;
+		if (isOwned) {
+			headerByte |= 0b1000_0000;
+		}
+		if (inner.accessMode === CapabilityAccessMode.WRITE) {
+			headerByte |= 0b0100_0000;
 		}
 
-		let accessModeByte = 0b0000_0000;
-		if (val.inner.accessMode === CapabilityAccessMode.WRITE) {
-			accessModeByte |= 0b0000_0001;
-		}
-		if (!isCommunal) {
-			accessModeByte |= 0b0000_0010;
-		}
+		const delegationsLength = UInt64.encodeVariable(
+			BigInt(inner.delegations.length),
+			headerByte,
+			6,
+			2,
+		);
+		headerByte = delegationsLength.headerByte;
 
 		const parts: ByteString[] = [
-			ByteString.of(accessModeByte),
-			NamespacePublicKey.encode(val.inner.namespaceKey),
-			UserPublicKey.encode(val.inner.userKey),
-			UInt64.encodeToVariable8(BigInt(val.inner.delegations.length)),
+			ByteString.of(headerByte),
+			NamespacePublicKey.encode(inner.namespaceKey),
+			UserPublicKey.encode(inner.userKey),
 		];
 
-		for (const delegation of val.inner.delegations) {
+		if (isOwned) {
+			parts.push(NamespaceSignature.encode(inner.initialAuthorisation));
+		}
+
+		parts.push(delegationsLength.additionalBytes);
+
+		let previousArea = isOwned ? Area.full() : Area.ofSubspace(inner.userKey);
+		for (const delegation of inner.delegations) {
 			parts.push(
-				Delegation.encodeDelegationSubspaceIdRelative(delegation, val.inner.userKey),
+				Area.encodeAreaInArea(delegation.area, previousArea),
+				UserPublicKey.encode(delegation.userPublicKey),
+				UserSignature.encode(delegation.userSignature),
 			);
+			previousArea = delegation.area;
 		}
 
 		return ByteString.concat(...parts);
 	}
 
 	public static async decode(provider: ByteProvider): Promise<Capability> {
-		const accessModeByte = (await provider.read(1))[0];
+		const headerByte = (await provider.read(1))[0];
 
-		const isCommunal = (accessModeByte & 0b0000_0010) === 0;
-		const isRead = (accessModeByte & 0b0000_0001) === 0;
-		if (!isCommunal) {
-			throw new Error("Decoding owned capabilities is not supported");
-		}
+		const isOwned = !!(headerByte & 0b1000_0000);
+		const isWrite = !!(headerByte & 0b0100_0000);
 
 		const namespacePublicKey = await NamespacePublicKey.decode(provider);
-		const userPublicKey = await UserPublicKey.decode(provider);
-		const delegationsLength = await UInt64.decodeVariable8(provider);
 
-		const delegations: Delegation[] = [];
-		for (let i = 0; i < delegationsLength.valueOf(); i++) {
-			delegations.push(
-				await Delegation.decodeDelegationSubspaceIdRelative(userPublicKey, provider),
+		if (!isOwned !== NamespaceId.isCommunal(namespacePublicKey)) {
+			throw new InvalidInputError(
+				"Invalid namespacePublicKey for " +
+					(isOwned ? "owned" : "communal") +
+					" capability",
+				{
+					cause: namespacePublicKey,
+				},
 			);
 		}
 
-		return {
+		const userPublicKey = await UserPublicKey.decode(provider);
+
+		let initialAuthorisation: NamespaceSignature | undefined;
+		if (isOwned) {
+			initialAuthorisation = await NamespaceSignature.decode(provider);
+		}
+
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 6, 2, provider);
+
+		const delegations: Delegation[] = [];
+		let previousArea = isOwned ? Area.full() : Area.ofSubspace(userPublicKey);
+		for (let i = 0; i < delegationsLength.valueOf(); i++) {
+			const delegation = {
+				area: await Area.decodeAreaInArea(previousArea, provider),
+				userPublicKey: await UserPublicKey.decode(provider),
+				userSignature: await UserSignature.decode(provider),
+			};
+			delegations.push(delegation);
+			previousArea = delegation.area;
+		}
+
+		const result = {
 			inner: {
 				namespaceKey: namespacePublicKey,
 				userKey: userPublicKey,
-				accessMode: isRead ? CapabilityAccessMode.READ : CapabilityAccessMode.WRITE,
+				accessMode: isWrite ? CapabilityAccessMode.WRITE : CapabilityAccessMode.READ,
 				delegations,
 			},
 		};
+
+		if (isOwned) {
+			result.inner["initialAuthorisation"] = initialAuthorisation;
+		}
+
+		if (!(await Capability.isValid(result.inner))) {
+			throw new InvalidInputError("Got invalid result", { cause: result });
+		}
+
+		return result;
 	}
 
 	public constructor(public inner: CommunalCapability | OwnedCapability) {}

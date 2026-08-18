@@ -1,17 +1,28 @@
+export type ByteStringOfLength<T extends number> = ByteString & {
+	readonly length: T;
+	readonly byteLength: T;
+};
+
 export class ByteString extends Uint8Array<ArrayBuffer> {
+	public static readonly LENGTH: number | undefined = undefined;
+
 	private static textEncoder = new TextEncoder();
 	private static textDecoder = new TextDecoder();
 
-	public static empty(): ByteString {
-		return new Uint8Array(0);
+	public static empty(): ByteStringOfLength<0> {
+		return new Uint8Array(0) as ByteStringOfLength<0>;
 	}
 
 	public static of(...elements: number[]): ByteString {
-		return Uint8Array.of(...elements);
+		const output = Uint8Array.of(...elements);
+		this.assertIs(output);
+		return output;
 	}
 
 	public static fromUtf8(input: string): ByteString {
-		return this.textEncoder.encode(input);
+		const output = this.textEncoder.encode(input);
+		this.assertIs(output);
+		return output;
 	}
 
 	public static toUtf8(input: ByteString): string {
@@ -19,15 +30,31 @@ export class ByteString extends Uint8Array<ArrayBuffer> {
 	}
 
 	public static fromHex(input: string): ByteString {
-		return Uint8Array.fromHex(input);
+		const output = Uint8Array.fromHex(input);
+		this.assertIs(output);
+		return output;
 	}
 
 	public static fromBase64(input: string): ByteString {
-		return Uint8Array.fromBase64(input);
+		const output = Uint8Array.fromBase64(input);
+		this.assertIs(output);
+		return output;
 	}
 
-	public static is(value: unknown): value is ByteString {
-		return value instanceof Uint8Array && value.buffer instanceof ArrayBuffer;
+	public static fromBuffer(value: ArrayBuffer): ByteString {
+		const output = new Uint8Array(value);
+		this.assertIs(output);
+		return output;
+	}
+
+	public static is(value: unknown): value is ByteString;
+	public static is<T extends number>(value: unknown, length: T): value is ByteStringOfLength<T>;
+	public static is(value: unknown, length?: number): boolean {
+		if (!(value instanceof Uint8Array && value.buffer instanceof ArrayBuffer)) {
+			return false;
+		}
+
+		return length === undefined || (value.length === length && value.byteLength === length);
 	}
 
 	public static equals(a: ByteString | undefined, b: ByteString | undefined) {
@@ -77,5 +104,23 @@ export class ByteString extends Uint8Array<ArrayBuffer> {
 			cursor += parts[i].byteLength;
 		}
 		return output;
+	}
+
+	private static assertIs(val: Uint8Array): void {
+		if (!this.is(val)) {
+			if (typeof this.LENGTH === "number" && val.byteLength !== this.LENGTH) {
+				throw new Error("Invalid number of elements", {
+					cause: {
+						actual: val.byteLength,
+						expected: this.LENGTH,
+						val,
+					},
+				});
+			} else {
+				throw new Error("Invalid val", {
+					cause: val,
+				});
+			}
+		}
 	}
 }

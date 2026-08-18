@@ -70,7 +70,7 @@ describe("Willow drop format", () => {
 			const encoded = Path.encodePathRelativePath(expectedPath, rel);
 
 			const provider = ByteProvider.of(encoded);
-			const decodedPath = await Path.decodePathRelativePath(expectedPath, provider);
+			const decodedPath = await Path.decodePathRelativePath(rel, provider);
 
 			assert.deepStrictEqual(
 				decodedPath && Path.toString(decodedPath),

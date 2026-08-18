@@ -1,8 +1,8 @@
-import { ByteString } from "./ByteString.js";
+import { ByteString, type ByteStringOfLength } from "./ByteString.js";
 
-type ReadRequest = {
-	length: number;
-	resolve: (value: ByteString) => void;
+type ReadRequest<T extends number = number> = {
+	length: T;
+	resolve: (value: ByteStringOfLength<T>) => void;
 	reject: (err: unknown) => void;
 };
 
@@ -54,13 +54,13 @@ export class ByteProvider {
 		}
 	}
 
-	public async read(length: number): Promise<ByteString> {
+	public async read<T extends number>(length: T): Promise<ByteStringOfLength<T>> {
 		if (this.isReadEnded) {
 			throw new Error("Tried to read after read ended");
 		}
 
-		return new Promise<ByteString>((resolve, reject) => {
-			const readRequest = {
+		return new Promise<ByteStringOfLength<T>>((resolve, reject) => {
+			const readRequest: ReadRequest<T> = {
 				length,
 				resolve,
 				reject,
@@ -81,7 +81,7 @@ export class ByteProvider {
 					),
 				);
 			} else {
-				this.readRequest = readRequest;
+				this.readRequest = readRequest as unknown as ReadRequest<number>;
 				this.stalledWriteTimeout = setTimeout(() => {
 					readRequest.reject(new Error("No bytes were written before timeout."));
 				}, this.timeout);
@@ -89,7 +89,7 @@ export class ByteProvider {
 		});
 	}
 
-	private fulfillReadRequest(req: ReadRequest): void {
+	private fulfillReadRequest<T extends number>(req: ReadRequest<T>): void {
 		if (this.isReadEnded) {
 			throw new Error("Tried to read (async) after read ended");
 		}
@@ -137,7 +137,14 @@ export class ByteProvider {
 				this.currentReadPart = undefined;
 			}
 		}
-		req.resolve(ByteString.concat(...outputParts));
+
+		const result = ByteString.concat(...outputParts);
+		if (!ByteString.is(result, req.length)) {
+			throw new Error("Got invalid read length", {
+				cause: { actual: result.length, expected: req.length },
+			});
+		}
+		req.resolve(result);
 	}
 
 	public endWrite() {

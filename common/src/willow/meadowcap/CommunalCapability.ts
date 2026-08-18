@@ -3,7 +3,7 @@ import type { ByteProvider } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { Ed25519, Ed25519Sk } from "../Ed25519.js";
 import type { Entry } from "../Entry.js";
-import { Path } from "../Path.js";
+import { NamespaceId } from "../NamespaceId.js";
 import { UInt64 } from "../UInt64.js";
 import { PrivateAreaContext } from "../private/PrivateAreaContext.js";
 import { PrivateInterest } from "../private/PrivateInterest.js";
@@ -32,33 +32,32 @@ export class CommunalCapability {
 			UserPublicKey.is(value.userKey) &&
 			"delegations" in value &&
 			Array.isArray(value.delegations) &&
-			value.delegations.every((val: unknown) => Delegation.is(val))
+			value.delegations.every((val: unknown) => Delegation.is(val)) &&
+			!OwnedCapability.is(value)
 		);
 	}
 
-	public static isCommunalCapability(
-		val: OwnedCapability | CommunalCapability,
-	): val is CommunalCapability {
-		return !OwnedCapability.isOwnedCapability(val);
-	}
+	public static async isValid(val: CommunalCapability): Promise<boolean> {
+		if (!NamespaceId.isCommunal(val.namespaceKey)) {
+			return false;
+		}
 
-	public static async isValid(capability: Capability["inner"]): Promise<boolean> {
-		const finalDelegation = Delegation.getFinalDelegation(capability);
+		const finalDelegation = Capability.getFinalDelegation(val);
 		if (finalDelegation === undefined) {
 			return true;
 		}
 
 		const previousCapability: CommunalCapability = {
-			accessMode: capability.accessMode,
-			namespaceKey: capability.namespaceKey,
-			userKey: capability.userKey,
-			delegations: capability.delegations.slice(0, capability.delegations.length - 1),
+			accessMode: val.accessMode,
+			namespaceKey: val.namespaceKey,
+			userKey: val.userKey,
+			delegations: val.delegations.slice(0, val.delegations.length - 1),
 		};
-		const previousArea = CommunalCapability.getGrantedArea(previousCapability);
-		const previousReceiver = CommunalCapability.getReceiver(previousCapability);
+		const previousArea = Capability.getGrantedArea(previousCapability);
+		const previousReceiver = Capability.getReceiver(previousCapability);
 
-		const newArea = CommunalCapability.getGrantedArea(capability);
-		const newReceiver = CommunalCapability.getReceiver(capability);
+		const newArea = Capability.getGrantedArea(val);
+		const newReceiver = Capability.getReceiver(val);
 
 		const handoverPayload: ByteString = CommunalCapability.getHandoverPayload(
 			previousCapability,
@@ -82,34 +81,13 @@ export class CommunalCapability {
 		};
 	}
 
-	public static getGrantedArea(capability: CommunalCapability): Area {
-		const finalDelegation = Delegation.getFinalDelegation(capability);
-		if (finalDelegation) {
-			return finalDelegation.area;
-		} else {
-			return {
-				subspaceId: capability.userKey,
-				path: Path.EMPTY,
-				times: {
-					start: 0n,
-					end: undefined,
-				},
-			};
-		}
-	}
-
-	public static getReceiver(capability: CommunalCapability): UserPublicKey {
-		const finalDelegation = Delegation.getFinalDelegation(capability);
-		return finalDelegation ? finalDelegation.userPublicKey : capability.userKey;
-	}
-
 	public static getHandoverPayload(
 		previousCapability: CommunalCapability,
 		newArea: Area,
 		newReceiver: UserPublicKey,
 	): ByteString {
-		const previousDelegation = Delegation.getFinalDelegation(previousCapability);
-		const previousArea = CommunalCapability.getGrantedArea(previousCapability);
+		const previousDelegation = Capability.getFinalDelegation(previousCapability);
+		const previousArea = Capability.getGrantedArea(previousCapability);
 		const relativeEncodedArea = Area.encodeAreaInArea(newArea, previousArea);
 		const newUserEncodedPk = UserPublicKey.encode(newReceiver);
 		if (previousDelegation === undefined) {
@@ -141,7 +119,7 @@ export class CommunalCapability {
 		secretKey: Ed25519Sk,
 		ignoreInvalidResult: boolean = false,
 	): Promise<CommunalCapability> {
-		if (!CommunalCapability.isCommunalCapability(val)) {
+		if (!CommunalCapability.is(val)) {
 			throw new Error("val needs to be a communal capability, found an owned capability", {
 				cause: val,
 			});
@@ -191,7 +169,7 @@ export class CommunalCapability {
 			});
 		}
 
-		if (!Area.includesEntry(CommunalCapability.getGrantedArea(val), rel.entry)) {
+		if (!Area.includesEntry(Capability.getGrantedArea(val), rel.entry)) {
 			throw new Error("entry isn't included in capability's granted area", {
 				cause: {
 					val,
@@ -201,13 +179,16 @@ export class CommunalCapability {
 		}
 
 		const relCap = rel.authorisedEntry.authorisationToken.capability.inner;
-		const shared = OwnedCapability.isOwnedCapability(relCap)
+		const shared = OwnedCapability.is(relCap)
 			? 0n
 			: BigInt(Delegation.getLongestCommonPrefixLength(val, relCap));
-		const niceHack = OwnedCapability.isOwnedCapability(relCap) ? 0n : shared + 1n;
+		const niceHack = OwnedCapability.is(relCap) ? 0n : shared + 1n;
 
-		const niceHackVariable = UInt64.encodeToVariable(niceHack, 3);
-		const delegationLengthVariable = UInt64.encodeToVariable(BigInt(val.delegations.length), 4);
+		const niceHackVariable = UInt64.toCompactEncoding(niceHack, 3);
+		const delegationLengthVariable = UInt64.toCompactEncoding(
+			BigInt(val.delegations.length),
+			4,
+		);
 
 		const headerByte =
 			0b0000_0000 | ((niceHackVariable.tag << 4) | delegationLengthVariable.tag);
@@ -325,7 +306,7 @@ export class CommunalCapability {
 			});
 		}
 
-		if (!Area.includesEntry(CommunalCapability.getGrantedArea(val), rel)) {
+		if (!Area.includesEntry(Capability.getGrantedArea(val), rel)) {
 			throw new Error("entry isn't included in capability's granted area", {
 				cause: {
 					val,

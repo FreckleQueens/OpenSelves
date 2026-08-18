@@ -1,4 +1,4 @@
-import type { ByteProvider } from "./ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 import type { Entry } from "./Entry.js";
 import { Path } from "./Path.js";
@@ -58,7 +58,7 @@ export class Area {
 		);
 	}
 
-	public static copy(area: Area) {
+	public static copy(area: Area): Area {
 		return {
 			subspaceId:
 				area.subspaceId === undefined ? undefined : SubspaceId.copy(area.subspaceId),
@@ -67,6 +67,17 @@ export class Area {
 				start: area.times.start,
 				end: area.times.end,
 			},
+		};
+	}
+
+	/**
+	 * https://willowprotocol.org/specs/grouping-entries/index.html#full_area
+	 */
+	public static full(): Area {
+		return {
+			subspaceId: undefined,
+			path: Path.EMPTY,
+			times: { start: 0n, end: undefined },
 		};
 	}
 
@@ -129,7 +140,7 @@ export class Area {
 			parts.push(endDiffAdditionalBytes);
 		}
 
-		parts.push(Path.encodePathRelativePath(val.path, rel.path));
+		parts.push(Path.encodePathExtendsPath(val.path, rel.path));
 		return ByteString.concat(...parts);
 	}
 
@@ -141,9 +152,12 @@ export class Area {
 		const startFromStart = !!(headerByte & 0b0010_0000);
 		const endFromStart = !!(headerByte & 0b0001_0000);
 		if (isEndOpen && !!(headerByte & 0b0000_0011)) {
-			throw new Error("val.times.end is open but header's last two bits aren't both 0", {
-				cause: headerByte.toString(2).padStart(8, "0"),
-			});
+			throw new InvalidInputError(
+				"val.times.end is open but endDiff tag isn't minimal (expected header last 2 bits to be 0)",
+				{
+					cause: headerByte.toString(2).padStart(8, "0"),
+				},
+			);
 		}
 
 		const subspaceId: SubspaceId | undefined = hasSubspaceId
@@ -155,14 +169,15 @@ export class Area {
 		if (!isEndOpen) {
 			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider);
 		}
-		const path = await Path.decodePathRelativePath(rel.path, provider);
+
+		const path = await Path.decodePathExtendsPath(rel.path, provider);
 
 		let start: Timestamp;
 		if (startFromStart) {
 			start = startDiff.valueOf() + rel.times.start.valueOf();
 		} else {
 			if (rel.times.end === undefined) {
-				throw new Error("startFromStart is false but rel.times.end is open", {
+				throw new InvalidInputError("startFromStart is false but rel.times.end is open", {
 					cause: rel,
 				});
 			}
@@ -183,13 +198,43 @@ export class Area {
 			end = rel.times.end.valueOf() - endDiff.valueOf();
 		}
 
-		return {
+		const result = {
 			subspaceId,
 			path,
 			times: {
 				start,
 				end,
 			},
+		};
+
+		if (!Area.includes(rel, result)) {
+			throw new InvalidInputError("Got area not included in rel", {
+				cause: {
+					rel,
+					val: result,
+				},
+			});
+		}
+
+		return result;
+	}
+
+	/**
+	 * See https://github.com/worm-blossom/willow_test_vectors#an-absolute-encoding-relation-for-area
+	 */
+	public static async decode(provider: ByteProvider): Promise<Area> {
+		const headerByte = (await provider.read(1))[0];
+		const isSubspaceAny = !!(headerByte & 0b1000_0000);
+		const isEndOpen = !!(headerByte & 0b0100_0000);
+
+		const subspaceId = isSubspaceAny ? undefined : await SubspaceId.decode(provider);
+		const path = await Path.decode(provider);
+		const start = await UInt64.decodeVariable8(provider);
+		const end = isEndOpen ? undefined : await UInt64.decodeVariable8(provider);
+		return {
+			subspaceId,
+			path,
+			times: { start, end },
 		};
 	}
 
