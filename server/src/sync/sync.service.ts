@@ -11,6 +11,7 @@ import {
 	AuthorisationToken,
 	type AuthorisedEntry,
 	AuthorisedEntryWithPayload,
+	ByteProvider,
 	ByteString,
 	Capability,
 	Entry,
@@ -415,9 +416,8 @@ export class SyncService {
 			}
 		}
 
-		return {
-			timestamp: returnedTimestamp,
-			entries: entries.map((entry): AuthorisedEntryWithPayload => {
+		const authorisedEntries: AuthorisedEntryWithPayload[] = await Promise.all(
+			entries.map(async (entry) => {
 				const {
 					queryTime,
 					timestamp,
@@ -435,23 +435,35 @@ export class SyncService {
 					payloadLength: UInt64.fromInt64(payloadLength),
 				};
 
+				const provider = ByteProvider.of(authorisationToken);
+				const decodedAuthorisationToken =
+					await AuthorisationToken.decodeAuthorisationTokenEntryRelative(
+						decodedEntry,
+						provider,
+					);
+				provider.endRead();
+
 				const decodedAuthorisedEntry: AuthorisedEntry & {
 					payload: ByteString | null;
 				} = {
 					...decodedEntry,
-					authorisationToken: AuthorisationToken.decodeAuthorisationTokenEntryRelative(
-						authorisationToken,
-						decodedEntry,
-					).authorisationToken,
+					authorisationToken: decodedAuthorisationToken,
 					payload,
 				};
+
 				if (!AuthorisedEntryWithPayload.is(decodedAuthorisedEntry)) {
 					throw new Error("Got entry without payload", {
 						cause: decodedEntry,
 					});
 				}
+
 				return decodedAuthorisedEntry;
 			}),
+		);
+
+		return {
+			timestamp: returnedTimestamp,
+			entries: authorisedEntries,
 		};
 	}
 }

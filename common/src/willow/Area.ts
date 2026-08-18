@@ -1,3 +1,4 @@
+import type { ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 import type { Entry } from "./Entry.js";
 import { Path } from "./Path.js";
@@ -132,55 +133,29 @@ export class Area {
 		return ByteString.concat(...parts);
 	}
 
-	public static decodeAreaInArea(
-		input: ByteString,
-		rel: Area,
-	): {
-		area: Area;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-		const headerByte = input[0];
+	public static async decodeAreaInArea(rel: Area, provider: ByteProvider): Promise<Area> {
+		const headerByte = (await provider.read(1))[0];
 
 		const hasSubspaceId = !!(headerByte & 0b1000_0000);
 		const isEndOpen = !!(headerByte & 0b0100_0000);
 		const startFromStart = !!(headerByte & 0b0010_0000);
 		const endFromStart = !!(headerByte & 0b0001_0000);
-		consumedBytes++;
-
-		let subspaceId: SubspaceId | undefined = rel.subspaceId;
-		if (hasSubspaceId) {
-			const { subspaceId: decoded, consumedBytes: subspaceIdConsumedBytes } =
-				SubspaceId.decode(input.slice(consumedBytes));
-			subspaceId = decoded;
-			consumedBytes += subspaceIdConsumedBytes;
+		if (isEndOpen && !!(headerByte & 0b0000_0011)) {
+			throw new Error("val.times.end is open but header's last two bits aren't both 0", {
+				cause: headerByte.toString(2).padStart(8, "0"),
+			});
 		}
 
-		const { value: startDiff, consumedBytes: startDiffConsumedBytes } = UInt64.decodeVariable(
-			headerByte,
-			2,
-			4,
-			input.slice(consumedBytes),
-		);
-		consumedBytes += startDiffConsumedBytes;
+		const subspaceId: SubspaceId | undefined = hasSubspaceId
+			? await SubspaceId.decode(provider)
+			: rel.subspaceId;
+		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider);
 
 		let endDiff: UInt64 | undefined;
-		if (!isEndOpen || rel.times.end !== undefined) {
-			const { value, consumedBytes: endDiffConsumedBytes } = UInt64.decodeVariable(
-				headerByte,
-				2,
-				6,
-				input.slice(consumedBytes),
-			);
-			endDiff = value;
-			consumedBytes += endDiffConsumedBytes;
+		if (!isEndOpen) {
+			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider);
 		}
-
-		const { path, consumedBytes: pathConsumedBytes } = Path.decodePathRelativePathRaw(
-			input.slice(consumedBytes),
-			rel.path,
-		);
-		consumedBytes += pathConsumedBytes;
+		const path = await Path.decodePathRelativePath(rel.path, provider);
 
 		let start: Timestamp;
 		if (startFromStart) {
@@ -209,15 +184,12 @@ export class Area {
 		}
 
 		return {
-			area: {
-				subspaceId,
-				path,
-				times: {
-					start,
-					end,
-				},
+			subspaceId,
+			path,
+			times: {
+				start,
+				end,
 			},
-			consumedBytes,
 		};
 	}
 

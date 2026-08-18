@@ -42,7 +42,7 @@ export class PushInterceptor implements NestInterceptor<void, void> {
 
 		const maxPayloadLength = this.configService.getOrThrow("MAX_UPLOAD_SIZE", { infer: true });
 
-		const decoder = await Drop.decoder();
+		const decoder = Drop.decoder();
 
 		const writer = decoder.writable.getWriter();
 

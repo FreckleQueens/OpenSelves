@@ -1,3 +1,4 @@
+import type { ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 import { Ed25519Pk } from "./Ed25519.js";
 import { NamespaceId } from "./NamespaceId.js";
@@ -108,17 +109,35 @@ export class Entry {
 	/**
 	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodeEntry
 	 */
-	public static encodeEntry(entry: Entry): ByteString {
+	public static encode(entry: Entry): ByteString {
 		const parts: ByteString[] = [];
 
 		parts.push(NamespaceId.encode(entry.namespaceId));
 		parts.push(SubspaceId.encode(entry.subspaceId));
-		parts.push(Path.encodePath(entry.path));
+		parts.push(Path.encode(entry.path));
 		parts.push(UInt64.encodeToVariable8(entry.timestamp));
 		parts.push(UInt64.encodeToVariable8(entry.payloadLength));
 		parts.push(PayloadDigest.encode(entry.payloadDigest));
 
 		return ByteString.concat(...parts);
+	}
+
+	public static async decode(provider: ByteProvider): Promise<Entry> {
+		const namespaceId = await NamespaceId.decode(provider);
+		const subspaceId = await SubspaceId.decode(provider);
+		const path = await Path.decode(provider);
+		const timestamp = await UInt64.decodeVariable8(provider);
+		const payloadLength = await UInt64.decodeVariable8(provider);
+		const payloadDigest = await PayloadDigest.decode(provider);
+
+		return {
+			namespaceId,
+			subspaceId,
+			path,
+			timestamp,
+			payloadLength,
+			payloadDigest,
+		};
 	}
 
 	public constructor(

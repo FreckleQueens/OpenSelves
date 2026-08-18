@@ -1,3 +1,4 @@
+import type { ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 
 export class PayloadDigest extends ByteString {
@@ -23,7 +24,7 @@ export class PayloadDigest extends ByteString {
 	public static encode(payloadDigest: PayloadDigest): ByteString {
 		return payloadDigest;
 	}
-	public static decode(input: ByteString): PayloadDigest {
-		return input;
+	public static async decode(provider: ByteProvider): Promise<PayloadDigest> {
+		return provider.read(PayloadDigest.LENGTH);
 	}
 }

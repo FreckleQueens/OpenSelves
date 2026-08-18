@@ -1,3 +1,4 @@
+import { ByteProvider } from "../../willow/ByteProvider.js";
 import { ByteString, UInt64 } from "../../willow/index.js";
 
 export class Payload extends ByteString {
@@ -25,26 +26,23 @@ export class Payload extends ByteString {
 		return ByteString.concat(ByteString.of(headerByte), ...parts);
 	}
 
-	public static decodeByteStringOrBlob(payload: Payload): ByteString | Blob {
-		let consumedBytes = 0;
-		const headerByte = payload[0];
-		consumedBytes++;
+	public static async decodeByteStringOrBlob(input: ByteString): Promise<ByteString | Blob> {
+		const provider = ByteProvider.of(input);
+		const headerByte = (await provider.read(1))[0];
 
 		const isBlob = headerByte >> 7 === 0b1;
+		let type: string = "";
 		if (isBlob) {
-			const { value: typeLength, consumedBytes: typeLengthConsumedBytes } =
-				UInt64.decodeVariable(headerByte, 7, 1, payload.slice(consumedBytes));
-			consumedBytes += typeLengthConsumedBytes;
-
-			const type = ByteString.toUtf8(
-				payload.slice(consumedBytes, consumedBytes + Number(typeLength)),
-			);
-			consumedBytes += Number(typeLength);
-			return new Blob([payload.slice(consumedBytes)], {
-				type: type,
-			});
-		} else {
-			return payload.slice(consumedBytes);
+			const typeLength = await UInt64.decodeVariable(headerByte, 7, 1, provider);
+			type = ByteString.toUtf8(await provider.read(Number(typeLength)));
 		}
+
+		const content = await provider.read(provider.remainingBytes);
+		provider.endRead();
+		return isBlob
+			? new Blob([content], {
+					type,
+				})
+			: content;
 	}
 }

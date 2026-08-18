@@ -1,6 +1,6 @@
 import { Area } from "../Area.js";
+import type { ByteProvider } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
-import type { DropDecodeMultiStep, DropDecodeStep } from "../Drop.js";
 import { Ed25519, Ed25519Sk } from "../Ed25519.js";
 import type { Entry } from "../Entry.js";
 import { Path } from "../Path.js";
@@ -244,29 +244,30 @@ export class CommunalCapability {
 		return ByteString.concat(...parts);
 	}
 
-	public static decodeCommunalCapabilityRelative(
+	public static async decodeCommunalCapabilityRelative(
 		rel: {
 			authorisedEntry: AuthorisedEntry;
 			entry: Omit<Entry, "payloadDigest">;
 		},
 		headerByte: number,
-		callback: (result: CommunalCapability) => void,
-	): DropDecodeStep[] {
-		const capability: CommunalCapability = {
-			accessMode: CapabilityAccessMode.WRITE,
-			namespaceKey: rel.entry.namespaceId,
-			userKey: rel.entry.subspaceId,
-			delegations: [],
-		};
-		let niceHack: UInt64;
-		const niceHackDecodeAdditionalBytesStep = UInt64.decodeUint64VariableAdditionalBytesStep(
-			"nice hack",
-			(result) => {
-				if (result.valueOf() < 1) {
-					throw new Error("nice hack must be at least 1");
-				}
-				niceHack = result;
-			},
+		provider: ByteProvider,
+	): Promise<CommunalCapability> {
+		if (headerByte >> 7 !== 0) {
+			throw new Error("Invalid header first bit, must be 0", {
+				cause: headerByte,
+			});
+		}
+
+		const delegations: Delegation[] = [];
+
+		const niceHack = await UInt64.decodeVariable(headerByte, 3, 1, provider);
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 4, 4, provider);
+
+		const sharedLength = Number(niceHack) - 1;
+		delegations.push(
+			...rel.authorisedEntry.authorisationToken.capability.inner.delegations
+				.slice(0, sharedLength)
+				.map((delegation) => Delegation.copy(delegation)),
 		);
 
 		const ctxPrivateInterest: PrivateInterest = {
@@ -274,90 +275,35 @@ export class CommunalCapability {
 			subspaceId: rel.entry.subspaceId,
 			path: rel.entry.path,
 		};
-		function makeDecodeDelegationSteps(): DropDecodeStep[] {
-			let area: Area;
-			let userPublicKey: UserPublicKey;
+		for (let i = 0; i < Number(delegationsLength) - sharedLength; i++) {
 			const previousCtx: PrivateAreaContext = {
 				privateInterest: ctxPrivateInterest,
 				rel:
-					capability.delegations.length === 0
+					delegations.length === 0
 						? Area.ofSubspace(rel.entry.subspaceId)
-						: capability.delegations[capability.delegations.length - 1].area,
+						: delegations[delegations.length - 1].area,
 			};
-			return [
-				...PrivateAreaContext.decodePrivateAreaAlmostInArea(previousCtx, (result) => {
-					area = result;
-				}),
-				{
-					name: "decode user public key",
-					consumedBytes: UserPublicKey.LENGTH,
-					decode(bytes) {
-						userPublicKey = UserPublicKey.decode(bytes).subspaceId;
-					},
-				},
-				{
-					name: "decode user signature",
-					consumedBytes: UserSignature.LENGTH,
-					decode(bytes) {
-						const { userSignature } = UserSignature.decode(bytes);
-						capability.delegations.push({
-							area,
-							userPublicKey,
-							userSignature,
-						});
-					},
-				},
-			];
+
+			const area = await PrivateAreaContext.decodePrivateAreaAlmostInArea(
+				previousCtx,
+				provider,
+			);
+			const userPublicKey = await UserPublicKey.decode(provider);
+			const userSignature = await UserSignature.decode(provider);
+
+			delegations.push({
+				area,
+				userPublicKey,
+				userSignature,
+			});
 		}
 
-		const decodeDelegationsStep: DropDecodeMultiStep = {
-			name: "Decode delegations step",
-			steps: [],
+		return {
+			accessMode: CapabilityAccessMode.WRITE,
+			namespaceKey: rel.entry.namespaceId,
+			userKey: rel.entry.subspaceId,
+			delegations,
 		};
-
-		const delegationsLengthDecodeAdditionalBytesStep =
-			UInt64.decodeUint64VariableAdditionalBytesStep("delegations length", (result) => {
-				const sharedLength = Number(niceHack) - 1;
-				capability.delegations.push(
-					...rel.authorisedEntry.authorisationToken.capability.inner.delegations
-						.slice(0, sharedLength)
-						.map((delegation) => Delegation.copy(delegation)),
-				);
-				decodeDelegationsStep.steps = Array(Number(result.valueOf()) - sharedLength)
-					.fill(0)
-					.map(() => makeDecodeDelegationSteps())
-					.flat();
-			});
-
-		if (headerByte >> 7 !== 0) {
-			throw new Error("Invalid header first bit, must be 0", {
-				cause: headerByte,
-			});
-		}
-
-		UInt64.decodeUint64VariableTagSetup(
-			(headerByte >> 4) & 0b0111,
-			3,
-			niceHackDecodeAdditionalBytesStep,
-		);
-		UInt64.decodeUint64VariableTagSetup(
-			headerByte & 0b1111,
-			4,
-			delegationsLengthDecodeAdditionalBytesStep,
-		);
-
-		return [
-			niceHackDecodeAdditionalBytesStep,
-			delegationsLengthDecodeAdditionalBytesStep,
-			decodeDelegationsStep,
-			{
-				name: "Return result",
-				consumedBytes: 0,
-				decode() {
-					callback(capability);
-				},
-			},
-		];
 	}
 
 	public static encodeCommunalCapabilityEntryRelative(
@@ -406,44 +352,31 @@ export class CommunalCapability {
 		return ByteString.concat(...parts);
 	}
 
-	public static decodeCommunalCapabilityEntryRelative(
-		input: ByteString,
+	public static async decodeCommunalCapabilityEntryRelative(
 		rel: Entry,
-	): { capability: CommunalCapability; consumedBytes: number } {
-		let consumedBytes = 0;
-		const headerByte = input[0];
-
+		headerByte: number,
+		provider: ByteProvider,
+	): Promise<CommunalCapability> {
 		if (headerByte >> 7 !== 0b0) {
 			throw new Error("First bit of header byte must be 0 for a communal capability", {
 				cause: headerByte.toString(2),
 			});
 		}
 
-		consumedBytes++;
-
-		const { value: delegationsLength, consumedBytes: delegationsLengthConsumedBytes } =
-			UInt64.decodeVariable(headerByte, 7, 1, input.slice(consumedBytes));
-		consumedBytes += delegationsLengthConsumedBytes;
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 7, 1, provider);
 
 		const delegations: Delegation[] = [];
 		for (let i = 0; i < delegationsLength.valueOf(); i++) {
-			const { delegation, consumedBytes: delegationConsumedBytes } =
-				Delegation.decodeDelegationSubspaceIdRelative(
-					input.slice(consumedBytes),
-					rel.subspaceId,
-				);
-			delegations.push(delegation);
-			consumedBytes += delegationConsumedBytes;
+			delegations.push(
+				await Delegation.decodeDelegationSubspaceIdRelative(rel.subspaceId, provider),
+			);
 		}
 
 		return {
-			capability: {
-				accessMode: CapabilityAccessMode.WRITE,
-				namespaceKey: rel.namespaceId,
-				userKey: rel.subspaceId,
-				delegations,
-			},
-			consumedBytes,
+			accessMode: CapabilityAccessMode.WRITE,
+			namespaceKey: rel.namespaceId,
+			userKey: rel.subspaceId,
+			delegations,
 		};
 	}
 

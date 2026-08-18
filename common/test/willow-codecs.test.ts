@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test, { describe } from "node:test";
 
+import { ByteProvider } from "../src/willow/ByteProvider.js";
 import { Path } from "../src/willow/Path.js";
 import { Timestamp } from "../src/willow/Timestamp.js";
 import { UInt64 } from "../src/willow/UInt64.js";
@@ -11,11 +12,12 @@ describe("willow codecs", () => {
 		Path.fromString("/"),
 		Path.fromString("/a/b///ccccc/d"),
 	]) {
-		test("Path.encodePath " + Path.toString(expectedPath), () => {
-			const encodedPath = Path.encodePath(expectedPath);
-			const { path: decodedPath, consumedBytes } = Path.decodePathRaw(encodedPath);
+		test("Path.encodePath " + Path.toString(expectedPath), async () => {
+			const encodedPath = Path.encode(expectedPath);
+			const provider = ByteProvider.of(encodedPath);
+			const decodedPath = await Path.decode(provider);
 			assert.deepStrictEqual(decodedPath, expectedPath);
-			assert.strictEqual(consumedBytes, encodedPath.length);
+			provider.endRead();
 		});
 	}
 
@@ -33,7 +35,7 @@ describe("willow codecs", () => {
 		Timestamp.now(),
 		UInt64.MAX_VALUE,
 	]) {
-		test("UInt64.encodeVariable " + expectedValue.toString(), () => {
+		test("UInt64.encodeVariable " + expectedValue.toString(), async () => {
 			for (let tagWidth = 2; tagWidth < 8; tagWidth++) {
 				for (let headerPosition = 0; headerPosition < 8; headerPosition++) {
 					const endPosition = headerPosition + tagWidth;
@@ -47,15 +49,16 @@ describe("willow codecs", () => {
 						tagWidth,
 						headerPosition,
 					);
-					const { value: decodedValue, consumedBytes } = UInt64.decodeVariable(
+					const provider = ByteProvider.of(additionalBytes);
+					const decodedValue = await UInt64.decodeVariable(
 						headerByte,
 						tagWidth,
 						headerPosition,
-						additionalBytes,
+						provider,
 					);
 					try {
 						assert.strictEqual(decodedValue, expectedValue);
-						assert.strictEqual(consumedBytes, additionalBytes.length);
+						provider.endRead();
 					} catch (e) {
 						// eslint-disable-next-line @typescript-eslint/only-throw-error
 						throw {

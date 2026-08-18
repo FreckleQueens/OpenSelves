@@ -14,6 +14,7 @@ import type { Request, Response } from "express";
 import { Writable } from "node:stream";
 import {
 	type AuthorisedEntryWithPayload,
+	ByteProvider,
 	ByteString,
 	Capability,
 	CapabilityAccessMode,
@@ -75,8 +76,9 @@ export class SyncController {
 		for (const encodedCap of pullDto.capabilities) {
 			let decodedCap: Capability;
 			try {
-				const { capability } = Capability.decode(encodedCap);
-				decodedCap = capability;
+				const provider = ByteProvider.of(encodedCap);
+				decodedCap = await Capability.decode(provider);
+				provider.endRead();
 			} catch {
 				throw new BadRequestException("Capability couldn't be decoded", {
 					cause: encodedCap,

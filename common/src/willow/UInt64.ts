@@ -1,5 +1,5 @@
+import type { ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
-import type { DropDecodeSingleStep, DropDecodeStep } from "./Drop.js";
 
 export class UInt64 extends BigInt {
 	public static readonly MAX_VALUE = 18446744073709551615n;
@@ -82,36 +82,14 @@ export class UInt64 extends BigInt {
 		return ByteString.concat(new Uint8Array([parts.tag]), parts.additionalBytes);
 	}
 
-	public static decodeVariable8(input: ByteString): {
-		value: UInt64;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-
-		const tag = input[0];
-		consumedBytes++;
-		let value: UInt64 = BigInt(tag);
-
+	public static async decodeVariable8(provider: ByteProvider): Promise<UInt64> {
+		const tag = (await provider.read(1))[0];
 		const variableLength = UInt64.decodeVariableBytesLength(tag, 8);
 		if (variableLength > 0) {
-			if (input.length < consumedBytes + variableLength) {
-				throw new Error(
-					"Decode variable 8 needed " +
-						variableLength +
-						" + 1 bytes, but input only has " +
-						input.length,
-					{ cause: input },
-				);
-			}
-			const variableBytes = input.slice(consumedBytes, consumedBytes + variableLength);
-			consumedBytes += variableLength;
-			value = UInt64.decodeVariableAdditionalBytes(variableBytes);
+			return UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength));
+		} else {
+			return BigInt(tag);
 		}
-
-		return {
-			value,
-			consumedBytes,
-		};
 	}
 
 	public static encodeVariable(
@@ -145,15 +123,12 @@ export class UInt64 extends BigInt {
 		};
 	}
 
-	public static decodeVariable(
+	public static async decodeVariable(
 		headerByte: number,
 		tagWidth: number,
 		bitBigEndianPosition: number,
-		additionalBytes: ByteString,
-	): {
-		value: UInt64;
-		consumedBytes: number;
-	} {
+		provider: ByteProvider,
+	): Promise<UInt64> {
 		if (tagWidth < 2 || tagWidth > 8) {
 			throw new Error("tagWidth must be between 2 and 8 included", {
 				cause: tagWidth,
@@ -173,13 +148,10 @@ export class UInt64 extends BigInt {
 		const variableLength = UInt64.decodeVariableBytesLength(tag, tagWidth);
 
 		if (variableLength > 0) {
-			value = UInt64.decodeVariableAdditionalBytes(additionalBytes.slice(0, variableLength));
+			value = UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength));
 		}
 
-		return {
-			value,
-			consumedBytes: variableLength,
-		};
+		return value;
 	}
 
 	public static decodeVariableBytesLength(tag: number, tagWidth: number) {
@@ -203,73 +175,5 @@ export class UInt64 extends BigInt {
 				previousValue | (BigInt(currentValue) << BigInt(index * 8)),
 			0n,
 		);
-	}
-
-	public static decodeUint64VariableTagSetup(
-		tag: number,
-		tagWidth: number,
-		additionalBytesStep: DropDecodeSingleStep & {
-			tag: number;
-		},
-	) {
-		additionalBytesStep.consumedBytes = this.decodeVariableBytesLength(tag, tagWidth);
-		additionalBytesStep.tag = tag;
-	}
-
-	public static decodeUint64VariableAdditionalBytesStep(
-		name: string,
-		callback: (result: UInt64) => void,
-	): DropDecodeSingleStep & {
-		tag: number;
-	} {
-		return {
-			name: "Decode " + name + " uint64 additional bytes",
-			consumedBytes: 0,
-			tag: NaN,
-			decode(bytes) {
-				callback(
-					bytes.length === 0
-						? BigInt(this.tag)
-						: UInt64.decodeVariableAdditionalBytes(bytes),
-				);
-			},
-		};
-	}
-
-	public static decodeUint64Variable8(callback: (result: UInt64) => void): DropDecodeStep[] {
-		return [
-			{
-				name: "decodeUint64Variable8 tag",
-				consumedBytes: 1,
-				decode(bytes) {
-					const additionalBytesLength = UInt64.decodeVariableBytesLength(bytes[0], 8);
-					if (additionalBytesLength === 0) {
-						const result = BigInt(bytes[0]);
-						if (!UInt64.isValid(result)) {
-							throw new Error("Invalid UInt64", {
-								cause: result,
-							});
-						}
-						callback(result);
-					}
-					return additionalBytesLength;
-				},
-			},
-			{
-				name: "decodeUint64Variable8 additionalBytes",
-				consumedBytes: 0,
-				decode(bytes) {
-					if (bytes.length > 0) {
-						const result = UInt64.decodeVariableAdditionalBytes(bytes);
-						if (!UInt64.isValid(result)) {
-							throw new Error("Invalid UInt64", {
-								cause: result,
-							});
-						}
-						callback(result);
-					}
-				},
-			},
-		];
 	}
 }

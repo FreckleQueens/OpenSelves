@@ -463,7 +463,7 @@ describe("/sync/pull", () => {
 					assert(response.body);
 
 					const entries: AuthorisedEntryWithPayload[] = await readStream(
-						response.body.pipeThrough(await Drop.decoder()),
+						response.body.pipeThrough(Drop.decoder()),
 					);
 
 					const expectedCount = expectEntryCount();

@@ -93,7 +93,7 @@ describe("meadowcap", () => {
 			});
 			authorisedEntry.authorisationToken.signature = await Ed25519.sign(
 				subspace.secretKey,
-				Entry.encodeEntry(wrongPayloadEntry),
+				Entry.encode(wrongPayloadEntry),
 			);
 			assert.strictEqual(await AuthorisedEntry.isAuthorisedWrite(authorisedEntry), false);
 		});

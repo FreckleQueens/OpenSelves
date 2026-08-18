@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import test, { describe } from "node:test";
 
+import { ByteProvider } from "../src/willow/ByteProvider.js";
 import {
 	AuthorisationToken,
 	AuthorisedEntry,
@@ -35,10 +36,14 @@ describe("willow non-standard codecs", () => {
 			expectedAuthorisationToken,
 			entry,
 		);
-		const decoded = AuthorisationToken.decodeAuthorisationTokenEntryRelative(encoded, entry);
+		const provider = ByteProvider.of(encoded);
+		const decoded = await AuthorisationToken.decodeAuthorisationTokenEntryRelative(
+			entry,
+			provider,
+		);
 
-		assert.deepStrictEqual(decoded.authorisationToken, expectedAuthorisationToken);
-		assert.deepStrictEqual(decoded.consumedBytes, encoded.length);
+		assert.deepStrictEqual(decoded, expectedAuthorisationToken);
+		provider.endRead();
 	});
 
 	test("Capability.encode simple", async () => {
@@ -52,9 +57,10 @@ describe("willow non-standard codecs", () => {
 		);
 
 		const encodedCap = Capability.encode(expectedCap);
-		const { capability: decodedCap, consumedBytes } = Capability.decode(encodedCap);
+		const provider = ByteProvider.of(encodedCap);
+		const decodedCap = await Capability.decode(provider);
 		assert.deepStrictEqual(decodedCap, expectedCap);
-		assert.strictEqual(consumedBytes, encodedCap.length);
+		provider.endRead();
 	});
 
 	test("Capability.encode delegations", async () => {
@@ -70,8 +76,9 @@ describe("willow non-standard codecs", () => {
 		);
 
 		const encodedCap = Capability.encode(expectedCap);
-		const { capability: decodedCap, consumedBytes } = Capability.decode(encodedCap);
+		const provider = ByteProvider.of(encodedCap);
+		const decodedCap = await Capability.decode(provider);
 		assert.deepStrictEqual(decodedCap, expectedCap);
-		assert.strictEqual(consumedBytes, encodedCap.length);
+		provider.endRead();
 	});
 });

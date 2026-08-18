@@ -1,4 +1,5 @@
 import { Area } from "../Area.js";
+import type { ByteProvider } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import type { SubspaceId } from "../SubspaceId.js";
 import { CommunalCapability } from "./CommunalCapability.js";
@@ -63,37 +64,17 @@ export class Delegation {
 		);
 	}
 
-	public static decodeDelegationSubspaceIdRelative(
-		input: ByteString,
+	public static async decodeDelegationSubspaceIdRelative(
 		rel: SubspaceId,
-	): {
-		delegation: Delegation;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-		const { area, consumedBytes: areaConsumedBytes } = Area.decodeAreaInArea(
-			input,
-			Area.ofSubspace(rel),
-		);
-		consumedBytes += areaConsumedBytes;
-
-		const { userPublicKey, consumedBytes: userPublicKeyConsumedBytes } = UserPublicKey.decode(
-			input.slice(consumedBytes),
-		);
-		consumedBytes += userPublicKeyConsumedBytes;
-
-		const { userSignature, consumedBytes: userSignatureConsumedBytes } = UserSignature.decode(
-			input.slice(consumedBytes),
-		);
-		consumedBytes += userSignatureConsumedBytes;
-
+		provider: ByteProvider,
+	): Promise<Delegation> {
+		const area = await Area.decodeAreaInArea(Area.ofSubspace(rel), provider);
+		const userPublicKey = await UserPublicKey.decode(provider);
+		const userSignature = await UserSignature.decode(provider);
 		return {
-			delegation: {
-				area,
-				userPublicKey,
-				userSignature,
-			},
-			consumedBytes,
+			area,
+			userPublicKey,
+			userSignature,
 		};
 	}
 

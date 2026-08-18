@@ -1,4 +1,5 @@
 import { Area } from "../Area.js";
+import type { ByteProvider } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { NamespaceId } from "../NamespaceId.js";
 import { SubspaceId } from "../SubspaceId.js";
@@ -166,14 +167,8 @@ export class Capability {
 		return ByteString.concat(...parts);
 	}
 
-	public static decode(input: ByteString): {
-		capability: Capability;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-
-		const accessModeByte = input[0];
-		consumedBytes++;
+	public static async decode(provider: ByteProvider): Promise<Capability> {
+		const accessModeByte = (await provider.read(1))[0];
 
 		const isCommunal = (accessModeByte & 0b0000_0010) === 0;
 		const isRead = (accessModeByte & 0b0000_0001) === 0;
@@ -181,40 +176,24 @@ export class Capability {
 			throw new Error("Decoding owned capabilities is not supported");
 		}
 
-		const { namespacePublicKey, consumedBytes: namespacePublicKeyConsumedBytes } =
-			NamespacePublicKey.decode(input.slice(consumedBytes));
-		consumedBytes += namespacePublicKeyConsumedBytes;
-
-		const { userPublicKey, consumedBytes: userPublicKeyConsumedBytes } = UserPublicKey.decode(
-			input.slice(consumedBytes),
-		);
-		consumedBytes += userPublicKeyConsumedBytes;
-
-		const { value: delegationsLength, consumedBytes: delegationsLengthConsumedBytes } =
-			UInt64.decodeVariable8(input.slice(consumedBytes));
-		consumedBytes += delegationsLengthConsumedBytes;
+		const namespacePublicKey = await NamespacePublicKey.decode(provider);
+		const userPublicKey = await UserPublicKey.decode(provider);
+		const delegationsLength = await UInt64.decodeVariable8(provider);
 
 		const delegations: Delegation[] = [];
 		for (let i = 0; i < delegationsLength.valueOf(); i++) {
-			const { delegation, consumedBytes: delegationConsumedBytes } =
-				Delegation.decodeDelegationSubspaceIdRelative(
-					input.slice(consumedBytes),
-					userPublicKey,
-				);
-			consumedBytes += delegationConsumedBytes;
-			delegations.push(delegation);
+			delegations.push(
+				await Delegation.decodeDelegationSubspaceIdRelative(userPublicKey, provider),
+			);
 		}
 
 		return {
-			capability: {
-				inner: {
-					namespaceKey: namespacePublicKey,
-					userKey: userPublicKey,
-					accessMode: isRead ? CapabilityAccessMode.READ : CapabilityAccessMode.WRITE,
-					delegations,
-				},
+			inner: {
+				namespaceKey: namespacePublicKey,
+				userKey: userPublicKey,
+				accessMode: isRead ? CapabilityAccessMode.READ : CapabilityAccessMode.WRITE,
+				delegations,
 			},
-			consumedBytes,
 		};
 	}
 

@@ -1,6 +1,6 @@
 import { Area } from "../Area.js";
+import type { ByteProvider } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
-import type { DropDecodeSingleStep, DropDecodeStep } from "../Drop.js";
 import { SubspaceId } from "../SubspaceId.js";
 import { UInt64 } from "../UInt64.js";
 import { PrivateInterest } from "./PrivateInterest.js";
@@ -78,105 +78,70 @@ export class PrivateAreaContext {
 		return ByteString.concat(...parts);
 	}
 
-	public static decodePrivateAreaAlmostInArea(
+	public static async decodePrivateAreaAlmostInArea(
 		rel: PrivateAreaContext,
-		callback: (area: Area) => void,
-	): DropDecodeStep[] {
-		let hasSubspaceId: boolean;
+		provider: ByteProvider,
+	): Promise<Area> {
+		const headerByte = (await provider.read(1))[0];
+		const hasSubspaceId = !!(headerByte & 0b1000_0000);
+		const isSubspaceIdOpen = !!(headerByte & 0b0100_0000);
+		const startFromStart = !!(headerByte & 0b0010_0000);
+		const endFromStart = !!(headerByte & 0b0001_0000);
+
+		const isEndOpen = rel.rel.times.end !== undefined ? false : !endFromStart;
+
 		let subspaceId: SubspaceId | undefined;
-		const subspaceIdDecodeStep: DropDecodeSingleStep = {
-			name: "Decode subspaceId",
-			consumedBytes: 0,
-			decode(bytes) {
-				if (hasSubspaceId) {
-					if (bytes.length === 0) {
-						subspaceId = undefined;
-					} else {
-						subspaceId = SubspaceId.decode(bytes).subspaceId;
-					}
-				} else {
-					subspaceId = rel.rel.subspaceId;
-				}
-			},
-		};
+		if (hasSubspaceId) {
+			if (isSubspaceIdOpen) {
+				subspaceId = undefined;
+			} else {
+				subspaceId = await SubspaceId.decode(provider);
+			}
+		} else {
+			subspaceId = rel.rel.subspaceId;
+		}
 
-		let startFromStart: boolean;
+		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider);
 		let start: UInt64;
-		const startDiffDecodeStep = UInt64.decodeUint64VariableAdditionalBytesStep(
-			"startDiff",
-			(result) => {
-				if (startFromStart) {
-					start = result.valueOf() + rel.rel.times.start.valueOf();
-				} else {
-					if (rel.rel.times.end === undefined) {
-						throw new Error("startFromStart is false but relEnd is undefined");
-					}
-					start = rel.rel.times.end.valueOf() - result.valueOf();
-				}
-			},
-		);
+		if (startFromStart) {
+			start = startDiff.valueOf() + rel.rel.times.start.valueOf();
+		} else {
+			if (rel.rel.times.end === undefined) {
+				throw new Error("startFromStart is false but relEnd is undefined");
+			}
+			start = rel.rel.times.end.valueOf() - startDiff.valueOf();
+		}
 
-		let endFromStart: boolean;
-		let isEndOpen: boolean;
+		let endDiff: UInt64 | undefined;
+		if (!isEndOpen) {
+			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider);
+		}
+
 		let end: UInt64 | undefined;
-		const endDiffDecodeStep = UInt64.decodeUint64VariableAdditionalBytesStep(
-			"endDiff",
-			(result) => {
-				if (isEndOpen) {
-					end = undefined;
-				} else if (endFromStart) {
-					end = result.valueOf() + rel.rel.times.start.valueOf();
-				} else {
-					if (rel.rel.times.end === undefined) {
-						throw new Error("endFromStart is false but relEnd is undefined");
-					}
-					end = rel.rel.times.end.valueOf() - result.valueOf();
-				}
+		if (endDiff === undefined) {
+			end = undefined;
+		} else if (endFromStart) {
+			end = endDiff.valueOf() + rel.rel.times.start.valueOf();
+		} else {
+			if (rel.rel.times.end === undefined) {
+				throw new Error("endFromStart is false but relEnd is undefined");
+			}
+			end = rel.rel.times.end.valueOf() - endDiff.valueOf();
+		}
+
+		const path = await PrivatePathContext.decodePrivatePathExtendsPath(
+			{
+				privatePath: rel.privateInterest.path,
+				rel: rel.rel.path,
 			},
+			provider,
 		);
 
-		return [
-			{
-				name: "decode header byte",
-				consumedBytes: 1,
-				decode(bytes) {
-					const headerByte = bytes[0];
-					hasSubspaceId = !!(headerByte & 0b1000_0000);
-					const isSubspaceIdOpen = !!(headerByte & 0b0100_0000);
-					startFromStart = !!(headerByte & 0b0010_0000);
-					endFromStart = !!(headerByte & 0b0001_0000);
-					const startDiffTag = headerByte & 0b0000_1100;
-					const endDiffTag = headerByte & 0b0000_0011;
-
-					if (hasSubspaceId && !isSubspaceIdOpen) {
-						subspaceIdDecodeStep.consumedBytes = SubspaceId.LENGTH;
-					}
-
-					UInt64.decodeUint64VariableTagSetup(startDiffTag, 2, startDiffDecodeStep);
-					isEndOpen = rel.rel.times.end !== undefined ? false : !endFromStart;
-					UInt64.decodeUint64VariableTagSetup(endDiffTag, 2, endDiffDecodeStep);
-					if (isEndOpen) {
-						endDiffDecodeStep.consumedBytes = 0;
-					}
-				},
-			},
-			subspaceIdDecodeStep,
-			startDiffDecodeStep,
-			endDiffDecodeStep,
-			...PrivatePathContext.decodePrivatePathExtendsPath(
-				{
-					privatePath: rel.privateInterest.path,
-					rel: rel.rel.path,
-				},
-				(result) => {
-					callback({
-						subspaceId,
-						path: result,
-						times: { start, end },
-					});
-				},
-			),
-		];
+		return {
+			subspaceId,
+			path,
+			times: { start, end },
+		};
 	}
 
 	public constructor(

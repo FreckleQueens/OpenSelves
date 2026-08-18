@@ -17,12 +17,20 @@ export function getMemberImageUrl(inState: { member?: MemberStatic }) {
 				return;
 			}
 
-			decodedValue = Payload.decodeByteStringOrBlob(imageContents);
-			if (decodedValue instanceof Blob) {
-				state.url = URL.createObjectURL(decodedValue);
-			} else {
-				state.url = ByteString.toUtf8(decodedValue);
-			}
+			Payload.decodeByteStringOrBlob(imageContents)
+				.then((result) => {
+					decodedValue = result;
+
+					if (decodedValue instanceof Blob) {
+						state.url = URL.createObjectURL(decodedValue);
+					} else {
+						state.url = ByteString.toUtf8(decodedValue);
+					}
+				})
+				.catch((err) => {
+					decodedValue = undefined;
+					throw err;
+				});
 		} else {
 			state.url = undefined;
 		}

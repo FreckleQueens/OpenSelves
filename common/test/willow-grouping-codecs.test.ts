@@ -2,6 +2,7 @@ import assert from "node:assert";
 import test, { describe } from "node:test";
 
 import { Area } from "../src/willow/Area.js";
+import { ByteProvider } from "../src/willow/ByteProvider.js";
 import { Ed25519 } from "../src/willow/Ed25519.js";
 import { Path } from "../src/willow/Path.js";
 
@@ -66,15 +67,13 @@ describe("willow grouping codecs", async () => {
 				expectedArea.times.start +
 				"; " +
 				expectedArea.times.end,
-			() => {
+			async () => {
 				const rel = Area.ofSubspace(subspace.publicKey);
 				const encodedArea = Area.encodeAreaInArea(expectedArea, rel);
-				const { area: decodedArea, consumedBytes } = Area.decodeAreaInArea(
-					encodedArea,
-					rel,
-				);
+				const provider = ByteProvider.of(encodedArea);
+				const decodedArea = await Area.decodeAreaInArea(rel, provider);
 				assert.deepStrictEqual(decodedArea, expectedArea);
-				assert.strictEqual(consumedBytes, encodedArea.length);
+				provider.endRead();
 			},
 		);
 	}

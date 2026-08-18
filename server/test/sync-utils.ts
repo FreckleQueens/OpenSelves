@@ -143,7 +143,7 @@ export async function getSyncFrom(
 
 	assert(response.body);
 	const entries: AuthorisedEntryWithPayload[] = await readStream(
-		response.body.pipeThrough(await Drop.decoder()),
+		response.body.pipeThrough(Drop.decoder()),
 	);
 
 	for (const entry of entries) {

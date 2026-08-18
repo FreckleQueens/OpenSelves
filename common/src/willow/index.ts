@@ -2,6 +2,7 @@ export * from "./extension/index.js";
 export * from "./meadowcap/index.js";
 export * from "./private/index.js";
 export * from "./Area.js";
+export * from "./ByteProvider.js";
 export * from "./ByteString.js";
 export * from "./Drop.js";
 export * from "./Ed25519.js";

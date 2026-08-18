@@ -1,3 +1,4 @@
+import { type ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
 import { Ed25519, type Ed25519KeyPair, Ed25519Pk } from "./Ed25519.js";
 
@@ -18,22 +19,7 @@ export class NamespaceId extends Ed25519Pk {
 		return namespaceId;
 	}
 
-	public static decode(input: ByteString): {
-		namespaceId: NamespaceId;
-		consumedBytes: number;
-	} {
-		if (input.length < NamespaceId.LENGTH) {
-			throw new Error(
-				"input is too short, needs " + NamespaceId.LENGTH + " bytes, got " + input.length,
-				{
-					cause: input,
-				},
-			);
-		}
-
-		return {
-			namespaceId: input.slice(0, NamespaceId.LENGTH),
-			consumedBytes: NamespaceId.LENGTH,
-		};
+	public static async decode(provider: ByteProvider): Promise<NamespaceId> {
+		return provider.read(NamespaceId.LENGTH);
 	}
 }

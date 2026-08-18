@@ -1,5 +1,5 @@
+import { type ByteProvider } from "./ByteProvider.js";
 import { ByteString } from "./ByteString.js";
-import type { DropDecodeMultiStep, DropDecodeSingleStep, DropDecodeStep } from "./Drop.js";
 import { PathComponent } from "./PathComponent.js";
 import { UInt64 } from "./UInt64.js";
 import { Willow25 } from "./Willow25.js";
@@ -114,7 +114,7 @@ export class Path extends Array<PathComponent> {
 	/**
 	 * https://willowprotocol.org/specs/encodings/index.html#encsec_EncodePath
 	 */
-	public static encodePath(path: Path): ByteString {
+	public static encode(path: Path): ByteString {
 		const componentLengthSum = UInt64.encodeToVariable(
 			path.reduce(
 				(previousValue, currentValue) => previousValue + BigInt(currentValue.byteLength),
@@ -143,159 +143,25 @@ export class Path extends Array<PathComponent> {
 		return ByteString.concat(...parts);
 	}
 
-	public static decodePath(callback: (path: Path) => void): DropDecodeStep[] {
-		const path: Path = [];
-		let componentCount: UInt64;
+	public static async decode(provider: ByteProvider): Promise<Path> {
+		const headerByte = (await provider.read(1))[0];
 
-		const componentLengthSumAdditionalBytesStep =
-			UInt64.decodeUint64VariableAdditionalBytesStep(
-				"component length sum",
-				(componentLengthSum) => {
-					if (componentLengthSum.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
-						throw new Error(
-							"Path total length is too big! max=" +
-								Willow25.MAX_PATH_LENGTH +
-								", got " +
-								componentLengthSum.valueOf(),
-						);
-					}
-
-					decodeLastComponentStep.consumedBytes = Number(componentLengthSum);
-				},
-			);
-
-		const componentCountAdditionalBytesStep = UInt64.decodeUint64VariableAdditionalBytesStep(
-			"component count",
-			(result) => {
-				componentCount = result;
-
-				if (componentCount.valueOf() > Willow25.MAX_COMPONENT_COUNT) {
-					throw new Error(
-						"Component count for path is too big! max=" +
-							Willow25.MAX_COMPONENT_COUNT +
-							", got " +
-							componentCount.valueOf(),
-					);
-				}
-
-				const intermediateComponentCount = Number(componentCount) - 1;
-				if (intermediateComponentCount > 0) {
-					decodeIntermediateComponentsStep.steps.push(
-						...Array(intermediateComponentCount)
-							.fill(0)
-							.reduce<DropDecodeStep[]>((previousValue) => {
-								const readComponentStep: DropDecodeStep = {
-									name: "readComponentStep",
-									consumedBytes: 0,
-									decode(bytes) {
-										path.push(bytes);
-									},
-								};
-
-								return [
-									...previousValue,
-									...UInt64.decodeUint64Variable8((result: UInt64) => {
-										if (result.valueOf() > Willow25.MAX_COMPONENT_LENGTH) {
-											throw new Error(
-												"Path component length is too big! max=" +
-													Willow25.MAX_COMPONENT_LENGTH +
-													", got " +
-													result.valueOf(),
-											);
-										}
-
-										const consumedBytes = Number(result);
-										readComponentStep.consumedBytes = consumedBytes;
-										decodeLastComponentStep.consumedBytes -= consumedBytes;
-									}),
-									readComponentStep,
-								];
-							}, []),
-					);
-				}
-			},
-		);
-
-		const decodeIntermediateComponentsStep: DropDecodeMultiStep = {
-			name: "decode intermediate components",
-			steps: [],
-		};
-
-		const decodeLastComponentStep: DropDecodeSingleStep = {
-			name: "decodeLastComponentStep",
-			consumedBytes: 0,
-			decode(bytes) {
-				if (componentCount.valueOf() > 0) {
-					path.push(bytes);
-				}
-				callback(path);
-			},
-		};
-
-		return [
-			// header byte
-			{
-				name: "path header byte",
-				consumedBytes: 1,
-				decode(bytes) {
-					UInt64.decodeUint64VariableTagSetup(
-						bytes[0] >> 4,
-						4,
-						componentLengthSumAdditionalBytesStep,
-					);
-
-					UInt64.decodeUint64VariableTagSetup(
-						bytes[0] & 0b1111,
-						4,
-						componentCountAdditionalBytesStep,
-					);
-				},
-			},
-			componentLengthSumAdditionalBytesStep,
-			componentCountAdditionalBytesStep,
-			decodeIntermediateComponentsStep,
-			decodeLastComponentStep,
-		];
-	}
-
-	public static decodePathRaw(input: ByteString): {
-		path: Path;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-
-		const headerByte = input[0];
-		consumedBytes++;
-
-		const { value: componentLengthSum, consumedBytes: componentLengthSumConsumedBytes } =
-			UInt64.decodeVariable(headerByte, 4, 0, input.slice(consumedBytes));
-		consumedBytes += componentLengthSumConsumedBytes;
-
-		const { value: componentCount, consumedBytes: componentCountConsumedBytes } =
-			UInt64.decodeVariable(headerByte, 4, 4, input.slice(consumedBytes));
-		consumedBytes += componentCountConsumedBytes;
+		const componentLengthSum = await UInt64.decodeVariable(headerByte, 4, 0, provider);
+		const componentCount = await UInt64.decodeVariable(headerByte, 4, 4, provider);
 
 		const path: Path = [];
-		let componentConsumedBytes = 0;
 		for (let i = 0; i < componentCount.valueOf() - 1n; i++) {
-			const { value: componentLength, consumedBytes: componentLengthConsumedBytes } =
-				UInt64.decodeVariable8(input.slice(consumedBytes));
-			consumedBytes += componentLengthConsumedBytes;
-			path.push(input.slice(consumedBytes, consumedBytes + Number(componentLength)));
-			consumedBytes += Number(componentLength);
-			componentConsumedBytes += Number(componentLength);
+			const componentLength = await UInt64.decodeVariable8(provider);
+			path.push(await provider.read(Number(componentLength)));
 		}
 
 		if (componentCount.valueOf() > 0) {
-			const lastComponentLength = Number(componentLengthSum) - componentConsumedBytes;
-			path.push(input.slice(consumedBytes, consumedBytes + lastComponentLength));
-			consumedBytes += lastComponentLength;
+			const lastComponentLength =
+				Number(componentLengthSum) - path.reduce((prev, cur) => prev + cur.length, 0);
+			path.push(await provider.read(lastComponentLength));
 		}
 
-		return {
-			path,
-			consumedBytes,
-		};
+		return path;
 	}
 
 	/**
@@ -308,48 +174,16 @@ export class Path extends Array<PathComponent> {
 		parts.push(UInt64.encodeToVariable8(BigInt(lcp.length)));
 
 		const difference = Path.difference(lcp, val);
-		parts.push(Path.encodePath(difference));
+		parts.push(Path.encode(difference));
 		return ByteString.concat(...parts);
 	}
 
-	public static decodePathRelativePath(
-		getRel: () => Path,
-		callback: (val: Path) => void,
-	): DropDecodeStep[] {
-		let pathLongestCommonPrefixLength: UInt64;
+	public static async decodePathRelativePath(rel: Path, provider: ByteProvider): Promise<Path> {
+		const pathLongestCommonPrefixLength = await UInt64.decodeVariable8(provider);
 		return [
-			...UInt64.decodeUint64Variable8((result) => {
-				pathLongestCommonPrefixLength = result;
-			}),
-			...Path.decodePath((pathSuffix) => {
-				callback([
-					...getRel().slice(0, Number(pathLongestCommonPrefixLength)),
-					...pathSuffix,
-				]);
-			}),
+			...rel.slice(0, Number(pathLongestCommonPrefixLength)),
+			...(await Path.decode(provider)),
 		];
-	}
-
-	public static decodePathRelativePathRaw(
-		input: ByteString,
-		rel: Path,
-	): {
-		path: Path;
-		consumedBytes: number;
-	} {
-		let consumedBytes = 0;
-		const { value: pathLongestCommonPrefixLength, consumedBytes: lcplConsumedBytes } =
-			UInt64.decodeVariable8(input);
-		consumedBytes += lcplConsumedBytes;
-
-		const { path, consumedBytes: pathConsumedBytes } = Path.decodePathRaw(
-			input.slice(consumedBytes),
-		);
-		consumedBytes += pathConsumedBytes;
-		return {
-			path: [...rel.slice(0, Number(pathLongestCommonPrefixLength)), ...path],
-			consumedBytes,
-		};
 	}
 
 	/**
@@ -362,15 +196,10 @@ export class Path extends Array<PathComponent> {
 			);
 		}
 
-		return Path.encodePath(Path.difference(rel, val));
+		return Path.encode(Path.difference(rel, val));
 	}
 
-	public static decodePathExtendsPath(
-		rel: Path,
-		callback: (result: Path) => void,
-	): DropDecodeStep[] {
-		return Path.decodePath((path) => {
-			callback([...rel, ...path]);
-		});
+	public static async decodePathExtendsPath(rel: Path, provider: ByteProvider): Promise<Path> {
+		return [...rel, ...(await Path.decode(provider))];
 	}
 }

@@ -48,7 +48,7 @@ export class AuthorisedEntry extends Entry {
 		entry: Entry,
 		signData: CapabilitySignData,
 	): Promise<AuthorisedEntry> {
-		const signature = await Ed25519.sign(signData.secretKey, Entry.encodeEntry(entry));
+		const signature = await Ed25519.sign(signData.secretKey, Entry.encode(entry));
 		let capability: Capability;
 		if (NamespaceId.isCommunal(entry.namespaceId)) {
 			capability = Capability.create(
@@ -94,11 +94,7 @@ export class AuthorisedEntry extends Entry {
 			val.authorisationToken.capability.inner.accessMode === CapabilityAccessMode.WRITE &&
 			Area.includesEntry(grantedArea, val) &&
 			(await Capability.isValid(val.authorisationToken.capability)) &&
-			(await Ed25519.verify(
-				receiver,
-				val.authorisationToken.signature,
-				Entry.encodeEntry(val),
-			))
+			(await Ed25519.verify(receiver, val.authorisationToken.signature, Entry.encode(val)))
 		);
 	}
 
