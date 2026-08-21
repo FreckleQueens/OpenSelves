@@ -216,7 +216,7 @@ export class Capability {
 		return ByteString.concat(...parts);
 	}
 
-	public static async decode(provider: ByteProvider): Promise<Capability> {
+	public static async decode(provider: ByteProvider, canonic: boolean): Promise<Capability> {
 		const headerByte = (await provider.read(1))[0];
 
 		const isOwned = !!(headerByte & 0b1000_0000);
@@ -242,13 +242,13 @@ export class Capability {
 			initialAuthorisation = await NamespaceSignature.decode(provider);
 		}
 
-		const delegationsLength = await UInt64.decodeVariable(headerByte, 6, 2, provider);
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 6, 2, provider, canonic);
 
 		const delegations: Delegation[] = [];
 		let previousArea = isOwned ? Area.full() : Area.ofSubspace(userPublicKey);
 		for (let i = 0; i < delegationsLength.valueOf(); i++) {
 			const delegation = {
-				area: await Area.decodeAreaInArea(previousArea, provider),
+				area: await Area.decodeAreaInArea(previousArea, provider, canonic),
 				userPublicKey: await UserPublicKey.decode(provider),
 				userSignature: await UserSignature.decode(provider),
 			};

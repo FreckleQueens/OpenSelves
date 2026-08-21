@@ -21,6 +21,10 @@ export class Area {
 		);
 	}
 
+	public static isValid(val: Area): boolean {
+		return Path.isValid(val.path) && TimeRange.isValid(val.times);
+	}
+
 	public static equals(a: Area, b: Area): boolean {
 		return (
 			SubspaceId.equals(a.subspaceId, b.subspaceId) &&
@@ -144,14 +148,44 @@ export class Area {
 		return ByteString.concat(...parts);
 	}
 
-	public static async decodeAreaInArea(rel: Area, provider: ByteProvider): Promise<Area> {
+	public static async decodeAreaInArea(
+		rel: Area,
+		provider: ByteProvider,
+		canonic: boolean,
+	): Promise<Area> {
 		const headerByte = (await provider.read(1))[0];
 
 		const hasSubspaceId = !!(headerByte & 0b1000_0000);
 		const isEndOpen = !!(headerByte & 0b0100_0000);
 		const startFromStart = !!(headerByte & 0b0010_0000);
 		const endFromStart = !!(headerByte & 0b0001_0000);
-		if (isEndOpen && !!(headerByte & 0b0000_0011)) {
+
+		if (rel.times.end === undefined && isEndOpen === endFromStart) {
+			throw new InvalidInputError(
+				"endFromStart must be set to !isEndOpen when rel.times.end is open",
+				{
+					cause: {
+						relEnd: rel.times.end,
+						isEndOpen,
+						endFromStart,
+					},
+				},
+			);
+		}
+
+		if (isEndOpen && rel.times.end !== undefined) {
+			throw new InvalidInputError(
+				"isEndOpen is true but rel.times.end is not open, decoded area wouldn't be included in rel",
+				{
+					cause: {
+						relEnd: rel.times.end,
+						isEndOpen,
+					},
+				},
+			);
+		}
+
+		if (canonic && isEndOpen && !!(headerByte & 0b0000_0011)) {
 			throw new InvalidInputError(
 				"val.times.end is open but endDiff tag isn't minimal (expected header last 2 bits to be 0)",
 				{
@@ -163,14 +197,9 @@ export class Area {
 		const subspaceId: SubspaceId | undefined = hasSubspaceId
 			? await SubspaceId.decode(provider)
 			: rel.subspaceId;
-		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider);
 
-		let endDiff: UInt64 | undefined;
-		if (!isEndOpen) {
-			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider);
-		}
-
-		const path = await Path.decodePathExtendsPath(rel.path, provider);
+		// Start
+		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider, canonic);
 
 		let start: Timestamp;
 		if (startFromStart) {
@@ -184,19 +213,49 @@ export class Area {
 			start = rel.times.end.valueOf() - startDiff.valueOf();
 		}
 
+		if (!UInt64.isValid(start)) {
+			throw new InvalidInputError("Got invalid start", {
+				cause: {
+					start,
+					startFromStart,
+					startDiff,
+					relTimes: rel.times,
+				},
+			});
+		}
+
+		// End
 		let end: Timestamp | undefined;
-		if (isEndOpen || endDiff === undefined) {
+		if (isEndOpen) {
 			end = undefined;
-		} else if (endFromStart) {
-			end = endDiff.valueOf() + rel.times.start.valueOf();
 		} else {
-			if (rel.times.end === undefined) {
-				throw new Error("endFromStart is false but rel.times.end is open", {
-					cause: rel,
+			const endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider, canonic);
+
+			if (endFromStart) {
+				end = endDiff.valueOf() + rel.times.start.valueOf();
+			} else {
+				if (rel.times.end === undefined) {
+					throw new InvalidInputError("endFromStart is false but rel.times.end is open", {
+						cause: rel,
+					});
+				}
+				end = rel.times.end.valueOf() - endDiff.valueOf();
+			}
+
+			if (!UInt64.isValid(end)) {
+				throw new InvalidInputError("Got invalid end", {
+					cause: {
+						end,
+						endFromStart,
+						endDiff,
+						relTimes: rel.times,
+					},
 				});
 			}
-			end = rel.times.end.valueOf() - endDiff.valueOf();
 		}
+
+		// Path
+		const path = await Path.decodePathExtendsPath(rel.path, provider, canonic);
 
 		const result = {
 			subspaceId,
@@ -207,6 +266,12 @@ export class Area {
 			},
 		};
 
+		if (!Area.isValid(result)) {
+			throw new InvalidInputError("Got invalid result", {
+				cause: result,
+			});
+		}
+
 		if (!Area.includes(rel, result)) {
 			throw new InvalidInputError("Got area not included in rel", {
 				cause: {
@@ -216,26 +281,63 @@ export class Area {
 			});
 		}
 
+		if (canonic) {
+			const expectedStartFromStart =
+				rel.times.end === undefined ||
+				start.valueOf() - rel.times.start.valueOf() <
+					rel.times.end.valueOf() - start.valueOf();
+
+			if (startFromStart !== expectedStartFromStart) {
+				throw new InvalidInputError("invalid startFromStart", {
+					cause: { actual: startFromStart, expected: expectedStartFromStart },
+				});
+			}
+
+			if (!isEndOpen) {
+				const expectedEndFromStart =
+					rel.times.end === undefined ||
+					end!.valueOf() - rel.times.start.valueOf() <
+						rel.times.end.valueOf() - end!.valueOf();
+
+				if (endFromStart !== expectedEndFromStart) {
+					throw new InvalidInputError("invalid endFromStart", {
+						cause: {
+							actual: endFromStart,
+							expected: expectedEndFromStart,
+						},
+					});
+				}
+			}
+		}
+
 		return result;
 	}
 
 	/**
 	 * See https://github.com/worm-blossom/willow_test_vectors#an-absolute-encoding-relation-for-area
 	 */
-	public static async decode(provider: ByteProvider): Promise<Area> {
+	public static async decode(provider: ByteProvider, canonic: boolean): Promise<Area> {
 		const headerByte = (await provider.read(1))[0];
 		const isSubspaceAny = !!(headerByte & 0b1000_0000);
 		const isEndOpen = !!(headerByte & 0b0100_0000);
 
 		const subspaceId = isSubspaceAny ? undefined : await SubspaceId.decode(provider);
-		const path = await Path.decode(provider);
-		const start = await UInt64.decodeVariable8(provider);
-		const end = isEndOpen ? undefined : await UInt64.decodeVariable8(provider);
-		return {
+		const path = await Path.decode(provider, canonic);
+		const start = await UInt64.decodeVariable8(provider, canonic);
+		const end = isEndOpen ? undefined : await UInt64.decodeVariable8(provider, canonic);
+
+		const result: Area = {
 			subspaceId,
 			path,
 			times: { start, end },
 		};
+		if (!Area.isValid(result)) {
+			throw new InvalidInputError("Got invalid result", {
+				cause: result,
+			});
+		}
+
+		return result;
 	}
 
 	public static getStartAndEndDiffsForRelativeEncoding(val: Area, rel: Area) {

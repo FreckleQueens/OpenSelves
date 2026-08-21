@@ -51,7 +51,7 @@ describe("Willow drop format", () => {
 			);
 
 			const provider = ByteProvider.of(encoded);
-			const decodedPath = await Path.decode(provider);
+			const decodedPath = await Path.decode(provider, false);
 
 			assert.deepStrictEqual(Path.toString(decodedPath), Path.toString(expectedPath));
 			provider.endRead();
@@ -70,7 +70,7 @@ describe("Willow drop format", () => {
 			const encoded = Path.encodePathRelativePath(expectedPath, rel);
 
 			const provider = ByteProvider.of(encoded);
-			const decodedPath = await Path.decodePathRelativePath(rel, provider);
+			const decodedPath = await Path.decodePathRelativePath(rel, provider, false);
 
 			assert.deepStrictEqual(
 				decodedPath && Path.toString(decodedPath),
@@ -87,7 +87,7 @@ describe("Willow drop format", () => {
 			async () => {
 				const encodedPath = Path.encodePathRelativePath(expectedPath, rel);
 				const provider = ByteProvider.of(encodedPath);
-				const decodedPath = await Path.decodePathRelativePath(rel, provider);
+				const decodedPath = await Path.decodePathRelativePath(rel, provider, false);
 				assert.deepStrictEqual(expectedPath, decodedPath);
 				provider.endRead();
 			},

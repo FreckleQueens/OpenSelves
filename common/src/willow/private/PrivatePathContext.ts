@@ -4,10 +4,21 @@ import { Path } from "../Path.js";
 import { UInt64 } from "../UInt64.js";
 
 export class PrivatePathContext {
+	public static isValid(val: PrivatePathContext): boolean {
+		return Path.isValid(val.privatePath) && Path.isValid(val.rel);
+	}
+
 	/**
 	 * https://willowprotocol.org/specs/encodings/index.html#enc_private_paths
 	 */
 	public static encodePrivatePathExtendsPath(val: Path, rel: PrivatePathContext): ByteString {
+		if (!Path.isValid(val)) {
+			throw new Error("Got invalid val", { cause: val });
+		}
+		if (!PrivatePathContext.isValid(rel)) {
+			throw new Error("Got invalid rel", { cause: rel });
+		}
+
 		if (!Path.extends(val, rel.rel)) {
 			throw new Error("rel.rel must be a prefix of val", {
 				cause: {
@@ -45,14 +56,16 @@ export class PrivatePathContext {
 	public static async decodePrivatePathExtendsPath(
 		rel: PrivatePathContext,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<Path> {
 		const relCount = rel.rel.length;
 		const privateCount = rel.privatePath.length;
 
+		let result: Path;
 		if (privateCount <= relCount) {
-			return await Path.decode(provider);
+			result = await Path.decode(provider, canonic);
 		} else {
-			const lcp = await UInt64.decodeVariable8(provider);
+			const lcp = await UInt64.decodeVariable8(provider, canonic);
 			if (lcp.valueOf() < rel.rel.length) {
 				throw new Error("Got lcp smaller than rel.rel", {
 					cause: {
@@ -63,11 +76,17 @@ export class PrivatePathContext {
 			}
 
 			if (lcp.valueOf() >= privateCount) {
-				return Path.decodePathExtendsPath(rel.privatePath, provider);
+				result = await Path.decodePathExtendsPath(rel.privatePath, provider, canonic);
 			} else {
-				return rel.privatePath.slice(0, Number(lcp));
+				result = rel.privatePath.slice(0, Number(lcp));
 			}
 		}
+
+		if (!Path.isValid(result)) {
+			throw new Error("Got invalid result", { cause: result });
+		}
+
+		return result;
 	}
 
 	public constructor(

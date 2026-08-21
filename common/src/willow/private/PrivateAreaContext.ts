@@ -10,10 +10,21 @@ import { PrivatePathContext } from "./PrivatePathContext.js";
  * https://willowprotocol.org/specs/encodings/index.html#PrivateAreaContext
  */
 export class PrivateAreaContext {
+	public static isValid(val: PrivateAreaContext): boolean {
+		return PrivateInterest.isValid(val.privateInterest) && Area.isValid(val.rel);
+	}
+
 	/**
 	 * https://willowprotocol.org/specs/encodings/index.html#enc_private_areas
 	 */
 	public static encodePrivateAreaAlmostInArea(val: Area, rel: PrivateAreaContext): ByteString {
+		if (!Area.isValid(val)) {
+			throw new Error("Invalid val", { cause: val });
+		}
+		if (!this.isValid(rel)) {
+			throw new Error("Invalid rel", { cause: rel });
+		}
+
 		if (!Area.almostIncludes(rel.rel, val)) {
 			throw new Error("rel.rel must almost include val", {
 				cause: {
@@ -78,10 +89,16 @@ export class PrivateAreaContext {
 		return ByteString.concat(...parts);
 	}
 
+	// TODO: replicate logic from area_in_area
 	public static async decodePrivateAreaAlmostInArea(
 		rel: PrivateAreaContext,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<Area> {
+		if (!this.isValid(rel)) {
+			throw new Error("Invalid rel", { cause: rel });
+		}
+
 		const headerByte = (await provider.read(1))[0];
 		const hasSubspaceId = !!(headerByte & 0b1000_0000);
 		const isSubspaceIdOpen = !!(headerByte & 0b0100_0000);
@@ -101,7 +118,7 @@ export class PrivateAreaContext {
 			subspaceId = rel.rel.subspaceId;
 		}
 
-		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider);
+		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider, canonic);
 		let start: UInt64;
 		if (startFromStart) {
 			start = startDiff.valueOf() + rel.rel.times.start.valueOf();
@@ -114,7 +131,7 @@ export class PrivateAreaContext {
 
 		let endDiff: UInt64 | undefined;
 		if (!isEndOpen) {
-			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider);
+			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider, canonic);
 		}
 
 		let end: UInt64 | undefined;
@@ -135,13 +152,20 @@ export class PrivateAreaContext {
 				rel: rel.rel.path,
 			},
 			provider,
+			canonic,
 		);
 
-		return {
+		const result = {
 			subspaceId,
 			path,
 			times: { start, end },
 		};
+
+		if (!Area.isValid(result)) {
+			throw new Error("Invalid result", { cause: result });
+		}
+
+		return result;
 	}
 
 	public constructor(

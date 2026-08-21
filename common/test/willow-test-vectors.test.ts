@@ -10,55 +10,160 @@ import { Entry } from "../src/willow/Entry.js";
 import { Path } from "../src/willow/Path.js";
 import { Capability } from "../src/willow/index.js";
 
-type EncodingFunctionSuite = {
+type AbsoluteEncodingSuite = {
 	name: string;
 	isValid(value: unknown): Promise<boolean> | boolean;
 
-	type: "encodingFunction";
+	type: "absolute";
 	encode(val: unknown): Promise<ByteString> | ByteString;
 	decode(provider: ByteProvider): Promise<unknown>;
 
-	hasNoYay?: boolean;
+	hasNoReencoded?: boolean;
 };
-type RelativeEncodingFunctionSuite = {
+type RelativeEncodingSuite = {
 	name: string;
 	isValid(value: unknown): Promise<boolean> | boolean;
 
-	type: "relativeEncodingFunction";
+	type: "relative";
 	encode(val: unknown, rel: unknown): Promise<ByteString> | ByteString;
 	decode(rel: unknown, provider: ByteProvider): Promise<unknown>;
 	decodeSingle(provider: ByteProvider): Promise<unknown>;
 
 	hasNoYay?: boolean;
+	hasNoReencoded?: boolean;
 };
-type Suite = EncodingFunctionSuite | RelativeEncodingFunctionSuite;
+type Suite = AbsoluteEncodingSuite | RelativeEncodingSuite;
 
 describe("willow_test_vectors repository", () => {
 	const suites: Suite[] = [
+		// Non-canonic
 		{
-			name: "encode_area_in_area",
-			type: "relativeEncodingFunction",
+			name: "EncodeAreaInArea",
+			type: "relative",
 			encode(val: Area, rel: Area): ByteString {
 				return Area.encodeAreaInArea(val, rel);
 			},
 			async decode(rel: Area, provider: ByteProvider): Promise<Area> {
-				return Area.decodeAreaInArea(rel, provider);
+				return Area.decodeAreaInArea(rel, provider, false);
 			},
 			async decodeSingle(provider: ByteProvider): Promise<Area> {
-				return Area.decode(provider);
+				return Area.decode(provider, false);
 			},
 			isValid(value: unknown): boolean {
-				return Area.is(value);
+				return Area.is(value) && Area.isValid(value);
 			},
 		},
 		{
-			name: "encode_entry",
-			type: "encodingFunction",
+			name: "EncodeEntry",
+			type: "absolute",
 			encode(value: Entry): ByteString {
 				return Entry.encode(value);
 			},
 			async decode(provider: ByteProvider): Promise<Entry> {
-				return Entry.decode(provider);
+				return Entry.decode(provider, false);
+			},
+			async isValid(value: unknown): Promise<boolean> {
+				return Entry.is(value) && (await Entry.isValid(value));
+			},
+		},
+		{
+			name: "EncodeMcCapability_1",
+			type: "absolute",
+			encode(value: Capability): ByteString {
+				return Capability.encode(value);
+			},
+			async decode(provider: ByteProvider): Promise<Capability> {
+				return Capability.decode(provider, false);
+			},
+			async isValid(value: unknown): Promise<boolean> {
+				return Capability.is(value) && (await Capability.isValid(value));
+			},
+		},
+		{
+			name: "EncodeMcCapability_2",
+			type: "absolute",
+			encode(value: Capability): ByteString {
+				return Capability.encode(value);
+			},
+			async decode(provider: ByteProvider): Promise<Capability> {
+				return Capability.decode(provider, false);
+			},
+			async isValid(value: unknown): Promise<boolean> {
+				return Capability.is(value) && (await Capability.isValid(value));
+			},
+		},
+		{
+			name: "EncodePath",
+			type: "absolute",
+			encode(value: Path): ByteString {
+				return Path.encode(value);
+			},
+			async decode(provider: ByteProvider): Promise<Path> {
+				return Path.decode(provider, false);
+			},
+			isValid(value: unknown): boolean {
+				return Path.is(value) && Path.isValid(value);
+			},
+		},
+		{
+			name: "EncodePathExtendsPath",
+			type: "relative",
+			encode(val: Path, rel: Path): ByteString {
+				return Path.encodePathExtendsPath(val, rel);
+			},
+			async decode(rel: Path, provider: ByteProvider): Promise<Path> {
+				return Path.decodePathExtendsPath(rel, provider, false);
+			},
+			async decodeSingle(provider: ByteProvider): Promise<Path> {
+				return Path.decode(provider, false);
+			},
+			isValid(value: unknown): boolean {
+				return Path.is(value) && Path.isValid(value);
+			},
+		},
+		{
+			name: "EncodePathRelativePath",
+			type: "relative",
+			encode(val: Path, rel: Path): ByteString {
+				return Path.encodePathRelativePath(val, rel);
+			},
+			async decode(rel: Path, provider: ByteProvider): Promise<Path> {
+				return Path.decodePathRelativePath(rel, provider, false);
+			},
+			async decodeSingle(provider: ByteProvider): Promise<Path> {
+				return Path.decode(provider, false);
+			},
+			isValid(value: unknown): boolean {
+				return Path.is(value) && Path.isValid(value);
+			},
+		},
+
+		// Canonic
+		{
+			name: "encode_area_in_area",
+			type: "relative",
+			encode(val: Area, rel: Area): ByteString {
+				return Area.encodeAreaInArea(val, rel);
+			},
+			async decode(rel: Area, provider: ByteProvider): Promise<Area> {
+				return Area.decodeAreaInArea(rel, provider, true);
+			},
+			async decodeSingle(provider: ByteProvider): Promise<Area> {
+				return Area.decode(provider, true);
+			},
+			isValid(value: unknown): boolean {
+				return Area.is(value) && Area.isValid(value);
+			},
+		},
+		{
+			name: "encode_entry",
+			type: "absolute",
+			hasNoReencoded: true,
+			encode(value: Entry): ByteString {
+				return Entry.encode(value);
+			},
+			async decode(provider: ByteProvider): Promise<Entry> {
+				return Entry.decode(provider, true);
 			},
 			async isValid(value: unknown): Promise<boolean> {
 				return Entry.is(value) && (await Entry.isValid(value));
@@ -66,12 +171,13 @@ describe("willow_test_vectors repository", () => {
 		},
 		{
 			name: "encode_mc_capability_1",
-			type: "encodingFunction",
+			type: "absolute",
+			hasNoReencoded: true,
 			encode(value: Capability): ByteString {
 				return Capability.encode(value);
 			},
 			async decode(provider: ByteProvider): Promise<Capability> {
-				return Capability.decode(provider);
+				return Capability.decode(provider, true);
 			},
 			async isValid(value: unknown): Promise<boolean> {
 				return Capability.is(value) && (await Capability.isValid(value));
@@ -79,13 +185,13 @@ describe("willow_test_vectors repository", () => {
 		},
 		{
 			name: "encode_mc_capability_2",
-			type: "encodingFunction",
-			hasNoYay: true,
+			type: "absolute",
+			hasNoReencoded: true,
 			encode(value: Capability): ByteString {
 				return Capability.encode(value);
 			},
 			async decode(provider: ByteProvider): Promise<Capability> {
-				return Capability.decode(provider);
+				return Capability.decode(provider, true);
 			},
 			async isValid(value: unknown): Promise<boolean> {
 				return Capability.is(value) && (await Capability.isValid(value));
@@ -93,12 +199,13 @@ describe("willow_test_vectors repository", () => {
 		},
 		{
 			name: "encode_path",
-			type: "encodingFunction",
+			type: "absolute",
+			hasNoReencoded: true,
 			encode(value: Path): ByteString {
 				return Path.encode(value);
 			},
 			async decode(provider: ByteProvider): Promise<Path> {
-				return Path.decode(provider);
+				return Path.decode(provider, true);
 			},
 			isValid(value: unknown): boolean {
 				return Path.is(value) && Path.isValid(value);
@@ -106,15 +213,15 @@ describe("willow_test_vectors repository", () => {
 		},
 		{
 			name: "path_extends_path",
-			type: "relativeEncodingFunction",
+			type: "relative",
 			encode(val: Path, rel: Path): ByteString {
 				return Path.encodePathExtendsPath(val, rel);
 			},
 			async decode(rel: Path, provider: ByteProvider): Promise<Path> {
-				return Path.decodePathExtendsPath(rel, provider);
+				return Path.decodePathExtendsPath(rel, provider, true);
 			},
 			async decodeSingle(provider: ByteProvider): Promise<Path> {
-				return Path.decode(provider);
+				return Path.decode(provider, true);
 			},
 			isValid(value: unknown): boolean {
 				return Path.is(value) && Path.isValid(value);
@@ -122,15 +229,15 @@ describe("willow_test_vectors repository", () => {
 		},
 		{
 			name: "path_rel_path",
-			type: "relativeEncodingFunction",
+			type: "relative",
 			encode(val: Path, rel: Path): ByteString {
 				return Path.encodePathRelativePath(val, rel);
 			},
 			async decode(rel: Path, provider: ByteProvider): Promise<Path> {
-				return Path.decodePathRelativePath(rel, provider);
+				return Path.decodePathRelativePath(rel, provider, true);
 			},
 			async decodeSingle(provider: ByteProvider): Promise<Path> {
-				return Path.decode(provider);
+				return Path.decode(provider, true);
 			},
 			isValid(value: unknown): boolean {
 				return Path.is(value) && Path.isValid(value);
@@ -149,114 +256,136 @@ describe("willow_test_vectors repository", () => {
 
 		describe(suite.name, () => {
 			describe("yay", () => {
-				// Check yay dir existence:
-				const yayDirExists = fs.existsSync(yayDir);
-				assert.strictEqual(yayDirExists, !suite.hasNoYay);
-				if (suite.hasNoYay) return;
+				// Check reencoded dir existence
+				const reencodedDirExists = fs.existsSync(reencodedDir);
+				if (reencodedDirExists !== !suite.hasNoReencoded) {
+					throw new Error("Invalid hasNoReencoded for " + suite.name);
+				}
 
 				for (const file of fs.readdirSync(yayDir)) {
-					test(file, async () => {
-						const bytes = new Uint8Array(fs.readFileSync(path.resolve(yayDir, file)));
-						const provider = ByteProvider.of(bytes);
-
-						let value: unknown;
-						let rel: unknown;
-						if (suite.type === "encodingFunction") {
-							value = await suite.decode(provider);
-						} else if (suite.type === "relativeEncodingFunction") {
-							const relProvider = ByteProvider.of(
-								new Uint8Array(
-									fs.readFileSync(path.resolve(yayRelativeToDir, file)),
-								),
+					test(
+						path.relative(
+							path.resolve(import.meta.dirname, "willow_test_vectors"),
+							path.resolve(yayDir, file),
+						),
+						async () => {
+							const bytes = new Uint8Array(
+								fs.readFileSync(path.resolve(yayDir, file)),
 							);
-							rel = await suite.decodeSingle(relProvider);
-							relProvider.endRead();
-							value = await suite.decode(rel, provider);
-						}
-						provider.endRead();
+							const provider = ByteProvider.of(bytes);
 
-						assert(value);
-						assert(await suite.isValid(value));
+							let value: unknown;
+							let rel: unknown;
+							if (suite.type === "absolute") {
+								value = await suite.decode(provider);
+							} else if (suite.type === "relative") {
+								const relProvider = ByteProvider.of(
+									new Uint8Array(
+										fs.readFileSync(path.resolve(yayRelativeToDir, file)),
+									),
+								);
+								rel = await suite.decodeSingle(relProvider);
+								relProvider.endRead();
+								value = await suite.decode(rel, provider);
+							}
+							provider.endRead();
 
-						let reencoded: unknown;
-						let expectedBytes: ByteString | undefined;
-						if (suite.type === "encodingFunction") {
-							reencoded = await suite.encode(value);
-							expectedBytes = bytes;
-						} else if (suite.type === "relativeEncodingFunction") {
-							reencoded = await suite.encode(value, rel);
-							expectedBytes = new Uint8Array(
-								fs.readFileSync(path.resolve(reencodedDir, file)),
+							assert(value);
+							assert(await suite.isValid(value));
+
+							let reencoded: unknown;
+							if (suite.type === "absolute") {
+								reencoded = await suite.encode(value);
+							} else if (suite.type === "relative") {
+								reencoded = await suite.encode(value, rel);
+							}
+
+							let expectedBytes: ByteString | undefined;
+							if (suite.type === "relative" || !suite.hasNoReencoded) {
+								expectedBytes = new Uint8Array(
+									fs.readFileSync(path.resolve(reencodedDir, file)),
+								);
+							} else {
+								expectedBytes = bytes;
+							}
+
+							assert(ByteString.is(reencoded));
+							assert(expectedBytes);
+							assert.deepStrictEqual(
+								[...reencoded.values()],
+								[...expectedBytes.values()],
 							);
-						}
-						assert(ByteString.is(reencoded));
-						assert(expectedBytes);
-						assert.deepStrictEqual(
-							[...reencoded.values()],
-							[...expectedBytes.values()],
-						);
-						assert(ByteString.equals(reencoded, expectedBytes));
-					});
+							assert(ByteString.equals(reencoded, expectedBytes));
+						},
+					);
 				}
 			});
 
 			describe("nay", () => {
 				for (const file of fs.readdirSync(nayDir)) {
-					test(file, async () => {
-						const bytes = new Uint8Array(fs.readFileSync(path.resolve(nayDir, file)));
-						const provider = ByteProvider.of(bytes);
-
-						let rel: unknown;
-						if (suite.type === "relativeEncodingFunction") {
-							const provider = ByteProvider.of(
-								new Uint8Array(
-									fs.readFileSync(path.resolve(nayRelativeToDir, file)),
-								),
+					test(
+						path.relative(
+							path.resolve(import.meta.dirname, "willow_test_vectors"),
+							path.resolve(nayDir, file),
+						),
+						async () => {
+							const bytes = new Uint8Array(
+								fs.readFileSync(path.resolve(nayDir, file)),
 							);
-							rel = await suite.decodeSingle(provider);
-							provider.endRead();
-						}
+							const provider = ByteProvider.of(bytes);
 
-						const doDecode = async () => {
-							let value: unknown;
-							if (suite.type === "encodingFunction") {
-								value = await suite.decode(provider);
-							} else if (suite.type === "relativeEncodingFunction") {
-								value = await suite.decode(rel, provider);
+							let rel: unknown;
+							if (suite.type === "relative") {
+								const provider = ByteProvider.of(
+									new Uint8Array(
+										fs.readFileSync(path.resolve(nayRelativeToDir, file)),
+									),
+								);
+								rel = await suite.decodeSingle(provider);
+								provider.endRead();
 							}
-							provider.endRead();
 
-							console.error(path.resolve(nayDir, file), "rel", rel, "val", value);
-						};
+							const doDecode = async () => {
+								let value: unknown;
+								if (suite.type === "absolute") {
+									value = await suite.decode(provider);
+								} else if (suite.type === "relative") {
+									value = await suite.decode(rel, provider);
+								}
+								provider.endRead();
 
-						let actualError: unknown;
-						try {
-							await doDecode();
-						} catch (e) {
-							actualError = e;
-						}
+								console.error(path.resolve(nayDir, file), "rel", rel, "val", value);
+							};
 
-						assert(actualError);
-						assert(typeof actualError === "object");
+							let actualError: unknown;
+							try {
+								await doDecode();
+							} catch (e) {
+								actualError = e;
+							}
 
-						const expectedErrorRaw = ByteString.toUtf8(
-							new Uint8Array(fs.readFileSync(path.resolve(nayReasonDir, file))),
-						);
-						if (
-							expectedErrorRaw.startsWith("UnexpectedEndOfInput") ||
-							expectedErrorRaw === "Other(\n    TheirFault,\n)"
-						) {
-							if (!(actualError instanceof InvalidInputError)) {
-								throw new Error("Expected InvalidInputError", {
-									cause: actualError,
+							assert(actualError);
+							assert(typeof actualError === "object");
+
+							const expectedErrorRaw = ByteString.toUtf8(
+								new Uint8Array(fs.readFileSync(path.resolve(nayReasonDir, file))),
+							);
+							if (
+								expectedErrorRaw.startsWith("UnexpectedEndOfInput") ||
+								expectedErrorRaw === "Other(\n    TheirFault,\n)"
+							) {
+								if (!(actualError instanceof InvalidInputError)) {
+									throw new Error("Expected InvalidInputError", {
+										cause: actualError,
+									});
+								}
+							} else {
+								throw new Error("Unsupported expected nay_reason", {
+									cause: expectedErrorRaw,
 								});
 							}
-						} else {
-							throw new Error("Unsupported expected nay_reason", {
-								cause: expectedErrorRaw,
-							});
-						}
-					});
+						},
+					);
 				}
 			});
 		});

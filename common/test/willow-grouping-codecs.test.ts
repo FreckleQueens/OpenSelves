@@ -71,7 +71,7 @@ describe("willow grouping codecs", async () => {
 				const rel = Area.ofSubspace(subspace.publicKey);
 				const encodedArea = Area.encodeAreaInArea(expectedArea, rel);
 				const provider = ByteProvider.of(encodedArea);
-				const decodedArea = await Area.decodeAreaInArea(rel, provider);
+				const decodedArea = await Area.decodeAreaInArea(rel, provider, false);
 				assert.deepStrictEqual(decodedArea, expectedArea);
 				provider.endRead();
 			},

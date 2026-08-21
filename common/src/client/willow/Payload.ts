@@ -33,7 +33,7 @@ export class Payload extends ByteString {
 		const isBlob = headerByte >> 7 === 0b1;
 		let type: string = "";
 		if (isBlob) {
-			const typeLength = await UInt64.decodeVariable(headerByte, 7, 1, provider);
+			const typeLength = await UInt64.decodeVariable(headerByte, 7, 1, provider, false);
 			type = ByteString.toUtf8(await provider.read(Number(typeLength)));
 		}
 

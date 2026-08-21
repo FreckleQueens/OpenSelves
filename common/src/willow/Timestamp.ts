@@ -17,11 +17,7 @@ export class Timestamp extends UInt64 {
 	}
 
 	public static is(value: unknown): value is Timestamp {
-		return typeof value === "bigint";
-	}
-
-	public static isValid(value: Timestamp): value is Timestamp {
-		return value.valueOf() >= 0n;
+		return super.is(value);
 	}
 
 	protected constructor() {

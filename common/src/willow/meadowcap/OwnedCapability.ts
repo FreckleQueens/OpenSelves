@@ -67,6 +67,7 @@ export class OwnedCapability {
 			);
 
 			return (
+				Delegation.isValid(finalDelegation) &&
 				Area.includes(previousArea, newArea) &&
 				(await OwnedCapability.isValid(previousCapability)) &&
 				(await Ed25519.verify(
@@ -95,22 +96,15 @@ export class OwnedCapability {
 		newReceiver: UserPublicKey,
 	): ByteString {
 		const previousDelegation = Capability.getFinalDelegation(previousCapability);
-		if (previousDelegation === undefined) {
-			return ByteString.concat(
-				ByteString.of(
-					previousCapability.accessMode === CapabilityAccessMode.READ ? 0x00 : 0x01,
-				),
-				NamespacePublicKey.encode(previousCapability.namespaceKey),
-				Area.encodeAreaInArea(newArea, previousArea),
-				UserPublicKey.encode(newReceiver),
-			);
-		} else {
-			return ByteString.concat(
-				Area.encodeAreaInArea(newArea, previousArea),
-				UserSignature.encode(previousDelegation.userSignature),
-				UserPublicKey.encode(newReceiver),
-			);
-		}
+		const previousSignature =
+			previousDelegation === undefined
+				? previousCapability.initialAuthorisation
+				: previousDelegation.userSignature;
+		return ByteString.concat(
+			Area.encodeAreaInArea(newArea, previousArea),
+			UserSignature.encode(previousSignature),
+			UserPublicKey.encode(newReceiver),
+		);
 	}
 
 	public constructor(

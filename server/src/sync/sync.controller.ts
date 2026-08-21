@@ -77,7 +77,7 @@ export class SyncController {
 			let decodedCap: Capability;
 			try {
 				const provider = ByteProvider.of(encodedCap);
-				decodedCap = await Capability.decode(provider);
+				decodedCap = await Capability.decode(provider, false);
 				provider.endRead();
 			} catch {
 				throw new BadRequestException("Capability couldn't be decoded", {

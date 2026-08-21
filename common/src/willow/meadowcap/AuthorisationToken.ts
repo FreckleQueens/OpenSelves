@@ -82,6 +82,7 @@ export class AuthorisationToken {
 			entry: Omit<Entry, "payloadDigest">;
 		},
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<AuthorisationToken> {
 		const headerByte = (await provider.read(1))[0];
 		const isOwned = headerByte >> 7 === 0b1;
@@ -94,6 +95,7 @@ export class AuthorisationToken {
 				rel,
 				headerByte,
 				provider,
+				canonic,
 			);
 		}
 
@@ -143,6 +145,7 @@ export class AuthorisationToken {
 	public static async decodeAuthorisationTokenEntryRelative(
 		rel: Entry,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<AuthorisationToken> {
 		const headerByte = (await provider.read(1))[0];
 		const isOwned = headerByte >> 7 === 0b1;
@@ -155,6 +158,7 @@ export class AuthorisationToken {
 				rel,
 				headerByte,
 				provider,
+				canonic,
 			);
 		}
 

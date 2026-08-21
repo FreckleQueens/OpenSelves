@@ -7,6 +7,10 @@ import { SubspaceId } from "../SubspaceId.js";
  * https://willowprotocol.org/specs/pio/index.html#PrivateInterest
  */
 export class PrivateInterest {
+	public static isValid(val: PrivateInterest): boolean {
+		return Path.isValid(val.path);
+	}
+
 	/**
 	 * https://willowprotocol.org/specs/encodings/index.html#pi_amost_include
 	 */

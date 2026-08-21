@@ -66,6 +66,7 @@ export class CommunalCapability {
 		);
 
 		return (
+			Delegation.isValid(finalDelegation) &&
 			Area.includes(previousArea, newArea) &&
 			(await CommunalCapability.isValid(previousCapability)) &&
 			(await Ed25519.verify(previousReceiver, finalDelegation.userSignature, handoverPayload))
@@ -225,6 +226,7 @@ export class CommunalCapability {
 		return ByteString.concat(...parts);
 	}
 
+	// TODO: check sharedLength is minimal if canonic === true
 	public static async decodeCommunalCapabilityRelative(
 		rel: {
 			authorisedEntry: AuthorisedEntry;
@@ -232,6 +234,7 @@ export class CommunalCapability {
 		},
 		headerByte: number,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<CommunalCapability> {
 		if (headerByte >> 7 !== 0) {
 			throw new Error("Invalid header first bit, must be 0", {
@@ -241,12 +244,23 @@ export class CommunalCapability {
 
 		const delegations: Delegation[] = [];
 
-		const niceHack = await UInt64.decodeVariable(headerByte, 3, 1, provider);
-		const delegationsLength = await UInt64.decodeVariable(headerByte, 4, 4, provider);
+		const niceHack = await UInt64.decodeVariable(headerByte, 3, 1, provider, canonic);
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 4, 4, provider, canonic);
 
 		const sharedLength = Number(niceHack) - 1;
+		const relDelegations = rel.authorisedEntry.authorisationToken.capability.inner.delegations;
+		if (sharedLength > relDelegations.length) {
+			throw new Error("Got sharedLength > relDelegations.length", {
+				cause: {
+					niceHack,
+					sharedLength,
+					relDelegationsLength: relDelegations.length,
+				},
+			});
+		}
+
 		delegations.push(
-			...rel.authorisedEntry.authorisationToken.capability.inner.delegations
+			...relDelegations
 				.slice(0, sharedLength)
 				.map((delegation) => Delegation.copy(delegation)),
 		);
@@ -268,6 +282,7 @@ export class CommunalCapability {
 			const area = await PrivateAreaContext.decodePrivateAreaAlmostInArea(
 				previousCtx,
 				provider,
+				canonic,
 			);
 			const userPublicKey = await UserPublicKey.decode(provider);
 			const userSignature = await UserSignature.decode(provider);
@@ -337,6 +352,7 @@ export class CommunalCapability {
 		rel: Entry,
 		headerByte: number,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<CommunalCapability> {
 		if (headerByte >> 7 !== 0b0) {
 			throw new Error("First bit of header byte must be 0 for a communal capability", {
@@ -344,12 +360,16 @@ export class CommunalCapability {
 			});
 		}
 
-		const delegationsLength = await UInt64.decodeVariable(headerByte, 7, 1, provider);
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 7, 1, provider, canonic);
 
 		const delegations: Delegation[] = [];
 		for (let i = 0; i < delegationsLength.valueOf(); i++) {
 			delegations.push(
-				await Delegation.decodeDelegationSubspaceIdRelative(rel.subspaceId, provider),
+				await Delegation.decodeDelegationSubspaceIdRelative(
+					rel.subspaceId,
+					provider,
+					canonic,
+				),
 			);
 		}
 

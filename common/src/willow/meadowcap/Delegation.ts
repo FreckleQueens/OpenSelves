@@ -21,6 +21,10 @@ export class Delegation {
 		);
 	}
 
+	public static isValid(val: Delegation): boolean {
+		return Area.isValid(val.area);
+	}
+
 	public static equals(a: Delegation, b: Delegation) {
 		return (
 			Area.equals(a.area, b.area) &&
@@ -61,8 +65,9 @@ export class Delegation {
 	public static async decodeDelegationSubspaceIdRelative(
 		rel: SubspaceId,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<Delegation> {
-		const area = await Area.decodeAreaInArea(Area.ofSubspace(rel), provider);
+		const area = await Area.decodeAreaInArea(Area.ofSubspace(rel), provider, canonic);
 		const userPublicKey = await UserPublicKey.decode(provider);
 		const userSignature = await UserSignature.decode(provider);
 		return {

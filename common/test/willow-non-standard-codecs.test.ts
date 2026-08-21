@@ -40,6 +40,7 @@ describe("willow non-standard codecs", () => {
 		const decoded = await AuthorisationToken.decodeAuthorisationTokenEntryRelative(
 			entry,
 			provider,
+			false,
 		);
 
 		assert.deepStrictEqual(decoded, expectedAuthorisationToken);
@@ -58,7 +59,7 @@ describe("willow non-standard codecs", () => {
 
 		const encodedCap = Capability.encode(expectedCap);
 		const provider = ByteProvider.of(encodedCap);
-		const decodedCap = await Capability.decode(provider);
+		const decodedCap = await Capability.decode(provider, false);
 		assert.deepStrictEqual(decodedCap, expectedCap);
 		provider.endRead();
 	});
@@ -77,7 +78,7 @@ describe("willow non-standard codecs", () => {
 
 		const encodedCap = Capability.encode(expectedCap);
 		const provider = ByteProvider.of(encodedCap);
-		const decodedCap = await Capability.decode(provider);
+		const decodedCap = await Capability.decode(provider, false);
 		assert.deepStrictEqual(decodedCap, expectedCap);
 		provider.endRead();
 	});

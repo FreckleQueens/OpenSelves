@@ -12,6 +12,14 @@ export class TimeRange {
 		);
 	}
 
+	public static isValid(val: TimeRange): boolean {
+		return (
+			Timestamp.isValid(val.start) &&
+			(val.end === undefined ||
+				(Timestamp.isValid(val.end) && val.end.valueOf() >= val.start.valueOf()))
+		);
+	}
+
 	public constructor(
 		public readonly start: Timestamp,
 		public readonly end: Timestamp | undefined,

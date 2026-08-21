@@ -101,9 +101,9 @@ export class Drop {
 		const subspaceId = hasSubspaceId
 			? await SubspaceId.decode(provider)
 			: previousEntry.subspaceId;
-		const path = await Path.decodePathRelativePath(previousEntry.path, provider);
-		const timestamp = await UInt64.decodeVariable(headerByte, 2, 4, provider);
-		const payloadLength = await UInt64.decodeVariable8(provider);
+		const path = await Path.decodePathRelativePath(previousEntry.path, provider, false);
+		const timestamp = await UInt64.decodeVariable(headerByte, 2, 4, provider, false);
+		const payloadLength = await UInt64.decodeVariable8(provider, false);
 		const authorisationToken = await AuthorisationToken.decodeAuthorisationTokenRelative(
 			{
 				authorisedEntry: previousEntry,
@@ -116,11 +116,12 @@ export class Drop {
 				},
 			},
 			provider,
+			false,
 		);
 		const payloadDigest = await PayloadDigest.decode(provider);
 		const payload = await provider.read(Number(payloadLength));
 
-		return {
+		const result: AuthorisedEntryWithPayload = {
 			namespaceId,
 			subspaceId,
 			path,
@@ -130,6 +131,12 @@ export class Drop {
 			authorisationToken,
 			payload,
 		};
+
+		if (!(await AuthorisedEntryWithPayload.isValid(result))) {
+			throw new Error("Got invalid result", { cause: result });
+		}
+
+		return result;
 	}
 
 	public static decoder(): TransformStream<ByteString, AuthorisedEntryWithPayload> {
@@ -146,9 +153,6 @@ export class Drop {
 				return;
 			}
 
-			if (!(await AuthorisedEntryWithPayload.isValid(decodedEntry))) {
-				throw new Error("Got invalid entry", { cause: decodedEntry });
-			}
 			previousEntry = decodedEntry;
 			consume(decodedEntry);
 

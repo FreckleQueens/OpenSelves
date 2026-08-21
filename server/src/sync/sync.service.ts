@@ -440,6 +440,7 @@ export class SyncService {
 					await AuthorisationToken.decodeAuthorisationTokenEntryRelative(
 						decodedEntry,
 						provider,
+						false,
 					);
 				provider.endRead();
 

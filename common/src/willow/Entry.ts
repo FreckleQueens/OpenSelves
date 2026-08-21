@@ -122,12 +122,12 @@ export class Entry {
 		return ByteString.concat(...parts);
 	}
 
-	public static async decode(provider: ByteProvider): Promise<Entry> {
+	public static async decode(provider: ByteProvider, canonic: boolean): Promise<Entry> {
 		const namespaceId = await NamespaceId.decode(provider);
 		const subspaceId = await SubspaceId.decode(provider);
-		const path = await Path.decode(provider);
-		const timestamp = await UInt64.decodeVariable8(provider);
-		const payloadLength = await UInt64.decodeVariable8(provider);
+		const path = await Path.decode(provider, canonic);
+		const timestamp = await UInt64.decodeVariable8(provider, canonic);
+		const payloadLength = await UInt64.decodeVariable8(provider, canonic);
 		const payloadDigest = await PayloadDigest.decode(provider);
 
 		return {

@@ -3,8 +3,10 @@ import test, { describe } from "node:test";
 
 import { ByteProvider } from "../src/willow/ByteProvider.js";
 import { Path } from "../src/willow/Path.js";
+import { PathComponent } from "../src/willow/PathComponent.js";
 import { Timestamp } from "../src/willow/Timestamp.js";
 import { UInt64 } from "../src/willow/UInt64.js";
+import { Willow25 } from "../src/willow/Willow25.js";
 
 describe("willow codecs", () => {
 	for (const expectedPath of [
@@ -15,11 +17,32 @@ describe("willow codecs", () => {
 		test("Path.encodePath " + Path.toString(expectedPath), async () => {
 			const encodedPath = Path.encode(expectedPath);
 			const provider = ByteProvider.of(encodedPath);
-			const decodedPath = await Path.decode(provider);
+			const decodedPath = await Path.decode(provider, false);
 			assert.deepStrictEqual(decodedPath, expectedPath);
 			provider.endRead();
 		});
 	}
+
+	test(
+		"Path.decode fails when component count is more than " + Willow25.MAX_COMPONENT_COUNT,
+		async () => {
+			const maxLengthPath: Path = Array(Willow25.MAX_PATH_LENGTH).fill(PathComponent.empty());
+			const tooLongPath: Path = Array(Willow25.MAX_PATH_LENGTH + 1).fill(
+				PathComponent.empty(),
+			);
+
+			await assert.doesNotReject(async () => {
+				const provider = ByteProvider.of(Path.encode(maxLengthPath));
+				await Path.decode(provider, false);
+				provider.endRead();
+			});
+			await assert.rejects(async () => {
+				const provider = ByteProvider.of(Path.encode(tooLongPath));
+				await Path.decode(provider, false);
+				provider.endRead();
+			});
+		},
+	);
 
 	for (const expectedValue of [
 		0n,
@@ -55,6 +78,7 @@ describe("willow codecs", () => {
 						tagWidth,
 						headerPosition,
 						provider,
+						false,
 					);
 					try {
 						assert.strictEqual(decodedValue, expectedValue);

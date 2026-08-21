@@ -7,14 +7,26 @@ export class UInt64 extends BigInt {
 	public static readonly MAX_UINT_64_STRING_LENGTH = UInt64.MAX_VALUE.toString().length; // 20
 
 	public static toInt64(input: UInt64): bigint {
+		if (!UInt64.isValid(input)) {
+			throw new Error("Got invalid input", { cause: input });
+		}
+
 		return input.valueOf() - UInt64.UINT64_TO_INT64_OFFSET;
 	}
 
 	public static fromInt64(input: bigint): UInt64 {
-		return input + UInt64.UINT64_TO_INT64_OFFSET;
+		const result = input + UInt64.UINT64_TO_INT64_OFFSET;
+		if (!UInt64.isValid(result)) {
+			throw new Error("Got invalid result", { cause: result });
+		}
+		return result;
 	}
 
 	public static padForLexicographicalOrder(input: UInt64) {
+		if (!UInt64.isValid(input)) {
+			throw new Error("Got invalid input", { cause: input });
+		}
+
 		return input.toString().padStart(UInt64.MAX_UINT_64_STRING_LENGTH, "0");
 	}
 
@@ -37,6 +49,10 @@ export class UInt64 extends BigInt {
 		tag: number;
 		additionalBytes: ByteString;
 	} {
+		if (!UInt64.isValid(input)) {
+			throw new Error("Got invalid input", { cause: input });
+		}
+
 		if (tagWidth < 2) {
 			throw new Error("tagWidth must be at least 2");
 		}
@@ -82,18 +98,40 @@ export class UInt64 extends BigInt {
 	}
 
 	public static encodeToVariable8(input: UInt64): ByteString {
+		if (!UInt64.isValid(input)) {
+			throw new Error("Got invalid input", { cause: input });
+		}
+
 		const parts = UInt64.toCompactEncoding(input, 8);
 		return ByteString.concat(new Uint8Array([parts.tag]), parts.additionalBytes);
 	}
 
-	public static async decodeVariable8(provider: ByteProvider): Promise<UInt64> {
+	public static async decodeVariable8(provider: ByteProvider, canonic: boolean): Promise<UInt64> {
 		const tag = (await provider.read(1))[0];
 		const variableLength = UInt64.decodeVariableBytesLength(tag, 8);
-		if (variableLength > 0) {
-			return UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength));
-		} else {
-			return BigInt(tag);
+		const value =
+			variableLength > 0
+				? UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength))
+				: BigInt(tag);
+
+		if (canonic) {
+			const expectedTag = this.toCompactEncoding(value, 8).tag;
+			if (tag !== expectedTag) {
+				throw new InvalidInputError("Tag is not minimal for value", {
+					cause: {
+						tag,
+						value,
+						expectedTag,
+					},
+				});
+			}
 		}
+
+		if (!UInt64.isValid(value)) {
+			throw new Error("Got invalid result", { cause: value });
+		}
+
+		return value;
 	}
 
 	/**
@@ -108,6 +146,10 @@ export class UInt64 extends BigInt {
 		headerByte: number;
 		additionalBytes: ByteString;
 	} {
+		if (!UInt64.isValid(val)) {
+			throw new Error("Got invalid val", { cause: val });
+		}
+
 		if (tagWidth < 2 || tagWidth > 8) {
 			throw new Error("tagWidth must be between 2 and 8 included", {
 				cause: tagWidth,
@@ -135,6 +177,7 @@ export class UInt64 extends BigInt {
 		tagWidth: number,
 		bitBigEndianPosition: number,
 		provider: ByteProvider,
+		canonic: boolean,
 	): Promise<UInt64> {
 		if (tagWidth < 2 || tagWidth > 8) {
 			throw new Error("tagWidth must be between 2 and 8 included", {
@@ -158,21 +201,27 @@ export class UInt64 extends BigInt {
 			value = UInt64.decodeVariableAdditionalBytes(await provider.read(variableLength));
 		}
 
-		const expectedTag = this.toCompactEncoding(value, tagWidth).tag;
-		if (tag !== expectedTag) {
-			throw new InvalidInputError("Tag is not minimal for value", {
-				cause: {
-					tag,
-					value,
-					expectedTag,
-				},
-			});
+		if (canonic) {
+			const expectedTag = this.toCompactEncoding(value, tagWidth).tag;
+			if (tag !== expectedTag) {
+				throw new InvalidInputError("Tag is not minimal for value", {
+					cause: {
+						tag,
+						value,
+						expectedTag,
+					},
+				});
+			}
+		}
+
+		if (!UInt64.isValid(value)) {
+			throw new Error("Got invalid result", { cause: value });
 		}
 
 		return value;
 	}
 
-	public static decodeVariableBytesLength(tag: number, tagWidth: number) {
+	private static decodeVariableBytesLength(tag: number, tagWidth: number) {
 		switch (2 ** tagWidth - tag) {
 			case 1:
 				return 8;
@@ -187,7 +236,7 @@ export class UInt64 extends BigInt {
 		}
 	}
 
-	public static decodeVariableAdditionalBytes(bytes: ByteString): UInt64 {
+	private static decodeVariableAdditionalBytes(bytes: ByteString): UInt64 {
 		return bytes
 			.reverse()
 			.reduce(
