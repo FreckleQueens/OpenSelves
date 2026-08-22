@@ -1,17 +1,17 @@
 import assert from "node:assert";
 import test, { describe } from "node:test";
 
-import { ByteProvider } from "../src/willow/ByteProvider.js";
+import { OPENSELVES_NAMESPACE_ID } from "../src/index.js";
 import {
 	AuthorisationToken,
 	AuthorisedEntry,
+	ByteProvider,
 	ByteString,
 	Capability,
 	CapabilityAccessMode,
 	Ed25519,
 	Entry,
 	NamespaceId,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	PayloadDigest,
 	Timestamp,

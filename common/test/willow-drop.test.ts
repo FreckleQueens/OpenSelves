@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { describe } from "node:test";
 import test from "node:test";
 
-import { readStream } from "../src/index.js";
+import { OPENSELVES_NAMESPACE_ID, readStream } from "../src/index.js";
 import { ByteProvider } from "../src/willow/ByteProvider.js";
 import {
 	AuthorisedEntryWithPayload,
@@ -10,7 +10,6 @@ import {
 	Drop,
 	Ed25519,
 	NamespaceId,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	SubspaceId,
 } from "../src/willow/index.js";

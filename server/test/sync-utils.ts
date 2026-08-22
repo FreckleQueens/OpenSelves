@@ -1,13 +1,12 @@
 import * as fs from "node:fs";
 import assert from "node:assert";
-import { readStream } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID, readStream } from "openselves-common";
 import { Member } from "openselves-common/client";
 import {
 	AuthorisedEntryWithPayload,
 	Capability,
 	CapabilityAccessMode,
 	Drop,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	type SubspaceId,
 	UserPublicKey,

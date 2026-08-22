@@ -2,12 +2,11 @@ import { Api, navigatorOnlineState } from "$lib/api.svelte.js";
 import { IDB } from "$lib/idb";
 import { IDBStore } from "$lib/idb/IDBStore";
 import { Profile, profilesState } from "$lib/idb/profiles";
-import { readStream } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID, readStream } from "openselves-common";
 import {
 	type AuthorisedEntryWithPayload,
 	Capability,
 	Drop,
-	OPENSELVES_NAMESPACE_ID,
 	SubspaceId,
 	Timestamp,
 } from "openselves-common/willow";

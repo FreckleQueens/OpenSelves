@@ -17,5 +17,4 @@ export * from "./TimeRange.js";
 export * from "./Timestamp.js";
 export * from "./UInt64.js";
 export * from "./Willow25.js";
-export * from "./constants.js";
 export * from "./types.js";

@@ -1,13 +1,9 @@
 import { IDBStore } from "$lib/idb/IDBStore";
 import { Profile } from "$lib/idb/profiles";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import { EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
 import { type SchemaStatic, isValidSchemaKey } from "openselves-common/schema";
-import {
-	AuthorisedEntryWithPayload,
-	OPENSELVES_NAMESPACE_ID,
-	Path,
-	SubspaceId,
-} from "openselves-common/willow";
+import { AuthorisedEntryWithPayload, Path, SubspaceId } from "openselves-common/willow";
 import { PathComponent } from "openselves-common/willow";
 import { onDestroy } from "svelte";
 import { SvelteSet } from "svelte/reactivity";

@@ -30,13 +30,9 @@
 	import { filesize } from "filesize";
 	import isUrl from "is-url";
 	import { Block, Button, List, ListInput, ListItem, Toast, Toggle } from "konsta/svelte";
+	import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 	import { Member, type MemberStatic, Payload } from "openselves-common/client";
-	import {
-		ByteString,
-		MAX_IN_DB_PAYLOAD_LENGTH,
-		OPENSELVES_NAMESPACE_ID,
-		SubspaceId,
-	} from "openselves-common/willow";
+	import { ByteString, MAX_IN_DB_PAYLOAD_LENGTH, SubspaceId } from "openselves-common/willow";
 	import { type Snippet } from "svelte";
 	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";

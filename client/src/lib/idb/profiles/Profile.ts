@@ -8,7 +8,7 @@ import { PAYLOAD_STORE_NAME } from "$lib/idb/IDBPayload";
 import { PROFILE_STORE_NAME } from "$lib/idb/IDBProfile";
 import { SETTING_STORE_NAME } from "$lib/idb/IDBSetting";
 import { profilesState } from "$lib/idb/profiles/profiles-state.svelte.js";
-import { API_VERSION, GetStatusSchema } from "openselves-common";
+import { API_VERSION, GetStatusSchema, OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import {
 	SchemaBuilder,
 	type SchemaStatic,
@@ -22,7 +22,6 @@ import {
 	CapabilitySignData,
 	Ed25519,
 	Ed25519Sk,
-	OPENSELVES_NAMESPACE_ID,
 	SubspaceId,
 } from "openselves-common/willow";
 

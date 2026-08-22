@@ -9,13 +9,12 @@ import type { ExecutionContext } from "@nestjs/common/interfaces/features/execut
 import type { CallHandler } from "@nestjs/common/interfaces/features/nest-interceptor.interface.js";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
-import { readStream } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID, readStream } from "openselves-common";
 import {
 	AuthorisedEntry,
 	type AuthorisedEntryWithPayload,
 	ByteString,
 	Drop,
-	OPENSELVES_NAMESPACE_ID,
 } from "openselves-common/willow";
 import { Observable } from "rxjs";
 

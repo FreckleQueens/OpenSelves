@@ -1,5 +1,5 @@
-import { Ed25519Sk } from "./Ed25519.js";
-import { NamespaceId } from "./NamespaceId.js";
+import { Ed25519Sk } from "./willow/Ed25519.js";
+import { NamespaceId } from "./willow/NamespaceId.js";
 
 export const OPENSELVES_NAMESPACE_ID = NamespaceId.of(
 	...[

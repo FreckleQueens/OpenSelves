@@ -15,12 +15,13 @@ import {
 	type GetStatus,
 	GetStatusSchema,
 	MISSING_REFRESH_TOKEN_COOKIE,
+	OPENSELVES_NAMESPACE_ID,
 	SESSION_EXPIRED_ERROR,
 	TOKEN_EXPIRED_ERROR,
 	readStream,
 } from "openselves-common";
 import { isValidSchemaStatic } from "openselves-common/schema";
-import { ByteString, Ed25519, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { ByteString, Ed25519 } from "openselves-common/willow";
 
 export const navigatorOnlineState: {
 	online: boolean;

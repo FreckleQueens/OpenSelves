@@ -5,7 +5,7 @@ import { Settings } from "$lib/Settings";
 import { IDB } from "$lib/idb";
 import { Profile } from "$lib/idb/profiles";
 import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte.js";
-import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import { tick } from "svelte";
 
 export const prerender = true;

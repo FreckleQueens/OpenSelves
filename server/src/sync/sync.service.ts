@@ -7,6 +7,7 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { DrizzleQueryError, SQL, and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import {
 	AuthorisationToken,
 	type AuthorisedEntry,
@@ -18,7 +19,6 @@ import {
 	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
 	NamespaceId,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	PayloadDigest,
 	SubspaceId,

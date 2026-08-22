@@ -2,7 +2,7 @@ import { type GetObjectCommandOutput, NoSuchKey } from "@aws-sdk/client-s3";
 import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
 import test, { describe } from "node:test";
-import { shuffleArray } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID, shuffleArray } from "openselves-common";
 import { type AnyEntryDataModel, Front, Member } from "openselves-common/client";
 import {
 	AuthorisedEntry,
@@ -15,7 +15,6 @@ import {
 	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
 	NamespaceId,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	PayloadDigest,
 	Timestamp,

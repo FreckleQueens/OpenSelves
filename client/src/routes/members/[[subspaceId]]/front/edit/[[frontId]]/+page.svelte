@@ -14,8 +14,9 @@
 	import { Profile } from "$lib/idb/profiles";
 	import { requireCurrentProfile } from "$lib/routing-utils";
 	import { Block, Button, List, ListInput } from "konsta/svelte";
+	import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 	import { Front, type FrontStatic, Member, type MemberStatic } from "openselves-common/client";
-	import { OPENSELVES_NAMESPACE_ID, SubspaceId } from "openselves-common/willow";
+	import { SubspaceId } from "openselves-common/willow";
 	import { type Snippet, onMount } from "svelte";
 
 	import type { PageProps } from "./$types";

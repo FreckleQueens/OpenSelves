@@ -1,7 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
 import test, { before, describe } from "node:test";
-import { readStream } from "openselves-common";
+import { OPENSELVES_NAMESPACE_ID, readStream } from "openselves-common";
 import { Member } from "openselves-common/client";
 import {
 	AuthorisationToken,
@@ -9,7 +9,6 @@ import {
 	Capability,
 	CapabilityAccessMode,
 	NamespaceId,
-	OPENSELVES_NAMESPACE_ID,
 	Path,
 	Timestamp,
 	UInt64,

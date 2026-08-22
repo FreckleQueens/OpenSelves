@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { Writable } from "node:stream";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import {
 	type AuthorisedEntryWithPayload,
 	ByteProvider,
@@ -19,7 +20,6 @@ import {
 	Capability,
 	CapabilityAccessMode,
 	Drop,
-	OPENSELVES_NAMESPACE_ID,
 	Timestamp,
 	UserPublicKey,
 } from "openselves-common/willow";

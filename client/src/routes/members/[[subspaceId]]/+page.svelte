@@ -34,8 +34,9 @@
 		Searchbar,
 		Toggle,
 	} from "konsta/svelte";
+	import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 	import { Front, Member, type MemberStatic } from "openselves-common/client";
-	import { OPENSELVES_NAMESPACE_ID, SubspaceId } from "openselves-common/willow";
+	import { SubspaceId } from "openselves-common/willow";
 	import { onMount } from "svelte";
 
 	import type { PageProps } from "./$types";
