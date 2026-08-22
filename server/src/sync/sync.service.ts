@@ -6,6 +6,7 @@ import {
 	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { DrizzleQueryError, SQL, and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import {
@@ -16,7 +17,6 @@ import {
 	ByteString,
 	Capability,
 	Entry,
-	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
 	NamespaceId,
 	Path,
@@ -26,6 +26,7 @@ import {
 	UInt64,
 } from "openselves-common/willow";
 
+import type { ConfigData } from "../config.data.js";
 import { DB, excludedColumn } from "../db/drizzle.js";
 import {
 	type EntryCreate,
@@ -38,6 +39,7 @@ import { S3Service } from "./s3.service.js";
 @Injectable()
 export class SyncService {
 	constructor(
+		private readonly configService: ConfigService<ConfigData>,
 		private readonly db: DB,
 		private readonly s3Service: S3Service,
 	) {}
@@ -136,6 +138,10 @@ export class SyncService {
 	}
 
 	private prepareS3Uploads(entries: EntryCreate[]) {
+		const maxInDbPayloadLength = this.configService.getOrThrow("MAX_IN_DB_PAYLOAD_LENGTH", {
+			infer: true,
+		});
+
 		const s3PreparedEntries: EntryCreate[] = [...entries];
 		const s3Uploads: {
 			digest: ByteString;
@@ -143,7 +149,7 @@ export class SyncService {
 		}[] = [];
 
 		for (const entry of entries) {
-			if (entry.payload && entry.payload.length > MAX_IN_DB_PAYLOAD_LENGTH) {
+			if (entry.payload && entry.payload.length > maxInDbPayloadLength) {
 				s3Uploads.push({
 					digest: entry.payloadDigest,
 					content: entry.payload,

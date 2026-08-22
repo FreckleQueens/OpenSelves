@@ -1,7 +1,7 @@
 import { type GetObjectCommandOutput, NoSuchKey } from "@aws-sdk/client-s3";
 import { createId } from "@paralleldrive/cuid2";
 import assert from "node:assert";
-import test, { describe } from "node:test";
+import test, { before, describe } from "node:test";
 import { OPENSELVES_NAMESPACE_ID, shuffleArray } from "openselves-common";
 import { type AnyEntryDataModel, Front, Member } from "openselves-common/client";
 import {
@@ -12,7 +12,6 @@ import {
 	Ed25519,
 	type Ed25519KeyPair,
 	Entry,
-	MAX_IN_DB_PAYLOAD_LENGTH,
 	MemoryStore,
 	NamespaceId,
 	Path,
@@ -235,6 +234,13 @@ describe(pushEndpoint, () => {
 		true,
 		true,
 	);
+
+	let maxInDbPayloadLength: number;
+	before(() => {
+		maxInDbPayloadLength = env.configService.getOrThrow("MAX_IN_DB_PAYLOAD_LENGTH", {
+			infer: true,
+		});
+	});
 
 	test("GET 404", async () => {
 		await env.request.get(pushEndpoint).expect(404).execute();
@@ -554,10 +560,10 @@ describe(pushEndpoint, () => {
 					expectCode: 400,
 				},
 				{
-					name: "small payload (<=8192) 200",
+					name: `small payload (<=${maxInDbPayloadLength}) 200`,
 					forgeEntry: async (entry) => {
 						await setEntryPayloadToForged(
-							ByteString.fromUtf8("a".repeat(MAX_IN_DB_PAYLOAD_LENGTH)),
+							ByteString.fromUtf8("a".repeat(maxInDbPayloadLength)),
 							entry,
 						);
 						assert(AuthorisedEntryWithPayload.is(entry));
@@ -565,10 +571,10 @@ describe(pushEndpoint, () => {
 					expectCode: 200,
 				},
 				{
-					name: "large payload (>8192) 200",
+					name: `large payload (>${maxInDbPayloadLength}) 200`,
 					forgeEntry: async (entry) => {
 						await setEntryPayloadToForged(
-							ByteString.fromUtf8("a".repeat(MAX_IN_DB_PAYLOAD_LENGTH + 1)),
+							ByteString.fromUtf8("a".repeat(maxInDbPayloadLength + 1)),
 							entry,
 						);
 						assert(AuthorisedEntryWithPayload.is(entry));
@@ -912,7 +918,7 @@ describe(pushEndpoint, () => {
 		test("Set member with image image's to undefined deletes image from s3", async () => {
 			const randomValues = crypto.getRandomValues(Buffer.alloc(5000));
 			const bigData = randomValues.toString("hex");
-			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
+			assert(bigData.length > maxInDbPayloadLength);
 			const { member, entries } = await createMember(
 				env.users.user1.keys,
 				undefined,
@@ -936,7 +942,7 @@ describe(pushEndpoint, () => {
 		test("payload is not uploaded to s3 if entry is prefix-pruned from existing entries in db", async () => {
 			const randomValues = crypto.getRandomValues(Buffer.alloc(5000));
 			const bigData = randomValues.toString("hex");
-			assert(bigData.length > MAX_IN_DB_PAYLOAD_LENGTH);
+			assert(bigData.length > maxInDbPayloadLength);
 
 			const keys = env.users.user1.keys;
 			const { member } = makeMember(keys.publicKey, undefined, bigData);

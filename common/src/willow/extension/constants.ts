@@ -1,1 +1,0 @@
-export const MAX_IN_DB_PAYLOAD_LENGTH = 8192;

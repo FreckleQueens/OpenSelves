@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
+	import { MAX_DATA_URL_LENGTH } from "$lib";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import MemberImage from "$lib/components/MemberImage.svelte";
 	import EditPage from "$lib/components/forms/EditPage.svelte";
@@ -32,7 +33,7 @@
 	import { Block, Button, List, ListInput, ListItem, Toast, Toggle } from "konsta/svelte";
 	import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 	import { Member, type MemberStatic, Payload } from "openselves-common/client";
-	import { ByteString, MAX_IN_DB_PAYLOAD_LENGTH, SubspaceId } from "openselves-common/willow";
+	import { ByteString, SubspaceId } from "openselves-common/willow";
 	import { type Snippet } from "svelte";
 	import { fly } from "svelte/transition";
 	import { isDataURI } from "validator";
@@ -91,10 +92,10 @@
 		if (imageFiles) {
 			const file = imageFiles.item(0);
 			if (file) {
-				const maxSizeForDataUrl = (MAX_IN_DB_PAYLOAD_LENGTH * 3) / 4;
+				const maxEncodedDataUrlSize = (MAX_DATA_URL_LENGTH * 3) / 4;
 				const maxFileSize = Math.max(
 					(profile?.isSyncEnabled() && profile.api.status?.maxUploadSize) || 0,
-					maxSizeForDataUrl,
+					maxEncodedDataUrlSize,
 				);
 				if (file.size > maxFileSize) {
 					formState.errors["image"] = t(
@@ -287,7 +288,7 @@
 					name="image"
 					label={t("Image url")}
 					floatingLabel
-					maxlength={MAX_IN_DB_PAYLOAD_LENGTH.toString()}
+					maxlength={MAX_DATA_URL_LENGTH.toString()}
 					bind:value={memberImageUrlInput}
 					error={formState.errors["image"] || ""}
 					{disabled}

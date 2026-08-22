@@ -30,6 +30,7 @@ export interface ConfigData {
 
 	MAX_UPLOAD_SIZE: number;
 	TMP_UPLOAD_DIR?: string;
+	MAX_IN_DB_PAYLOAD_LENGTH: number;
 	S3_REGION?: string;
 	S3_ENDPOINT?: string;
 	S3_BUCKET?: string;
@@ -130,6 +131,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 
 	MAX_UPLOAD_SIZE: Joi.number().min(0).default(0),
 	TMP_UPLOAD_DIR: Joi.string(),
+	MAX_IN_DB_PAYLOAD_LENGTH: Joi.number().min(0).default(8192),
 	S3_REGION: Joi.string(),
 	S3_ENDPOINT: Joi.string().uri(),
 	S3_BUCKET: Joi.string(),
