@@ -1,5 +1,5 @@
 import { Area } from "../Area.js";
-import type { ByteProvider } from "../ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { SubspaceId } from "../SubspaceId.js";
 import { UInt64 } from "../UInt64.js";
@@ -37,7 +37,6 @@ export class PrivateAreaContext {
 		if (!PrivateInterest.almostIncludes(rel.privateInterest, rel.rel)) {
 			throw new Error("rel.privateInterest must almost include rel.rel", {
 				cause: {
-					val,
 					rel,
 				},
 			});
@@ -89,14 +88,21 @@ export class PrivateAreaContext {
 		return ByteString.concat(...parts);
 	}
 
-	// TODO: replicate logic from area_in_area
+	// TODO: refactor TimeRange encoding and decoding (same in EncodeAreaInArea)
 	public static async decodePrivateAreaAlmostInArea(
 		rel: PrivateAreaContext,
 		provider: ByteProvider,
-		canonic: boolean,
 	): Promise<Area> {
 		if (!this.isValid(rel)) {
 			throw new Error("Invalid rel", { cause: rel });
+		}
+
+		if (!PrivateInterest.almostIncludes(rel.privateInterest, rel.rel)) {
+			throw new Error("rel.privateInterest must almost include rel.rel", {
+				cause: {
+					rel,
+				},
+			});
 		}
 
 		const headerByte = (await provider.read(1))[0];
@@ -107,52 +113,74 @@ export class PrivateAreaContext {
 
 		const isEndOpen = rel.rel.times.end !== undefined ? false : !endFromStart;
 
+		// SubspaceId
 		let subspaceId: SubspaceId | undefined;
-		if (hasSubspaceId) {
-			if (isSubspaceIdOpen) {
-				subspaceId = undefined;
-			} else {
-				subspaceId = await SubspaceId.decode(provider);
-			}
+		if (isSubspaceIdOpen) {
+			subspaceId = undefined;
+		} else if (hasSubspaceId) {
+			subspaceId = await SubspaceId.decode(provider);
 		} else {
 			subspaceId = rel.rel.subspaceId;
 		}
 
-		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider, canonic);
+		// Start
+		const startDiff = await UInt64.decodeVariable(headerByte, 2, 4, provider, false);
 		let start: UInt64;
 		if (startFromStart) {
 			start = startDiff.valueOf() + rel.rel.times.start.valueOf();
 		} else {
 			if (rel.rel.times.end === undefined) {
-				throw new Error("startFromStart is false but relEnd is undefined");
+				throw new InvalidInputError("startFromStart is false but relEnd is undefined");
 			}
 			start = rel.rel.times.end.valueOf() - startDiff.valueOf();
 		}
 
-		let endDiff: UInt64 | undefined;
-		if (!isEndOpen) {
-			endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider, canonic);
+		if (!UInt64.isValid(start)) {
+			throw new InvalidInputError("Got invalid start", {
+				cause: {
+					start,
+					startFromStart,
+					startDiff,
+					relRelTimes: rel.rel.times,
+				},
+			});
 		}
 
+		// End
 		let end: UInt64 | undefined;
-		if (endDiff === undefined) {
+		if (isEndOpen) {
 			end = undefined;
-		} else if (endFromStart) {
-			end = endDiff.valueOf() + rel.rel.times.start.valueOf();
 		} else {
-			if (rel.rel.times.end === undefined) {
-				throw new Error("endFromStart is false but relEnd is undefined");
+			const endDiff = await UInt64.decodeVariable(headerByte, 2, 6, provider, false);
+
+			if (endFromStart) {
+				end = endDiff.valueOf() + rel.rel.times.start.valueOf();
+			} else {
+				if (rel.rel.times.end === undefined) {
+					throw new InvalidInputError("endFromStart is false but relEnd is undefined");
+				}
+				end = rel.rel.times.end.valueOf() - endDiff.valueOf();
 			}
-			end = rel.rel.times.end.valueOf() - endDiff.valueOf();
+
+			if (!UInt64.isValid(end)) {
+				throw new InvalidInputError("Got invalid end", {
+					cause: {
+						end,
+						endFromStart,
+						endDiff,
+						relRelTimes: rel.rel.times,
+					},
+				});
+			}
 		}
 
+		// Path
 		const path = await PrivatePathContext.decodePrivatePathExtendsPath(
 			{
 				privatePath: rel.privateInterest.path,
 				rel: rel.rel.path,
 			},
 			provider,
-			canonic,
 		);
 
 		const result = {
@@ -162,7 +190,7 @@ export class PrivateAreaContext {
 		};
 
 		if (!Area.isValid(result)) {
-			throw new Error("Invalid result", { cause: result });
+			throw new InvalidInputError("Invalid result", { cause: result });
 		}
 
 		return result;

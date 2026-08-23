@@ -1,5 +1,5 @@
 import { Area } from "../Area.js";
-import type { ByteProvider } from "../ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { Ed25519, Ed25519Sk } from "../Ed25519.js";
 import type { Entry } from "../Entry.js";
@@ -227,7 +227,6 @@ export class CommunalCapability {
 		return ByteString.concat(...parts);
 	}
 
-	// TODO: check sharedLength is minimal if canonic === true
 	public static async decodeCommunalCapabilityRelative(
 		rel: {
 			authorisedEntry: AuthorisedEntry;
@@ -235,23 +234,22 @@ export class CommunalCapability {
 		},
 		headerByte: number,
 		provider: ByteProvider,
-		canonic: boolean,
 	): Promise<CommunalCapability> {
 		if (headerByte >> 7 !== 0) {
-			throw new Error("Invalid header first bit, must be 0", {
+			throw new InvalidInputError("Invalid header first bit, must be 0", {
 				cause: headerByte,
 			});
 		}
 
 		const delegations: Delegation[] = [];
 
-		const niceHack = await UInt64.decodeVariable(headerByte, 3, 1, provider, canonic);
-		const delegationsLength = await UInt64.decodeVariable(headerByte, 4, 4, provider, canonic);
+		const niceHack = await UInt64.decodeVariable(headerByte, 3, 1, provider, false);
+		const delegationsLength = await UInt64.decodeVariable(headerByte, 4, 4, provider, false);
 
 		const sharedLength = Number(niceHack) - 1;
 		const relDelegations = rel.authorisedEntry.authorisationToken.capability.inner.delegations;
 		if (sharedLength > relDelegations.length) {
-			throw new Error("Got sharedLength > relDelegations.length", {
+			throw new InvalidInputError("Got sharedLength > relDelegations.length", {
 				cause: {
 					niceHack,
 					sharedLength,
@@ -283,7 +281,6 @@ export class CommunalCapability {
 			const area = await PrivateAreaContext.decodePrivateAreaAlmostInArea(
 				previousCtx,
 				provider,
-				canonic,
 			);
 			const userPublicKey = await UserPublicKey.decode(provider);
 			const userSignature = await UserSignature.decode(provider);

@@ -1,4 +1,4 @@
-import type { ByteProvider } from "../ByteProvider.js";
+import { type ByteProvider, InvalidInputError } from "../ByteProvider.js";
 import { ByteString } from "../ByteString.js";
 import { Path } from "../Path.js";
 import { UInt64 } from "../UInt64.js";
@@ -56,29 +56,40 @@ export class PrivatePathContext {
 	public static async decodePrivatePathExtendsPath(
 		rel: PrivatePathContext,
 		provider: ByteProvider,
-		canonic: boolean,
 	): Promise<Path> {
+		if (!PrivatePathContext.isValid(rel)) {
+			throw new Error("Got invalid rel", { cause: rel });
+		}
+
 		const relCount = rel.rel.length;
 		const privateCount = rel.privatePath.length;
 
 		let result: Path;
 		if (privateCount <= relCount) {
-			result = await Path.decode(provider, canonic);
+			result = await Path.decodePathExtendsPath(rel.rel, provider, false);
 		} else {
-			const lcp = await UInt64.decodeVariable8(provider, canonic);
-			if (lcp.valueOf() < rel.rel.length) {
-				throw new Error("Got lcp smaller than rel.rel", {
+			const lcpLength = (await UInt64.decodeVariable8(provider, false)).valueOf();
+			if (lcpLength < rel.rel.length) {
+				throw new InvalidInputError("Got lcpLength smaller than rel.rel", {
 					cause: {
-						lcp,
+						lcpLength,
 						rel,
 					},
 				});
 			}
 
-			if (lcp.valueOf() >= privateCount) {
-				result = await Path.decodePathExtendsPath(rel.privatePath, provider, canonic);
+			if (lcpLength >= privateCount) {
+				result = await Path.decodePathExtendsPath(rel.privatePath, provider, false);
 			} else {
-				result = rel.privatePath.slice(0, Number(lcp));
+				if (lcpLength > rel.privatePath.length) {
+					throw new InvalidInputError("Got lcpLength bigger than rel.privatePath", {
+						cause: {
+							lcpLength,
+							relPrivatePath: rel.privatePath,
+						},
+					});
+				}
+				result = rel.privatePath.slice(0, Number(lcpLength));
 			}
 		}
 

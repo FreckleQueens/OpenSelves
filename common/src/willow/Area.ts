@@ -194,6 +194,7 @@ export class Area {
 			);
 		}
 
+		// SubspaceId
 		const subspaceId: SubspaceId | undefined = hasSubspaceId
 			? await SubspaceId.decode(provider)
 			: rel.subspaceId;

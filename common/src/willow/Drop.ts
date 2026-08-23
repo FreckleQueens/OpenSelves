@@ -115,7 +115,6 @@ export class Drop {
 				},
 			},
 			provider,
-			false,
 		);
 		const payloadDigest = await PayloadDigest.decode(provider);
 		const payload = await provider.read(Number(payloadLength));
