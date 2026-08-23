@@ -37,6 +37,7 @@ export class CommunalCapability {
 		);
 	}
 
+	// TODO: test this with a huge amount of delegations (stackoverflow? add delegations limit in decoders?)
 	public static async isValid(val: CommunalCapability): Promise<boolean> {
 		if (!NamespaceId.isCommunal(val.namespaceKey)) {
 			return false;

@@ -10,7 +10,6 @@ import { AuthorisationToken, AuthorisedEntry } from "./meadowcap/index.js";
 
 /**
  * https://willowprotocol.org/specs/drop-format/index.html
- * TODO: make every encode method in the whole package return a ByteString array (no useless concat operation)
  */
 export class Drop {
 	/**

@@ -8,6 +8,9 @@ type ReadRequest<T extends number = number> = {
 
 export class InvalidInputError extends Error {}
 
+// TODO: use this in encoders
+// TODO: user Streams API? https://developer.mozilla.org/en-US/docs/Web/API/Streams_API
+// TODO: if not (above), have a ByteConsumer and a ByteProducer interfaces
 export class ByteProvider {
 	public static of(...parts: ByteString[]): ByteProvider {
 		const provider = new ByteProvider();
