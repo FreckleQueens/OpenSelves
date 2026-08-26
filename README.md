@@ -1,3 +1,8 @@
+⚠️ Repository was moved to https://codeberg.org/FreckleQueens/OpenSelves ⚠️
+
+<details>
+  <summary>Old readme</summary>
+  
 <img src="client/static/logo_trans.svg" height="64px" align="left" alt="A stylized ampersand gradually orange to pink from top to bottom. It has two overlapping implicit heart shapes in it.">
 
 # OpenSelves
@@ -53,3 +58,4 @@ various backgrounds. We&, the initiators of the project known as Freckles, ackno
 them·& for their·& precious contributions to the project.
 
 The list of contributors is kept in [CONTRIBUTORS](./CONTRIBUTORS) and can be viewed on https://openselves.org
+</details>
