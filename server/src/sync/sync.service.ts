@@ -2,72 +2,92 @@ import { type GetObjectCommandOutput, S3ServiceException } from "@aws-sdk/client
 import {
 	BadRequestException,
 	ConflictException,
-	ForbiddenException,
 	Injectable,
 	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
-import { DrizzleQueryError, SQL, and, eq, gt, inArray, like, lt, or, sql } from "drizzle-orm";
+import { ConfigService } from "@nestjs/config";
+import { DrizzleQueryError, SQL, and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import {
-	type Entry,
-	type EntryCreate,
-	type Transaction,
-	type User,
-	entries,
-} from "openselves-common/db";
-import {
-	MAX_IN_DB_PAYLOAD_LENGTH,
+	AuthorisationToken,
+	type AuthorisedEntry,
+	AuthorisedEntryWithPayload,
+	ByteProvider,
+	ByteString,
+	Capability,
+	Entry,
 	MemoryStore,
-	OPENSELVES_NAMESPACE_ID,
-	hashPayload,
-	int64toUint64,
-	isEntryNewerThan,
-	uint64ToInt64,
+	NamespaceId,
+	Path,
+	PayloadDigest,
+	SubspaceId,
+	Timestamp,
+	UInt64,
 } from "openselves-common/willow";
 
+import type { ConfigData } from "../config.data.js";
 import { DB, excludedColumn } from "../db/drizzle.js";
-import { PushEntryDto } from "./data/push.dto.js";
+import {
+	type EntryCreate,
+	byteStringArrayToPostgresByteaArrayLiteral,
+	entries,
+} from "../db/index.js";
+import type { Transaction } from "../db/type-utils.js";
 import { S3Service } from "./s3.service.js";
 
 @Injectable()
 export class SyncService {
 	constructor(
+		private readonly configService: ConfigService<ConfigData>,
 		private readonly db: DB,
 		private readonly s3Service: S3Service,
 	) {}
 
-	private async verifyEntries(userId: string, entryDtos: PushEntryDto[]) {
-		for (const dto of entryDtos) {
-			if (dto.subspaceId !== userId) {
-				throw new ForbiddenException("Invalid subspaceId", {
-					cause: dto,
-				});
-			}
-			if (dto.payload) {
-				if (BigInt(dto.payload.length) !== dto.payloadLength) {
+	private async verifyEntries(entries: AuthorisedEntryWithPayload[]) {
+		for (const entry of entries) {
+			if (entry.payload) {
+				if (entry.timestamp === UInt64.MAX_VALUE && entry.payloadLength.valueOf() > 0) {
+					throw new BadRequestException(
+						"Can't accept non-empty payload with maximum possible timestamp",
+					);
+				}
+
+				if (
+					entry.timestamp !== UInt64.MAX_VALUE &&
+					entry.timestamp.valueOf() > Timestamp.now().valueOf() + 10n * 60n * 1000_000n
+				) {
+					throw new BadRequestException("Can't accept timestamp too far in the future");
+				}
+
+				if (BigInt(entry.payload.length) !== entry.payloadLength) {
 					throw new BadRequestException("Invalid payloadLength", {
-						cause: dto,
+						cause: entry,
 					});
 				}
 
-				if ((await hashPayload(dto.payload)) !== dto.payloadDigest) {
+				if (!(await PayloadDigest.verify(entry.payloadDigest, entry.payload))) {
 					throw new BadRequestException("Invalid payloadDigest", {
-						cause: dto,
+						cause: entry,
 					});
 				}
 			}
 		}
 	}
 
-	private toEntryCreate(entryDtos: PushEntryDto[]) {
-		return entryDtos.map((dto) => ({
-			subspaceId: dto.subspaceId,
-			path: dto.path,
-			timestamp: uint64ToInt64(dto.timestamp),
-			payloadLength: uint64ToInt64(dto.payloadLength),
-			payloadDigest: dto.payloadDigest,
-			payload: Buffer.from(dto.payload),
+	private toEntryCreate(entries: AuthorisedEntryWithPayload[]): EntryCreate[] {
+		return entries.map((entry) => ({
+			subspaceId: entry.subspaceId,
+			path: entry.path,
+			timestamp: UInt64.toInt64(entry.timestamp),
+			payloadLength: UInt64.toInt64(entry.payloadLength),
+			payloadDigest: entry.payloadDigest,
+			payload: entry.payload,
 			payloadStorage: null,
+			authorisationToken: AuthorisationToken.encodeAuthorisationTokenEntryRelative(
+				entry.authorisationToken,
+				entry,
+			),
 		}));
 	}
 
@@ -80,7 +100,12 @@ export class SyncService {
 					...entryCreates.map((entry) =>
 						and(
 							eq(entries.subspaceId, entry.subspaceId),
-							like(sql`${entry.path}`, sql`concat(${entries.path}, '/%')`),
+							eq(
+								entries.path,
+								byteStringArrayToPostgresByteaArrayLiteral(entry.path).append(
+									sql`[:(array_length(${entries.path}, 1))]`,
+								),
+							),
 							or(
 								gt(entries.timestamp, entry.timestamp),
 								and(
@@ -100,24 +125,31 @@ export class SyncService {
 
 		return entryCreates.filter(
 			(entry) =>
-				!overridingEntries.some((overridingEntry) =>
-					isEntryNewerThan(
-						{ namespaceId: OPENSELVES_NAMESPACE_ID, ...overridingEntry },
-						{ namespaceId: OPENSELVES_NAMESPACE_ID, ...entry },
-					),
+				!overridingEntries.some(
+					(overridingEntry) =>
+						SubspaceId.equals(overridingEntry.subspaceId, entry.subspaceId) &&
+						Path.extends(entry.path, overridingEntry.path) &&
+						Entry.isNewer(
+							{ namespaceId: OPENSELVES_NAMESPACE_ID, ...overridingEntry },
+							{ namespaceId: OPENSELVES_NAMESPACE_ID, ...entry },
+						),
 				),
 		);
 	}
 
 	private prepareS3Uploads(entries: EntryCreate[]) {
-		const preparedEntries: EntryCreate[] = [...entries];
+		const maxInDbPayloadLength = this.configService.getOrThrow("MAX_IN_DB_PAYLOAD_LENGTH", {
+			infer: true,
+		});
+
+		const s3PreparedEntries: EntryCreate[] = [...entries];
 		const s3Uploads: {
-			digest: string;
-			content: Buffer<ArrayBufferLike>;
+			digest: ByteString;
+			content: ByteString;
 		}[] = [];
 
 		for (const entry of entries) {
-			if (entry.payload && entry.payload.length > MAX_IN_DB_PAYLOAD_LENGTH) {
+			if (entry.payload && entry.payload.length > maxInDbPayloadLength) {
 				s3Uploads.push({
 					digest: entry.payloadDigest,
 					content: entry.payload,
@@ -128,21 +160,21 @@ export class SyncService {
 		}
 
 		return {
-			preparedEntries,
+			s3PreparedEntries,
 			s3Uploads,
 		};
 	}
 
-	public async ingestEntries(userId: string, entryDtos: PushEntryDto[]): Promise<void> {
-		await this.verifyEntries(userId, entryDtos);
+	public async ingestEntries(entriesToIngest: AuthorisedEntryWithPayload[]): Promise<void> {
+		await this.verifyEntries(entriesToIngest);
 
 		try {
 			await this.db.transaction(async (tx) => {
-				const store = new MemoryStore<PushEntryDto>(OPENSELVES_NAMESPACE_ID);
-				await store.ingest(entryDtos);
-				entryDtos = store.getEntries();
+				const store = new MemoryStore<AuthorisedEntryWithPayload>(OPENSELVES_NAMESPACE_ID);
+				await store.ingest(entriesToIngest);
+				entriesToIngest = store.getEntries();
 
-				const entryCreates = this.toEntryCreate(entryDtos);
+				const entryCreates = this.toEntryCreate(entriesToIngest);
 
 				const survivingEntryCreates = await this.prefixPruneFromExistingEntriesInDb(
 					tx,
@@ -152,14 +184,20 @@ export class SyncService {
 					return;
 				}
 
-				const { preparedEntries, s3Uploads } = this.prepareS3Uploads(survivingEntryCreates);
+				const { s3PreparedEntries, s3Uploads } =
+					this.prepareS3Uploads(survivingEntryCreates);
+
+				const pathPreparedEntries = s3PreparedEntries.map((entry) => ({
+					...entry,
+					path: byteStringArrayToPostgresByteaArrayLiteral(entry.path),
+				}));
 
 				const oldUpdatedRows = await tx
 					.select()
 					.from(entries)
 					.where(
 						or(
-							...preparedEntries.map((entry) =>
+							...pathPreparedEntries.map((entry) =>
 								and(
 									eq(entries.subspaceId, entry.subspaceId),
 									eq(entries.path, entry.path),
@@ -182,7 +220,7 @@ export class SyncService {
 
 				const upsertedEntries = await tx
 					.insert(entries)
-					.values(preparedEntries)
+					.values(pathPreparedEntries)
 					.onConflictDoUpdate({
 						target: [entries.subspaceId, entries.path],
 						setWhere: or(
@@ -203,6 +241,7 @@ export class SyncService {
 							payloadDigest: excludedColumn(entries.payloadDigest),
 							payload: excludedColumn(entries.payload),
 							payloadStorage: excludedColumn(entries.payloadStorage),
+							authorisationToken: excludedColumn(entries.authorisationToken),
 						},
 					})
 					.returning();
@@ -218,7 +257,10 @@ export class SyncService {
 							...upsertedEntries.map((entry) =>
 								and(
 									eq(entries.subspaceId, entry.subspaceId),
-									like(entries.path, `${entry.path}/%`),
+									eq(
+										byteStringArrayToPostgresByteaArrayLiteral(entry.path),
+										sql`(${entries.path})[:(${entry.path.length})]`,
+									),
 									or(
 										lt(entries.timestamp, entry.timestamp),
 										and(
@@ -244,31 +286,37 @@ export class SyncService {
 							.map((row) => row.payloadDigest),
 					),
 				];
-				const stillReferencedDigests = [
-					...new Set(
-						(
-							await tx
-								.select({
-									payloadDigest: entries.payloadDigest,
-								})
-								.from(entries)
-								.where(inArray(entries.payloadDigest, deletedDigests))
-						).map((row) => row.payloadDigest),
-					),
-				];
-				const digestsToDelete = deletedDigests.filter(
-					(digest) => !stillReferencedDigests.includes(digest),
-				);
 
-				await this.s3Service.transaction((tx) => {
-					for (const { digest, content } of s3Uploads) {
-						tx.queuePut(digest, content, true);
-					}
+				let digestsToDelete: ByteString[] = [];
+				if (deletedDigests.length > 0) {
+					const stillReferencedDigests = [
+						...new Set(
+							(
+								await tx
+									.select({
+										payloadDigest: entries.payloadDigest,
+									})
+									.from(entries)
+									.where(inArray(entries.payloadDigest, deletedDigests))
+							).map((row) => row.payloadDigest),
+						),
+					];
+					digestsToDelete = deletedDigests.filter(
+						(digest) => !stillReferencedDigests.includes(digest),
+					);
+				}
 
-					for (const digest of digestsToDelete) {
-						tx.queueDelete(digest);
-					}
-				});
+				if (s3Uploads.length > 0 || digestsToDelete.length > 0) {
+					await this.s3Service.transaction((tx) => {
+						for (const { digest, content } of s3Uploads) {
+							tx.queuePut(digest.toBase64(), content, true);
+						}
+
+						for (const digest of digestsToDelete) {
+							tx.queueDelete(digest.toBase64());
+						}
+					});
+				}
 			});
 		} catch (error) {
 			if (error instanceof DrizzleQueryError && error.cause?.["code"] === "23505") {
@@ -285,15 +333,51 @@ export class SyncService {
 	}
 
 	public async getEntriesFrom(
-		userId: User["id"],
+		capabilities: Capability[],
 		timestamp: string,
 	): Promise<{
 		timestamp: string;
-		entries: Entry[];
+		entries: AuthorisedEntryWithPayload[];
 	}> {
 		const entries = await this.db.query.entries.findMany({
 			where: {
-				subspaceId: userId,
+				OR: capabilities.map((capability) => {
+					const namespaceId = Capability.getGrantedNamespace(capability);
+					if (!NamespaceId.equals(namespaceId, OPENSELVES_NAMESPACE_ID)) {
+						throw new Error("Got unexpected namespace");
+					}
+					const area = Capability.getGrantedArea(capability);
+					const subspaceId = area.subspaceId;
+					if (!SubspaceId.equals(area.subspaceId, subspaceId)) {
+						throw new Error("Got unexpected granted area subspace");
+					}
+
+					const timestampConditions: ({ gte: bigint } | { lt: bigint })[] = [
+						{
+							gte: UInt64.toInt64(area.times.start),
+						},
+					];
+
+					if (area.times.end !== undefined) {
+						timestampConditions.push({
+							lt: UInt64.toInt64(area.times.end),
+						});
+					}
+
+					return {
+						subspaceId: {
+							eq: subspaceId,
+						},
+						RAW: (table, operators) =>
+							operators.eq(
+								byteStringArrayToPostgresByteaArrayLiteral(area.path),
+								sql`(${table.path})[:(${area.path.length})]`,
+							),
+						timestamp: {
+							AND: timestampConditions,
+						},
+					};
+				}),
 				updatedAt: {
 					gte: timestamp === "" ? "-infinity" : timestamp,
 				},
@@ -321,7 +405,7 @@ export class SyncService {
 			if (!entry.payload && entry.payloadStorage === "s3") {
 				let commandOutput: GetObjectCommandOutput;
 				try {
-					commandOutput = await this.s3Service.getObject(entry.payloadDigest);
+					commandOutput = await this.s3Service.getObject(entry.payloadDigest.toBase64());
 				} catch (error) {
 					if (error instanceof S3ServiceException) {
 						switch (error.$metadata.httpStatusCode) {
@@ -338,16 +422,55 @@ export class SyncService {
 			}
 		}
 
+		const authorisedEntries: AuthorisedEntryWithPayload[] = await Promise.all(
+			entries.map(async (entry) => {
+				const {
+					queryTime,
+					timestamp,
+					payloadLength,
+					authorisationToken,
+					payload,
+					payloadStorage,
+					updatedAt,
+					...rest
+				} = entry;
+				const decodedEntry: Entry = {
+					namespaceId: OPENSELVES_NAMESPACE_ID,
+					...rest,
+					timestamp: UInt64.fromInt64(timestamp),
+					payloadLength: UInt64.fromInt64(payloadLength),
+				};
+
+				const provider = ByteProvider.of(authorisationToken);
+				const decodedAuthorisationToken =
+					await AuthorisationToken.decodeAuthorisationTokenEntryRelative(
+						decodedEntry,
+						provider,
+						false,
+					);
+				provider.endRead();
+
+				const decodedAuthorisedEntry: AuthorisedEntry & {
+					payload: ByteString | null;
+				} = {
+					...decodedEntry,
+					authorisationToken: decodedAuthorisationToken,
+					payload,
+				};
+
+				if (!AuthorisedEntryWithPayload.is(decodedAuthorisedEntry)) {
+					throw new Error("Got entry without payload", {
+						cause: decodedEntry,
+					});
+				}
+
+				return decodedAuthorisedEntry;
+			}),
+		);
+
 		return {
 			timestamp: returnedTimestamp,
-			entries: entries.map((entries) => {
-				const { queryTime, timestamp, payloadLength, ...rest } = entries;
-				return {
-					...rest,
-					timestamp: int64toUint64(timestamp),
-					payloadLength: int64toUint64(payloadLength),
-				};
-			}),
+			entries: authorisedEntries,
 		};
 	}
 }

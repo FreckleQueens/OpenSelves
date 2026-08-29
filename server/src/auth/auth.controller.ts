@@ -3,7 +3,6 @@ import {
 	Controller,
 	HttpCode,
 	HttpStatus,
-	InternalServerErrorException,
 	NotFoundException,
 	Post,
 	Req,
@@ -11,43 +10,75 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { createId } from "@paralleldrive/cuid2";
 import type { Request, Response } from "express";
 import { MISSING_REFRESH_TOKEN_COOKIE, SESSION_EXPIRED_ERROR } from "openselves-common";
+import { ByteString, Ed25519, UserPublicKey } from "openselves-common/willow";
 
 import { Captcha } from "../captcha/decorators/captcha.decorator.js";
 import { type ConfigData } from "../config.data.js";
+import type { ChallengeData } from "./data/challenge.data.js";
+import { GetChallengeDto } from "./data/get-challenge.dto.js";
 import { LoginDto } from "./data/login.dto.js";
 import { Public } from "./decorators/public.decorator.js";
 import { SessionService } from "./session/session.service.js";
-import { UserService } from "./user/user.service.js";
 
 @Controller("auth")
 export class AuthController {
 	constructor(
 		private readonly configService: ConfigService<ConfigData>,
-		private readonly userService: UserService,
 		private readonly sessionService: SessionService,
+		private readonly jwtService: JwtService,
 	) {}
+
+	@Public()
+	@Post("challenge")
+	@HttpCode(HttpStatus.OK)
+	@Captcha()
+	public async getChallenge(@Body() getChallengeDto: GetChallengeDto) {
+		return {
+			challenge: await this.jwtService.signAsync<ChallengeData>(
+				{
+					uniqueId: createId(),
+					timestampMs: Date.now(),
+					userKey: getChallengeDto.userKey.toBase64(),
+				},
+				{
+					expiresIn: this.configService.getOrThrow("AUTH_CHALLENGE_DURATION", {
+						infer: true,
+					}),
+				},
+			),
+		};
+	}
 
 	@Public()
 	@Post("login")
 	@HttpCode(HttpStatus.OK)
-	@Captcha()
 	public async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
-		const user = await this.userService.getUserWithPassword({ email: loginDto.email });
-		if (user && (await this.userService.verifyPassword(user, loginDto.password))) {
-			const session = await this.sessionService.createSession(
-				user.id,
-				!!loginDto.persistSession,
-			);
-			const accessToken = await this.sessionService.makeAccessToken(user);
-			this.setAuthCookies(accessToken, session.token, session.persist, response);
-			return {
-				userId: user.id,
-			};
+		let challengePayload: ChallengeData;
+		try {
+			challengePayload = await this.jwtService.verifyAsync<ChallengeData>(loginDto.challenge);
+		} catch (e) {
+			throw new UnauthorizedException("Invalid challenge payload", { cause: e });
 		}
 
-		throw new UnauthorizedException("Incorrect email or password");
+		const userKey = UserPublicKey.fromBase64(challengePayload.userKey);
+		if (
+			!(await Ed25519.verify(
+				userKey,
+				loginDto.signature,
+				ByteString.fromUtf8(loginDto.challenge),
+			))
+		) {
+			throw new UnauthorizedException("Invalid signature", { cause: loginDto.signature });
+		}
+
+		const session = await this.sessionService.createSession(userKey, !!loginDto.persistSession);
+		const accessToken = await this.sessionService.makeAccessToken(session);
+		this.setAuthCookies(accessToken, session.token, session.persist, response);
+		return {};
 	}
 
 	@Public()
@@ -59,7 +90,7 @@ export class AuthController {
 	) {
 		const refreshToken = this.getRefreshTokenFromRequest(request);
 
-		const session = await this.sessionService.getSession({ token: refreshToken });
+		const session = await this.sessionService.getSessionByToken(refreshToken);
 		if (!session) {
 			throw new UnauthorizedException({
 				name: SESSION_EXPIRED_ERROR,
@@ -74,17 +105,12 @@ export class AuthController {
 			});
 		}
 
-		const user = session.user;
-		if (user === null) {
-			throw new InternalServerErrorException("User was not loaded with old session");
-		}
-
 		const newSession = await this.sessionService.refreshSession(session.token, session.persist);
 		if (!newSession) {
 			throw new UnauthorizedException("Invalid token (session not found or token revoked)");
 		}
 
-		const accessToken = await this.sessionService.makeAccessToken(user);
+		const accessToken = await this.sessionService.makeAccessToken(newSession);
 		this.setAuthCookies(accessToken, newSession.token, session.persist, response);
 		return {};
 	}

@@ -1,7 +1,8 @@
 import { SQL, sql } from "drizzle-orm";
 import { PostgresJsDatabase, drizzle } from "drizzle-orm/postgres-js";
-import { relations } from "openselves-common/db";
 import { type Sql } from "postgres";
+
+import { relations } from "./index.js";
 
 export class DB extends PostgresJsDatabase<typeof relations> {
 	$client!: Sql;

@@ -7,7 +7,7 @@
 	import FrontTimeFrontedFor from "$lib/components/FrontTimeFrontedFor.svelte";
 	import MemberCard from "$lib/components/MemberCard.svelte";
 	import { subscribeToModel } from "$lib/idb/entry-subscription.svelte";
-	import { requireAuth } from "$lib/routing-utils";
+	import { requireCurrentProfile } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
 	import { Front, Member } from "openselves-common/client";
 
@@ -28,11 +28,12 @@
 			.sort(sortBy((front) => front.memberName)),
 	);
 	let pageContent: HTMLDivElement | undefined = $state();
+	let loading = $derived(!members.loaded || !fronts.loaded);
 
-	requireAuth();
+	requireCurrentProfile();
 </script>
 
-<AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD}>
+<AppPage title="" bind:pageContent activeMenuItem={MenuItem.DASHBOARD} {loading}>
 	<a href={resolve("/members")}>
 		<BlockTitle medium>Currently fronting</BlockTitle>
 		<Block id="current-fronting-members" class="pt-2 pb-2">

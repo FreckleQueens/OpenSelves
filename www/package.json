@@ -6,7 +6,7 @@
 	"license": "AGPL-3.0-only",
 	"type": "module",
 	"scripts": {
-		"clean": "rm -rf auto-imports.d.ts build .svelte-kit",
+		"clean": "rm -rf ./src/generated build .svelte-kit",
 		"dev": "vite dev",
 		"build": "yarn prepare && vite build",
 		"preview": "vite preview",
@@ -16,7 +16,6 @@
 		"lint": "yarn check && prettier --check . && eslint .",
 		"format": "prettier --write . && eslint . --fix"
 	},
-	"packageManager": "yarn@4.13.0",
 	"dependencies": {
 		"openselves-common-ui": "workspace:^"
 	},

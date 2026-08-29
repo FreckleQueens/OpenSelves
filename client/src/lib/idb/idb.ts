@@ -1,6 +1,8 @@
 import { IDBEntry } from "$lib/idb/IDBEntry";
+import { IDBKnownSubspace } from "$lib/idb/IDBKnownSubspace";
 import { IDBPayload } from "$lib/idb/IDBPayload";
-import { IDBStorageEntry } from "$lib/idb/IDBStorageEntry";
+import { IDBProfile } from "$lib/idb/IDBProfile.js";
+import { IDBSetting } from "$lib/idb/IDBSetting";
 import { IDB_MIGRATIONS } from "$lib/idb/idb-migrations";
 
 const IDB_NAME = "openselves";
@@ -25,7 +27,9 @@ export class IDB {
 		this.instance = idb;
 	}
 
-	public readonly storageEntry: IDBStorageEntry = new IDBStorageEntry(this);
+	public readonly settings: IDBSetting = new IDBSetting(this);
+	public readonly profiles: IDBProfile = new IDBProfile(this);
+	public readonly knownSubspaces: IDBKnownSubspace = new IDBKnownSubspace(this);
 	public readonly entries: IDBEntry = new IDBEntry(this);
 	public readonly payloads: IDBPayload = new IDBPayload(this);
 	private db?: IDBDatabase;

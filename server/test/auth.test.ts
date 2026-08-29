@@ -3,10 +3,12 @@ import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import assert from "node:assert";
 import test, { describe } from "node:test";
-import { GetUser, TOKEN_EXPIRED_ERROR, parseApiResult } from "openselves-common";
-import { sessions } from "openselves-common/db";
-import request from "supertest";
+import { TOKEN_EXPIRED_ERROR } from "openselves-common";
+import { ByteString, Ed25519, UserPublicKey } from "openselves-common/willow";
 
+import { sessions } from "../src/db/index.js";
+import type { UserAuthData } from "./TestQueryBuilder.js";
+import { getSyncFrom } from "./sync-utils.js";
 import {
 	type TestEnvWithUsers,
 	convertResponseCookiesToRequestCookies,
@@ -16,8 +18,6 @@ import {
 	testCaptcha,
 	waitFor,
 } from "./utils.js";
-
-const expectCookies = request.cookies;
 
 describe("Auth (e2e)", () => {
 	let env: TestEnvWithUsers;
@@ -29,6 +29,13 @@ describe("Auth (e2e)", () => {
 		undefined,
 		true,
 	);
+
+	async function testUserIsAuthenticated(
+		user: UserAuthData & { keys: { publicKey: UserPublicKey } } = env.users.user1,
+		expectCode: number = 200,
+	) {
+		return await getSyncFrom(env, "", user, expectCode);
+	}
 
 	async function makeExpiredAccessToken(originalTokenForPayload: string) {
 		const jwtService = env.app.get(JwtService);
@@ -53,7 +60,7 @@ describe("Auth (e2e)", () => {
 			},
 		);
 
-		const refreshToken = extractCookie("refreshToken", env.users.cookies);
+		const refreshToken = extractCookie("refreshToken", env.users.user1.cookies);
 
 		// time is (refresh token duration + 1 second) ago
 		const time = new Date(Date.now() - refreshTokenDuration * 1000 - 1000);
@@ -64,51 +71,102 @@ describe("Auth (e2e)", () => {
 	}
 
 	describe("/auth", () => {
+		describe("/challenge", () => {
+			test("POST returns a string payload 200", async () => {
+				const response = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				assert("challenge" in response.body);
+				assert.strictEqual(typeof response.body.challenge, "string");
+			});
+
+			test("POST returns a different payload every time", async () => {
+				const response1 = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				const response2 = await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(200)
+					.json();
+				assert("challenge" in response1.body);
+				assert.strictEqual(typeof response1.body.challenge, "string");
+				assert.notStrictEqual(response1.body["challenge"], response2.body["challenge"]);
+			});
+
+			test("POST invalid userKey", async () => {
+				await env.request
+					.post("/auth/challenge")
+					.send({
+						userKey: ByteString.fromUtf8("not valid").toBase64(),
+						captcha: await solveCaptcha(env),
+					})
+					.expect(400)
+					.json();
+			});
+
+			testCaptcha(
+				() => env,
+				200,
+				(name, callback) => {
+					test(name, callback);
+				},
+				(captcha) => {
+					return env.request.post("/auth/challenge").send({
+						userKey: env.users.user1.keys.publicKey.toBase64(),
+						captcha: captcha,
+					});
+				},
+			);
+		});
+
 		describe("/login", () => {
 			test("POST 200", async () => {
 				const response = await env.request
 					.post("/auth/login")
 					.send({
-						email: env.users.user.email,
-						password: env.users.userPassword,
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: true,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
-					.expect("Content-Type", /json/)
-					.expect(
-						// TODO@supertest: the case is wrong because of a bug in supertest, fix all TODOs in tag when this eventually fails
-						expectCookies
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "accesstoken",
-								options: {
-									httponly: true,
-									"max-age": env.configService.getOrThrow(
-										"ACCESS_TOKEN_DURATION",
-										{
-											infer: true,
-										},
-									),
-								},
-							})
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "refreshtoken",
-								options: {
-									httponly: true,
-									"max-age": env.configService.getOrThrow(
-										"REFRESH_TOKEN_DURATION",
-										{
-											infer: true,
-										},
-									),
-								},
-							}),
-					);
-				assert.strictEqual(response.body.accessToken, undefined);
-				assert.strictEqual(response.body.refreshToken, undefined);
-				assert.notStrictEqual(response.body.userId, undefined);
+					.expectCookie({
+						name: "accessToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("ACCESS_TOKEN_DURATION", {
+									infer: true,
+								})
+								.toString(),
+						},
+					})
+					.expectCookie({
+						name: "refreshToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("REFRESH_TOKEN_DURATION", {
+									infer: true,
+								})
+								.toString(),
+						},
+					})
+					.json();
+				assert.strictEqual(response.body["accessToken"], undefined);
+				assert.strictEqual(response.body["refreshToken"], undefined);
 
 				const accessToken = extractCookie(
 					"accessToken",
@@ -125,243 +183,228 @@ describe("Auth (e2e)", () => {
 				await env.request
 					.post("/auth/login")
 					.send({
-						email: env.users.user.email,
-						password: env.users.userPassword,
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: false,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
-					.expect("Content-Type", /json/)
-					.expect(
-						// TODO@supertest: the case is wrong because of a bug in supertest, fix all TODOs in tag when this eventually fails
-						// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-						expectCookies.contain({
-							name: "refreshtoken",
-							options: {
-								httponly: true,
-								"max-age": env.configService.getOrThrow(
-									"REFRESH_TOKEN_SHORT_DURATION",
-									{
-										infer: true,
-									},
-								),
-							},
-						}),
-					);
+					.expectCookie({
+						name: "refreshToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("REFRESH_TOKEN_SHORT_DURATION", {
+									infer: true,
+								})
+								.toString(),
+						},
+					})
+					.json();
 			});
 
-			for (const { test: testName, data, status } of [
-				{
-					test: "POST 401 wrong password",
-					status: 401,
-					data: () => ({ email: env.users.user.email, password: "wrong password" }),
-				},
-				{
-					test: "POST 401 unknown email address",
-					status: 401,
-					data: () => ({
-						email: "unknown.email@example.com",
-						password: env.users.userPassword,
-					}),
-				},
-				{
-					test: "POST 400 no email provided",
-					status: 400,
-					data: () => ({ password: env.users.userPassword }),
-				},
-				{
-					test: "POST 400 empty email provided",
-					status: 400,
-					data: () => ({ email: "", password: env.users.userPassword }),
-				},
-				{
-					test: "POST 400 invalid email provided",
-					status: 400,
-					data: () => ({
-						email: "not an email address",
-						password: env.users.userPassword,
-					}),
-				},
-				{
-					test: "POST 400 no password provided",
-					status: 400,
-					data: () => ({ email: env.users.user.email }),
-				},
-				{
-					test: "POST 400 empty password",
-					status: 400,
-					data: () => ({ email: env.users.user.email, password: "" }),
-				},
-			]) {
-				test(testName, async () => {
-					const response = await env.request
-						.post("/auth/login")
-						.send({
-							...data(),
-							captcha: await solveCaptcha(env),
-						})
-						.expect("Content-Type", /json/)
-						.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
-					if (response.status !== status) {
-						console.error(response.body);
-					}
-					assert.strictEqual(response.status, status);
-				});
-			}
+			test("POST invalid challenge", async () => {
+				const params = await env.getValidAuthLoginParameters();
 
-			testCaptcha(
-				() => env,
-				200,
-				(name, callback) => {
-					test(name, callback);
-				},
-				async (captcha) => {
-					return env.request.post("/auth/login").send({
-						email: env.users.user.email,
-						password: env.users.userPassword,
-						captcha: captcha,
-					});
-				},
-			);
+				// Invalid challenge
+				params.challenge = createId();
+				params.signature = (
+					await Ed25519.sign(
+						env.users.user1.keys.secretKey,
+						ByteString.fromUtf8(params.challenge),
+					)
+				).toBase64();
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
+
+			test("POST invalid signature", async () => {
+				const params = await env.getValidAuthLoginParameters();
+
+				// Sign something else
+				params.signature = (
+					await Ed25519.sign(
+						env.users.user1.keys.secretKey,
+						ByteString.fromUtf8(createId()),
+					)
+				).toBase64();
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
+
+			test("POST expired challenge", async () => {
+				const params = await env.getValidAuthLoginParameters();
+
+				// This duration is set to 5s for tests in package.json
+				await waitFor(5000);
+
+				await env.request
+					.post("/auth/login")
+					.send({
+						...params,
+						persistSession: false,
+					})
+					.expect(401)
+					.expectNotCookie("refreshToken")
+					.expectNotCookie("accessToken")
+					.json();
+			});
 		});
 
 		describe("/refresh", () => {
-			async function testAuthRefreshFails(cookies: string, status: number) {
+			async function testAuthRefreshFails(user: UserAuthData, status: number) {
 				const response = await env.request
 					.post("/auth/refresh")
-					.set("Cookie", cookies)
+					.authenticated(user)
 					.expect(status)
-					.expect("Content-Type", /json/)
-					.expect(expectCookies.set({ name: "refreshtoken" }, false)); // TODO@supertest
-				assert.strictEqual(response.body.accessToken, undefined);
-				assert.strictEqual(response.body.refreshToken, undefined);
+					.expectNotCookie("refreshToken")
+					.json();
+				assert.strictEqual(response.body["accessToken"], undefined);
+				assert.strictEqual(response.body["refreshToken"], undefined);
 			}
 
 			test("POST 200", async () => {
 				const response = await env.request
 					.post("/auth/refresh")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(200)
-					.expect("Content-Type", /json/)
-					.expect(
-						// TODO@supertest
-						expectCookies
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "accesstoken",
-								options: {
-									httponly: true,
-									"max-age": env.configService.getOrThrow(
-										"ACCESS_TOKEN_DURATION",
-										{
-											infer: true,
-										},
-									),
-								},
-							})
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "refreshtoken",
-								options: {
-									httponly: true,
-									"max-age": env.configService.getOrThrow(
-										"REFRESH_TOKEN_SHORT_DURATION",
-										{
-											infer: true,
-										},
-									),
-								},
-							}),
-					);
-				assert.strictEqual(response.body.accessToken, undefined);
-				assert.strictEqual(response.body.refreshToken, undefined);
+					.expectCookie({
+						name: "accessToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("ACCESS_TOKEN_DURATION", {
+									infer: true,
+								})
+								.toString(),
+						},
+					})
+					.expectCookie({
+						name: "refreshToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("REFRESH_TOKEN_SHORT_DURATION", {
+									infer: true,
+								})
+								.toString(),
+						},
+					})
+					.json();
+				assert.strictEqual(response.body["accessToken"], undefined);
+				assert.strictEqual(response.body["refreshToken"], undefined);
 
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
-				const oldAccessToken = extractCookie("accessToken", env.users.cookies);
+				const oldAccessToken = extractCookie("accessToken", env.users.user1.cookies);
 				const newAccessToken = extractCookie("accessToken", newCookies);
 				assert.notStrictEqual(newAccessToken, oldAccessToken);
 
-				const oldRefreshToken = extractCookie("refreshToken", env.users.cookies);
+				const oldRefreshToken = extractCookie("refreshToken", env.users.user1.cookies);
 				const newRefreshToken = extractCookie("refreshToken", newCookies);
 				assert.notStrictEqual(newRefreshToken, oldRefreshToken);
 
-				await env.request
-					.get("/user/" + env.users.user.id)
-					.set("Cookie", newCookies)
-					.expect(200);
+				// New access token must work
+				await testUserIsAuthenticated({ cookies: newCookies, keys: env.users.user1.keys });
 
 				// Old refresh token must be revoked
-				await testAuthRefreshFails(env.users.cookies, 401);
+				await testAuthRefreshFails(env.users.user1, 401);
 
-				// New access token must work
-				await env.request
-					.get("/user/" + env.users.user.id)
-					.set("Cookie", newCookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				// New access token must still work
+				await testUserIsAuthenticated({ cookies: newCookies, keys: env.users.user1.keys });
 
 				// New refresh token must work
 				await env.request
 					.post("/auth/refresh")
 					.set("Cookie", newCookies)
 					.expect(200)
-					.expect("Content-Type", /json/);
+					.json();
 			});
 
 			test("POST long-lived session 200", async () => {
 				const response = await env.request
 					.post("/auth/login")
 					.send({
-						email: env.users.user.email,
-						password: env.users.userPassword,
+						...(await env.getValidAuthLoginParameters()),
 						persistSession: true,
-						captcha: await solveCaptcha(env),
 					})
 					.expect(200)
-					.expect("Content-Type", /json/);
+					.json();
 
 				const cookies = convertResponseCookiesToRequestCookies(response);
 				await env.request
 					.post("/auth/refresh")
 					.set("Cookie", cookies)
 					.expect(200)
-					.expect("Content-Type", /json/)
-					.expect(
-						// TODO@supertest
-						// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-						expectCookies.contain({
-							name: "refreshtoken",
-							options: {
-								httponly: true,
-								"max-age": env.configService.getOrThrow("REFRESH_TOKEN_DURATION", {
+					.expectCookie({
+						name: "refreshToken",
+						options: {
+							HttpOnly: true,
+							"Max-Age": env.configService
+								.getOrThrow("REFRESH_TOKEN_DURATION", {
 									infer: true,
-								}),
-							},
-						}),
-					);
+								})
+								.toString(),
+						},
+					})
+					.json();
 			});
 
 			test("POST 401 invalid refresh token", async () => {
-				await testAuthRefreshFails("refreshToken=notavalidtoken", 401);
+				await testAuthRefreshFails(
+					{
+						cookies: "refreshToken=notavalidtoken",
+					},
+					401,
+				);
 			});
 
 			test("POST 401 revoked refresh token", async () => {
-				await env.request.post("/auth/logout").set("Cookie", env.users.cookies).expect(200);
-				await testAuthRefreshFails(env.users.cookies, 401);
+				await env.request
+					.post("/auth/logout")
+					.authenticated(env.users.user1)
+					.expect(200)
+					.execute();
+				await testAuthRefreshFails(env.users.user1, 401);
 			});
 
 			test("POST 401 expired refresh token", async () => {
 				await makeRefreshTokenExpired();
-				await testAuthRefreshFails(env.users.cookies, 401);
+				await testAuthRefreshFails(env.users.user1, 401);
 			});
 
 			test("POST 401 no refresh token provided", async () => {
-				await testAuthRefreshFails("", 401);
+				await testAuthRefreshFails(
+					{
+						cookies: "",
+					},
+					401,
+				);
 			});
 
 			test("POST 401 empty refresh token", async () => {
-				await testAuthRefreshFails("refreshToken=", 401);
+				await testAuthRefreshFails(
+					{
+						cookies: "refreshToken=",
+					},
+					401,
+				);
 			});
 		});
 
@@ -369,56 +412,40 @@ describe("Auth (e2e)", () => {
 			test("POST 200", async () => {
 				const response = await env.request
 					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(200)
-					.expect("Content-Type", /json/)
-					.expect(
-						expectCookies
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "accesstoken",
-								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
-							})
-							// @ts-expect-error TODO@@types/supertest Documentation says value is optional, DT typing does not
-							.contain({
-								name: "refreshtoken",
-								options: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
-							}),
-					); // TODO@supertest
-				assert.strictEqual(response.body.accessToken, undefined);
-				assert.strictEqual(response.body.refreshToken, undefined);
+					.expectCookieDelete("accessToken")
+					.expectCookieDelete("refreshToken")
+					.json();
+				assert.strictEqual(response.body["accessToken"], undefined);
+				assert.strictEqual(response.body["refreshToken"], undefined);
 
 				// /auth/refresh already tested
 			});
 
 			test("POST 401 revoked token", async () => {
 				// Access token works
-				await env.request
-					.get(`/user/${env.users.user.id}`)
-					.set("Cookie", env.users.cookies)
-					.expect(200)
-					.expect("Content-Type", /json/);
+				await testUserIsAuthenticated();
 
 				const response = await env.request
 					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(200)
-					.expect("Content-Type", /json/);
+					.json();
 				const newCookies = convertResponseCookiesToRequestCookies(response);
 
 				// Access token removed from cookies
-				await env.request
-					.get(`/user/${env.users.user.id}`)
-					.set("Cookie", newCookies)
-					.expect(401)
-					.expect("Content-Type", /json/);
+				await testUserIsAuthenticated(
+					{ cookies: newCookies, keys: env.users.user1.keys },
+					401,
+				);
 
 				// Refresh token revoked
 				await env.request
 					.post("/auth/refresh")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(401)
-					.expect("Content-Type", /json/);
+					.json();
 			});
 
 			test("POST 401 expired token", async () => {
@@ -426,9 +453,9 @@ describe("Auth (e2e)", () => {
 
 				await env.request
 					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(401)
-					.expect("Content-Type", /json/);
+					.json();
 			});
 
 			test("POST 401 expired token long-lived session", async () => {
@@ -436,9 +463,9 @@ describe("Auth (e2e)", () => {
 
 				await env.request
 					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(401)
-					.expect("Content-Type", /json/);
+					.json();
 			});
 
 			test("POST 200 session lived past short-lived ttl but not long-lived", async () => {
@@ -446,528 +473,25 @@ describe("Auth (e2e)", () => {
 
 				await env.request
 					.post("/auth/logout")
-					.set("Cookie", env.users.cookies)
+					.authenticated(env.users.user1)
 					.expect(200)
-					.expect("Content-Type", /json/);
+					.json();
 			});
 		});
 
 		test("Access tokens expire", async () => {
-			await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			const accessToken = extractCookie("accessToken", env.users.cookies);
+			await testUserIsAuthenticated();
+			const accessToken = extractCookie("accessToken", env.users.user1.cookies);
 			const expiredAccessToken = await makeExpiredAccessToken(accessToken);
-			const response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", `accessToken=${expiredAccessToken}`)
-				.expect(401)
-				.expect("Content-Type", /json/);
-			assert.strictEqual(response.body.name, TOKEN_EXPIRED_ERROR);
-		});
-	});
-
-	describe("/user", () => {
-		test("POST 201", async () => {
-			const email = createId() + "@example.com";
-			const response = await env.request
-				.post("/user")
-				.send({
-					email: email,
-					password: "12345678",
-					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(201)
-				.expect("Content-Type", /json/);
-			assert.deepStrictEqual(Object.keys(response.body), [
-				"id",
-				"domain",
-				"email",
-				"createdAt",
-				"isEmailVerified",
-				"newEmailRequest",
-			]);
-		});
-
-		for (const testCase of [
-			{
-				test: "Invalid email",
-				email: "is_not_an_email",
-				password: "12345678",
-				captchaCode: 400,
-			},
-			{ test: "Password too short", email: "john@example.com", password: "123" },
-			{ test: "Missing password", email: "john@example.com" },
-			{ test: "Missing email", password: "12345678", captchaCode: 400 },
-		]) {
-			test(`POST ${testCase.test} 400`, async () => {
-				await env.request
-					.post("/user")
-					.send({
-						registrationPassword: env.registrationPassword,
-						...testCase,
-						captcha: await solveCaptcha(
-							env,
-							"sendEmail",
-							testCase.email,
-							testCase.captchaCode,
-						),
-					})
-					.expect(400)
-					.expect("Content-Type", /json/);
-			});
-		}
-
-		test("POST existing email address 409", async () => {
-			const email = createId() + "@example.com";
-			await env.request
-				.post("/user")
-				.send({
-					email: email,
-					password: "12345678",
-					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(201);
-			await env.request
-				.post("/user")
-				.send({
-					email: email,
-					password: "87654321",
-					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(409)
-				.expect("Content-Type", /json/);
-		});
-
-		test("POST authenticated 401", async () => {
-			const email = "john@example.com";
-			await env.request
-				.post("/user")
-				.set("Cookie", env.users.cookies)
-				.send({
-					email: email,
-					password: "12345678",
-					registrationPassword: env.registrationPassword,
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("POST without general registration password 401", async () => {
-			const email = "john@example.com";
-			await env.request
-				.post("/user")
-				.send({
-					email: email,
-					password: "12345678",
-					captcha: await solveCaptcha(env, "sendEmail", email),
-				})
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		testCaptcha(
-			() => env,
-			201,
-			(name, callback) => {
-				test(name, callback);
-			},
-			async (captcha, actionValue) => {
-				return env.request.post("/user").send({
-					email: actionValue,
-					password: "12345678",
-					registrationPassword: env.registrationPassword,
-					captcha,
-				});
-			},
-			"sendEmail",
-			() => createId() + "@example.com",
-			createId(),
-		);
-
-		test("GET 200", async () => {
-			const response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200)
-				.expect("Content-Type", /json/);
-			const expectedDomain = env.configService
-				.getOrThrow("PUBLIC_URL", { infer: true })
-				.split("//", 2)[1];
-			assert.deepStrictEqual(response.body, {
-				id: env.users.user.id,
-				domain: expectedDomain,
-				email: env.users.user.email,
-				createdAt: env.users.user.createdAt,
-				isEmailVerified: false,
-				newEmailRequest: "",
-			});
-		});
-
-		test("GET unauthenticated 401", async () => {
-			await env.request
-				.get("/user/" + env.users.user.id)
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("GET other user 401", async () => {
-			await env.request
-				.get("/user/" + env.users.user2.id)
-				.set("Cookie", env.users.cookies)
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("PUT 404", async () => {
-			const newEmail = "new.jane@example.org";
-			await env.request
-				.put("/user/" + env.users.user.id)
-				.send({ email: newEmail })
-				.expect(404);
-			const response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			assert.strictEqual(response.body.email, env.users.user.email);
-			assert.notStrictEqual(response.body.email, newEmail);
-		});
-
-		test("PATCH email 200", async () => {
-			let dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
+			const { response } = await testUserIsAuthenticated(
+				{
+					cookies: `accessToken=${expiredAccessToken}`,
+					keys: env.users.user1.keys,
 				},
-			});
-			assert(dbUser);
-
-			const emailVerificationToken = dbUser.emailVerificationToken;
-			const newEmail = createId() + "@example.org";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(200);
-
-			dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			// Changing email should never change isEmailVerified in DB
-			assert.strictEqual(dbUser.isEmailVerified, false);
-			assert.notEqual(dbUser.emailVerificationToken, emailVerificationToken);
-			assert.strictEqual(dbUser.emailVerificationToken.length, 64);
-
-			let response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			const parsedBody = parseApiResult(GetUser, response.body);
-			assert.strictEqual(parsedBody.email, env.users.user.email);
-			// This should *not* correspond to isEmailVerified in DB, but instead should reflect the
-			//  presence of a to-be-verified new email address field
-			assert.strictEqual(parsedBody.isEmailVerified, false);
-
-			await env.request
-				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
-				)
-				.expect(200);
-
-			response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			assert.strictEqual(response.body.email, newEmail);
-			assert.notStrictEqual(response.body.email, env.users.user.email);
-		});
-
-		test("PATCH email doesn't set isEmailVerified back to false in DB 200", async () => {
-			let dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			await env.request
-				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
-				)
-				.expect(200);
-
-			dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			assert.strictEqual(dbUser.isEmailVerified, true);
-
-			const email = createId() + "@example.org";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", email), email: email })
-				.expect(200);
-
-			dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			// Changing email should never set isEmailVerified back to false in DB
-			assert.strictEqual(dbUser.isEmailVerified, true);
-		});
-
-		test("PATCH email sets newEmailRequest in GET /user/:id 200", async () => {
-			const dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			await env.request
-				.post(
-					"/user/" + env.users.user.id + "/verify-email/" + dbUser.emailVerificationToken,
-				)
-				.expect(200);
-
-			let apiGetUser = parseApiResult(
-				GetUser,
-				(
-					await env.request
-						.get("/user/" + env.users.user.id)
-						.set("Cookie", env.users.cookies)
-						.expect(200)
-				).body,
+				401,
 			);
-			assert.strictEqual(apiGetUser.newEmailRequest, "");
-
-			const newEmail = createId() + "@example.org";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(200);
-
-			apiGetUser = parseApiResult(
-				GetUser,
-				(
-					await env.request
-						.get("/user/" + env.users.user.id)
-						.set("Cookie", env.users.cookies)
-						.expect(200)
-				).body,
-			);
-			assert.strictEqual(apiGetUser.newEmailRequest, newEmail);
-		});
-
-		test("PATCH email twice without verifying 200", async () => {
-			for (let i = 0; i < 2; i++) {
-				const email = createId() + "@example.com";
-				await env.request
-					.patch("/user/" + env.users.user.id)
-					.set("Cookie", env.users.cookies)
-					.send({ captcha: await solveCaptcha(env, "sendEmail", email), email: email })
-					.expect(200);
-			}
-		});
-
-		test("PATCH email to existing email 409", async () => {
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({
-					captcha: await solveCaptcha(env, "sendEmail", env.users.user2.email),
-					email: env.users.user2.email,
-				})
-				.expect(409);
-		});
-
-		test("PATCH email same email for 2 users 409", async () => {
-			const newEmail = createId() + "@example.org";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(200);
-			await env.request
-				.patch("/user/" + env.users.user2.id)
-				.set("Cookie", env.users.cookies2)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(200);
-
-			// Verify user 1 succeeds
-			let dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user.id,
-				},
-			});
-			assert(dbUser);
-			await env.request
-				.post("/user/" + dbUser.id + "/verify-email/" + dbUser.emailVerificationToken)
-				.expect(200);
-
-			// Verify user 2 fails
-			dbUser = await env.db.query.users.findFirst({
-				where: {
-					id: env.users.user2.id,
-				},
-			});
-			assert(dbUser);
-			await env.request
-				.post("/user/" + dbUser.id + "/verify-email/" + dbUser.emailVerificationToken)
-				.expect(409);
-		});
-
-		testCaptcha(
-			() => env,
-			200,
-			(testName, testCallback) => {
-				test(testName, testCallback);
-			},
-			(captcha, actionValue) => {
-				return env.request
-					.patch("/user/" + env.users.user.id)
-					.set("Cookie", env.users.cookies)
-					.send({ captcha, email: actionValue });
-			},
-			"sendEmail",
-			() => createId() + "@example.org",
-			createId(),
-		);
-
-		test("PATCH unauthenticated 401", async () => {
-			const newEmail = "new.jane@example.org";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("PATCH other user 401", async () => {
-			const newEmail = "new.jane@example.org";
-			await env.request
-				.patch("/user/" + env.users.user2.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env, "sendEmail", newEmail), email: newEmail })
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("PATCH bad email 400", async () => {
-			const newEmail = "not an email address";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({
-					captcha: await solveCaptcha(env, "sendEmail", newEmail, 400),
-					email: newEmail,
-				})
-				.expect(400);
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({
-					captcha: await solveCaptcha(env),
-					email: newEmail,
-				})
-				.expect(400);
-			const response = await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			assert.strictEqual(response.body.email, env.users.user.email);
-			assert.notStrictEqual(response.body.email, newEmail);
-		});
-
-		test("PATCH password 200", async () => {
-			const oldPassword = env.users.userPassword;
-			const newPassword = "87654321";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
-				.expect(200);
-		});
-
-		test("PATCH missing oldPassword 400", async () => {
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), newPassword: "87654321" })
-				.expect(400);
-		});
-
-		test("PATCH missing newPassword 400", async () => {
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), oldPassword: env.users.userPassword })
-				.expect(400);
-		});
-
-		test("PATCH wrong old password 401", async () => {
-			const oldPassword = "wrong old password";
-			const newPassword = "87654321";
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
-				.expect(401);
-		});
-
-		test("PATCH bad new password 400", async () => {
-			const oldPassword = env.users.userPassword;
-			const newPassword = "short"; // Less than 8 characters
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env), oldPassword, newPassword })
-				.expect(400);
-		});
-
-		test("PATCH empty 400", async () => {
-			await env.request
-				.patch("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.send({ captcha: await solveCaptcha(env) })
-				.expect(400);
-		});
-
-		test("DELETE 200", async () => {
-			await env.request
-				.delete("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(200);
-			await env.request
-				.get("/user/" + env.users.user.id)
-				.set("Cookie", env.users.cookies)
-				.expect(404);
-		});
-
-		test("DELETE unauthenticated fails", async () => {
-			await env.request
-				.delete("/user/" + env.users.user.id)
-				.expect(401)
-				.expect("Content-Type", /json/);
-		});
-
-		test("DELETE other user 401", async () => {
-			await env.request
-				.delete("/user/" + env.users.user2.id)
-				.set("Cookie", env.users.cookies)
-				.expect(401)
-				.expect("Content-Type", /json/);
+			assert(response.body);
+			assert.strictEqual(response.body["name"], TOKEN_EXPIRED_ERROR);
 		});
 	});
 });

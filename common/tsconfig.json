@@ -1,8 +1,8 @@
 {
 	"compilerOptions": {
-		"module": "NodeNext", // or Node18/NodeNext
-		"target": "ESNext",
-		"moduleResolution": "nodenext",
+		"lib": ["DOM", "ESNext"],
+		"module": "nodenext",
+		"target": "esnext",
 		"esModuleInterop": true,
 		"isolatedModules": true,
 		"resolvePackageJsonExports": true,

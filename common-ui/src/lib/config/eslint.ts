@@ -8,7 +8,11 @@ import { defineConfig } from "eslint/config";
 import globals from "globals";
 import ts from "typescript-eslint";
 
-export function makeEslintConfig(gitignorePath: string, svelteConfig: SvelteConfig): Config[] {
+export function makeEslintConfig(
+	gitignorePath: string,
+	svelteConfig: SvelteConfig,
+	tsconfigRootDir: string,
+): Config[] {
 	return defineConfig(
 		includeIgnoreFile(gitignorePath),
 		js.configs.recommended,
@@ -16,6 +20,13 @@ export function makeEslintConfig(gitignorePath: string, svelteConfig: SvelteConf
 		...svelte.configs.recommended,
 		prettier,
 		...svelte.configs.prettier,
+		{
+			languageOptions: {
+				parserOptions: {
+					tsconfigRootDir,
+				},
+			},
+		},
 		{
 			languageOptions: { globals: { ...globals.browser, ...globals.node } },
 			rules: {

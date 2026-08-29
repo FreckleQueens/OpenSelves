@@ -1,25 +1,33 @@
 import { createId } from "@paralleldrive/cuid2";
 
-import { EntryWrapper, MAX_UINT64 } from "../../willow/index.js";
-import { OPENSELVES_NAMESPACE_ID } from "../../willow/index.js";
-import { j2000Now } from "../../willow/time.js";
-import { deserializeValueFromPayload, serializeValueToPayload } from "./entry-payload.js";
-import { SchemaBuilder } from "./schema-builder.js";
+import { OPENSELVES_NAMESPACE_ID } from "../../index.js";
 import {
+	type AnyFieldTypesValue,
+	SchemaBuilder,
+	type SchemaStaticValue,
 	isValidSchemaFieldValue,
 	isValidSchemaKey,
 	isValidSchemaStatic,
 	validateSchemaStatic,
-} from "./schema-validator.js";
-import type {
-	KeyOfSchema,
-	SchemaCreate,
-	SchemaStatic,
-	SchemaType,
-	SchemaValueTypes,
-} from "./types.js";
+} from "../../schema/index.js";
+import type { KeyOfSchema, SchemaCreate, SchemaStatic, SchemaType } from "../../schema/types.js";
+import {
+	AuthorisedEntryWithPayload,
+	ByteString,
+	type CapabilitySignData,
+	Path,
+	PathComponent,
+	SubspaceId,
+	Timestamp,
+	UInt64,
+} from "../../willow/index.js";
+import {
+	deserializeValueFromPayload,
+	serializeValueToPayload,
+	serializeValueToPayloadUnsafe,
+} from "./entry-payload.js";
 
-export const BaseSchema = {
+export const BaseSchema = Object.freeze({
 	id: SchemaBuilder.string()
 		.required()
 		.default(() => createId())
@@ -28,10 +36,10 @@ export const BaseSchema = {
 		.required()
 		.default(() => new Date())
 		.readonly(),
-} satisfies SchemaType;
+}) satisfies SchemaType;
 
 export type EntryDataModelSchema = SchemaType & typeof BaseSchema;
-export type AnyEntryDataModel = EntryDataModel<EntryDataModelSchema>;
+export type AnyEntryDataModel = EntryDataModel<typeof BaseSchema>;
 
 export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	public static getModelKey(): string {
@@ -39,21 +47,22 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	}
 
 	public readonly class: typeof EntryDataModel;
-	private readonly _data: Record<string, SchemaValueTypes> = {};
-	private readonly entries: Record<string, EntryWrapper> = {};
-	private readonly pendingEntryMutations: [bigint, KeyOfSchema<Schema>, SchemaValueTypes][] = [];
+	private readonly _data: Record<string, AnyFieldTypesValue> = {};
+	private readonly entries: Record<string, AuthorisedEntryWithPayload> = {};
+	private readonly pendingEntryMutations: [Timestamp, KeyOfSchema<Schema>, AnyFieldTypesValue][] =
+		[];
 	private readonly isConstructed: boolean;
 
 	/**
 	 * @param schema
 	 * @param subspaceId
-	 * @param from `SchemaCreate<Schema>` means create a new DataModel. `EntryWrapper[]` means load
+	 * @param from `SchemaCreate<Schema>` means create a new DataModel. `AuthorisedEntryWithPayload[]` means load
 	 * from existing DataModel.
 	 */
 	protected constructor(
 		public readonly schema: Schema,
-		public readonly subspaceId: string,
-		from: SchemaCreate<Schema> | EntryWrapper[],
+		public readonly subspaceId: SubspaceId,
+		from: SchemaCreate<Schema> | AuthorisedEntryWithPayload[],
 	) {
 		this.class = this.constructor as typeof EntryDataModel;
 
@@ -64,30 +73,37 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 
 			const modelKey = this.class.getModelKey();
 			const firstEntryPath = from[0].path;
-			if (!firstEntryPath.startsWith(`/${modelKey}`)) {
+			if (!Path.extends(firstEntryPath, Path.fromStrings(modelKey))) {
 				throw new Error("Gave an entry of wrong data model", { cause: from[0] });
 			}
 
-			this._data["id"] = firstEntryPath.substring(`/${modelKey}/`.length).split("/", 2)[0];
+			this._data["id"] = PathComponent.toString(firstEntryPath[1]);
 
 			const pathRoot = this.getPathRoot();
 			for (const entry of from) {
-				if (!entry.path.startsWith(pathRoot)) {
+				if (!Path.extends(entry.path, pathRoot)) {
 					throw new Error("Gave an entry of wrong record", {
 						cause: {
 							pathRoot,
-							entry: entry.entryMaybeWithPayload,
+							entry: entry,
 						},
 					});
 				}
 
-				const key = entry.path.substring(pathRoot.length + 1);
+				const keyPathComponent = entry.path[pathRoot.length];
+				if (!keyPathComponent) {
+					throw new Error("Got entry with invalid path, not corresponding to any key", {
+						cause: Path.toString(entry.path),
+					});
+				}
+
+				const key = PathComponent.toString(keyPathComponent);
 				if (this.entries[key]) {
 					throw new Error("Got two entries with same key", {
 						cause: {
 							key,
-							entry1: this.entries[key].entry,
-							entry2: entry.entry,
+							entry1: this.entries[key],
+							entry2: entry,
 						},
 					});
 				}
@@ -100,21 +116,13 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 					});
 				}
 
-				if (entry.payload === "") {
-					throw new Error("Got entry with empty payload", {
-						cause: {
-							entry: entry.entryWithPayload,
-						},
-					});
-				}
-
 				if (isValidSchemaKey(this.schema, key)) {
 					this.entries[key] = entry;
 					this._data[key] = deserializeValueFromPayload(this.schema, key, entry.payload);
 				}
 			}
 		} else {
-			const now = j2000Now();
+			const now = Timestamp.now();
 			for (const key of Object.keys(this.schema)) {
 				if (key in from) {
 					this.set(key, from[key], now);
@@ -137,8 +145,8 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		this.isConstructed = true;
 	}
 
-	public getPathRoot(): string {
-		return `/${this.class.getModelKey()}/${this.get("id").toString()}`;
+	public getPathRoot(): Path {
+		return Path.fromStrings(this.class.getModelKey(), this.get("id") as "string");
 	}
 
 	public get data(): SchemaStatic<Schema> {
@@ -158,8 +166,8 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		return output;
 	}
 
-	public get<K extends KeyOfSchema<Schema>>(key: K): SchemaStatic<Schema>[K] {
-		let value: SchemaValueTypes;
+	public get<K extends KeyOfSchema<Schema>>(key: K): SchemaStaticValue<Schema, K> {
+		let value: AnyFieldTypesValue;
 
 		if (key in this._data) {
 			value = this._data[key];
@@ -185,14 +193,14 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 
 	public set<K extends KeyOfSchema<Schema>>(
 		key: K,
-		value: SchemaStatic<Schema>[K],
-		timestamp?: bigint,
+		value: SchemaStaticValue<Schema, K>,
+		Timestamp?: bigint,
 	): void;
-	public set<K extends KeyOfSchema<Schema>>(key: K, value: unknown, timestamp?: bigint): void;
+	public set<K extends KeyOfSchema<Schema>>(key: K, value: unknown, timestamp?: Timestamp): void;
 	public set<K extends KeyOfSchema<Schema>>(
 		key: K,
 		value: unknown,
-		timestamp: bigint = j2000Now(),
+		timestamp: Timestamp = Timestamp.now(),
 	) {
 		if (!isValidSchemaFieldValue(this.schema, key, value)) {
 			throw new Error("Invalid value for key " + key, {
@@ -213,11 +221,9 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 			this.pendingEntryMutations.splice(this.pendingEntryMutations.indexOf(mutation), 1);
 		}
 
-		if (
-			!this.entries[key] ||
-			typeof this.entries[key].payload !== "string" ||
-			value !== deserializeValueFromPayload(this.schema, key, this.entries[key].payload)
-		) {
+		const oldValue = this.entries[key]?.payload;
+		const newValue = serializeValueToPayload(this.schema, key, value);
+		if (!ByteString.equals(oldValue, newValue)) {
 			this.pendingEntryMutations.push([timestamp, key, value]);
 		}
 
@@ -225,7 +231,7 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	}
 
 	public assign(object: Partial<SchemaStatic<Schema>>) {
-		Object.entries(object).map(([key, value]: [string, SchemaStatic<Schema>[string]]) => {
+		Object.entries(object).map(([key, value]) => {
 			return this.set(key, value);
 		});
 	}
@@ -235,26 +241,35 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 	}
 
 	public async flushDirtyEntries(
-		callback?: (entries: EntryWrapper[]) => Promise<void>,
-	): Promise<EntryWrapper[]> {
+		signData: CapabilitySignData,
+		callback?: (entries: AuthorisedEntryWithPayload[]) => Promise<void>,
+	): Promise<AuthorisedEntryWithPayload[]> {
 		const mutations = [...this.pendingEntryMutations];
 		this.pendingEntryMutations.splice(0);
 
-		let dirtyEntries: Set<EntryWrapper>;
+		let dirtyEntries: Set<AuthorisedEntryWithPayload>;
 		try {
-			dirtyEntries = new Set<EntryWrapper>();
+			dirtyEntries = new Set<AuthorisedEntryWithPayload>();
 			for (const [timestamp, key, value] of mutations) {
 				const payload = serializeValueToPayload(this.schema, key, value);
 				let entry = this.entries[key];
 				if (entry) {
-					await entry.setPayload(payload, timestamp);
+					entry = this.entries[key] = await AuthorisedEntryWithPayload.setPayload(
+						entry,
+						payload,
+						{
+							signData,
+							timestamp,
+						},
+					);
 				} else {
-					entry = this.entries[key] = await EntryWrapper.create(
+					entry = this.entries[key] = await AuthorisedEntryWithPayload.create(
 						OPENSELVES_NAMESPACE_ID,
 						this.subspaceId,
-						this.getPathRoot() + "/" + key,
+						[...this.getPathRoot(), PathComponent.fromString(key)],
 						timestamp,
 						payload,
+						signData,
 					);
 				}
 				dirtyEntries.add(entry);
@@ -269,24 +284,30 @@ export abstract class EntryDataModel<Schema extends EntryDataModelSchema> {
 		return [...dirtyEntries];
 	}
 
-	public getEntries(): EntryWrapper[] {
+	public getEntries(): AuthorisedEntryWithPayload[] {
 		if (this.isDirty()) {
 			throw new Error("DataModel is dirty. Must call flushDirtyEntries() first.");
 		}
 		return Object.values(this.entries);
 	}
 
-	public async makeDeleteEntry(timestamp: bigint = j2000Now()): Promise<EntryWrapper> {
-		return await EntryWrapper.create(
+	public async makeDeleteEntry(
+		signData: CapabilitySignData,
+		timestamp: Timestamp = Timestamp.now(),
+	): Promise<AuthorisedEntryWithPayload> {
+		return await AuthorisedEntryWithPayload.create(
 			OPENSELVES_NAMESPACE_ID,
 			this.subspaceId,
 			this.getPathRoot(),
 			timestamp,
-			"",
+			serializeValueToPayloadUnsafe(""),
+			signData,
 		);
 	}
 
-	public async makePermanentDeleteEntry(): Promise<EntryWrapper> {
-		return this.makeDeleteEntry(MAX_UINT64);
+	public async makePermanentDeleteEntry(
+		signData: CapabilitySignData,
+	): Promise<AuthorisedEntryWithPayload> {
+		return this.makeDeleteEntry(signData, UInt64.MAX_VALUE);
 	}
 }

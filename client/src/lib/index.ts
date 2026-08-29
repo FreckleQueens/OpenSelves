@@ -1,11 +1,11 @@
-// place files you want to import through the `$lib` alias in this folder.
 export const USER_LANDED_STORAGE_KEY = "userLanded";
 export const WARN_FOR_REMAINING_LOCAL_DATA_STORAGE_KEY = "warnForRemainingLocalData";
+export const MAX_DATA_URL_LENGTH = 8192;
 
 export enum MenuItem {
 	DASHBOARD,
 	MEMBERS,
-	ACCOUNT,
+	PROFILE,
 	SETTINGS,
 }
 

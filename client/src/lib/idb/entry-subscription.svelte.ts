@@ -1,13 +1,10 @@
-import { PersistentStorage } from "$lib/PersistentStorage";
-import { appState } from "$lib/appState.svelte";
 import { IDBStore } from "$lib/idb/IDBStore";
-import {
-	EntryDataModel,
-	type EntryDataModelSchema,
-	type SchemaStatic,
-	isValidSchemaKey,
-} from "openselves-common/client";
-import { EntryWrapper, OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { Profile } from "$lib/idb/profiles";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
+import { EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
+import { type SchemaStatic, isValidSchemaKey } from "openselves-common/schema";
+import { AuthorisedEntryWithPayload, Path, SubspaceId } from "openselves-common/willow";
+import { PathComponent } from "openselves-common/willow";
 import { onDestroy } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -20,10 +17,17 @@ export type SubscriptionState<Schema extends EntryDataModelSchema> = {
 	staticData: SchemaStatic<Schema>[];
 };
 
-export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
-	new (subspaceId: string, from: SchemaStatic<Schema> | EntryWrapper[]): EntryDataModel<Schema>;
-	getModelKey(): string;
-}): () => SubscriptionState<Schema> {
+export function subscribeToModel<Schema extends EntryDataModelSchema>(
+	model: {
+		new (
+			subspaceId: SubspaceId,
+			from: SchemaStatic<Schema> | AuthorisedEntryWithPayload[],
+		): EntryDataModel<Schema>;
+		getModelKey(): string;
+	},
+	getSubspaceIds: (() => Promise<SubspaceId[]> | SubspaceId[]) | SubspaceId = () =>
+		Profile.getCurrentProfile().ownSubspaces.map((subspace) => subspace.subspaceId),
+): () => SubscriptionState<Schema> {
 	let loaded: boolean = $state(false);
 	let dataModels: EntryDataModel<Schema>[] = $state([]);
 	const staticData: SchemaStatic<Schema>[] = $derived(proxyEntryDataModels(dataModels));
@@ -36,89 +40,101 @@ export function subscribeToModel<Schema extends EntryDataModelSchema>(model: {
 
 	let unsubscribe: (() => void) | undefined;
 	onDestroy(async () => {
-		activeSubscriptions.delete(stateFn);
+		activeSubscriptions.delete(
+			stateFn as unknown as () => SubscriptionState<EntryDataModelSchema>,
+		);
 		if (unsubscribe) {
 			unsubscribe();
 		}
 	});
 
 	(async () => {
-		if (!appState.isAuthenticated) {
-			return;
-		}
-		activeSubscriptions.add(stateFn);
+		const subspaceIds = SubspaceId.is(getSubspaceIds)
+			? [getSubspaceIds]
+			: await getSubspaceIds();
 
-		const modelPathPrefix = `/${model.getModelKey()}`;
-		const storage = PersistentStorage.getInstance();
-		const userId = storage.getUserId();
+		activeSubscriptions.add(
+			stateFn as unknown as () => SubscriptionState<EntryDataModelSchema>,
+		);
+
+		const modelPathPrefix = Path.fromStrings(model.getModelKey());
 
 		const store = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID);
 
-		unsubscribe = IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
-			.userArea(userId, modelPathPrefix)
-			.subscribe(async (entry) => {
-				const modelId = entry.path.substring(1).split("/")[1];
-				const modelPath = `${modelPathPrefix}/${modelId}`;
-				const storeEntries = store.userArea(userId, modelPath).getEntries();
-				if (entry.path === modelPath && storeEntries.length === 0) {
+		const unsubscribes = subspaceIds.map((subspaceId) =>
+			IDBStore.getInstance(OPENSELVES_NAMESPACE_ID)
+				.area(subspaceId, modelPathPrefix)
+				.subscribe(async (newEntry) => {
+					const modelIdComponent = newEntry.path[1];
+					const modelId = PathComponent.toString(newEntry.path[1]);
+					const modelPath: Path = [...modelPathPrefix, modelIdComponent];
+					const existingEntries = store.area(subspaceId, modelPath).getEntries();
+
+					const isDeleteEntry = Path.equals(newEntry.path, modelPath);
+
+					if (isDeleteEntry && existingEntries.length === 0) {
+						// Model was deleted
+						dataModels = dataModels.filter((model) => model.get("id") !== modelId);
+						return;
+					}
+
+					// Remove previous model
 					dataModels = dataModels.filter((model) => model.get("id") !== modelId);
-				} else {
-					const newEntries: EntryWrapper[] = [];
-					if (entry.payloadLength > 0n) {
-						newEntries.push(await EntryWrapper.load(entry));
-					}
 
-					const loadedModel = dataModels.find((model) => model.get("id") === modelId);
-					if (loadedModel) {
-						dataModels = dataModels.filter((model) => model !== loadedModel);
-						const loadedEntries = loadedModel.getEntries();
-						for (const storeEntry of storeEntries) {
-							if (storeEntry.payloadLength === 0n || storeEntry.path === entry.path) {
-								continue;
-							}
-
-							const loadedEntry = loadedEntries.find(
-								(loadedEntry) =>
-									loadedEntry.path === storeEntry.path &&
-									loadedEntry.payloadDigest === storeEntry.payloadDigest,
-							);
-							newEntries.push(
-								loadedEntry ? loadedEntry : await EntryWrapper.load(storeEntry),
-							);
-						}
+					const newModelEntries: AuthorisedEntryWithPayload[] = existingEntries
+						// Skip delete entries
+						.filter((entry) => !Path.equals(entry.path, modelPath));
+					if (newModelEntries.length > 0) {
+						dataModels.push(new model(subspaceId, newModelEntries));
 					}
-					if (newEntries.length > 0) {
-						dataModels.push(new model(userId, newEntries));
-					}
-				}
-			});
+				}),
+		);
+		unsubscribe = () => unsubscribes.forEach((unsubscribe) => unsubscribe());
 
 		await store.init();
-		const initialEntries = store.userArea(userId, modelPathPrefix).getEntries();
+		const initialEntries = subspaceIds
+			.map((subspaceId) => store.area(subspaceId, modelPathPrefix).getEntries())
+			.flat();
 
-		const entries = await Promise.all(initialEntries.map((entry) => EntryWrapper.load(entry)));
 		dataModels = [
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
-			...new Set(
-				entries.map(
-					(entry) => entry.path.substring(modelPathPrefix.length + 1).split("/")[0],
-				),
-			),
+			...new Set(initialEntries.map((entry) => entry.subspaceId.toBase64())),
 		]
-			.map((id) =>
-				entries.filter((entry) => entry.path.startsWith(`/${model.getModelKey()}/${id}/`)),
-			)
-			.filter((entries) => entries.length > 0)
-			.map((entries) => new model(userId, entries));
+			.map((base64Subspace) => {
+				const subspaceId = SubspaceId.fromBase64(base64Subspace);
+				const subspaceEntries = initialEntries.filter((entry) =>
+					SubspaceId.equals(entry.subspaceId, subspaceId),
+				);
+				return [
+					// eslint-disable-next-line svelte/prefer-svelte-reactivity
+					...new Set(
+						subspaceEntries.map((entry) => PathComponent.toString(entry.path[1])),
+					),
+				]
+					.map((modelId) =>
+						subspaceEntries.filter(
+							(entry) =>
+								entry.path.length > 2 &&
+								Path.extends(entry.path, [
+									...modelPathPrefix,
+									PathComponent.fromString(modelId),
+								]),
+						),
+					)
+					.filter((modelEntries) => modelEntries.length > 0)
+					.map((modelEntries) => new model(subspaceId, modelEntries));
+			})
+			.flat();
 		loaded = true;
 	})();
 
 	return stateFn;
 }
 
-export function proxyEntryDataModel<Schema extends EntryDataModelSchema>(
-	model: EntryDataModel<Schema>,
-): SchemaStatic<Schema> {
+export function proxyEntryDataModel<
+	Model extends EntryDataModel<Schema>,
+	Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+>(model: Model): SchemaStatic<Schema> {
 	const data = $state(model.data);
 	return new Proxy<SchemaStatic<Schema>>(data, {
 		get(target: SchemaStatic<Schema>, p: string | symbol, receiver?: unknown) {
@@ -147,8 +163,9 @@ export function proxyEntryDataModel<Schema extends EntryDataModelSchema>(
 	});
 }
 
-export function proxyEntryDataModels<Schema extends EntryDataModelSchema>(
-	models: EntryDataModel<Schema>[],
-): SchemaStatic<Schema>[] {
+export function proxyEntryDataModels<
+	Model extends EntryDataModel<Schema>,
+	Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+>(models: Model[]): SchemaStatic<Schema>[] {
 	return models.map((model) => proxyEntryDataModel(model));
 }

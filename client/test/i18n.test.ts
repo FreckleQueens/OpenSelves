@@ -12,27 +12,27 @@ describe("i18n", () => {
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "fr");
 		await ctx.locator("#continue-button").click();
-		await ctx.waitForNavigation("/auth?landed=1");
+		await ctx.waitForNavigation("/profiles?landed=1");
 	});
 
 	test("change lang", async () => {
-		await ctx.goto("/auth");
+		await ctx.goto("/profiles");
 
 		await ctx.locator("#settings-link").click();
-		await ctx.waitForNavigation("/auth/settings");
+		await ctx.waitForNavigation("/profiles/settings");
 
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "fr");
-		await ctx.waitForNavigation("/auth/settings");
+		await ctx.waitForNavigation("/profiles/settings");
 		await ctx.expectNoAppError();
 
 		await ctx.locator("select[name=language]").wait();
 		await ctx.page.select("select[name=language]", "en");
-		await ctx.waitForNavigation("/auth/settings");
+		await ctx.waitForNavigation("/profiles/settings");
 		await ctx.expectNoAppError();
 
 		await ctx.locator("#back-link").click();
-		await ctx.waitForNavigation("/auth");
+		await ctx.waitForNavigation("/profiles");
 
 		await ctx.expectNoAppError();
 	});

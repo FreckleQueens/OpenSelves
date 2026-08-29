@@ -2,11 +2,13 @@
 	import FormFields from "$lib/components/forms/FormFields.svelte";
 	import SubmitButton from "$lib/components/forms/SubmitButton.svelte";
 	import { type OSFormData, type OSFormProps, submitOSForm } from "$lib/forms";
+	import { Profile } from "$lib/idb/profiles";
 	import { Block, List } from "konsta/svelte";
 	import type { Snippet } from "svelte";
 
 	let {
 		children,
+		profile,
 		formData = {},
 		endpoint,
 		method,
@@ -21,6 +23,7 @@
 		...rest
 	}: OSFormProps & {
 		children?: Snippet;
+		profile: Profile | undefined;
 		onSuccess: OSFormData["onSuccess"];
 		inline?: boolean;
 	} = $props();
@@ -50,7 +53,11 @@
 			throw new Error("undefined formState");
 		}
 
-		await submitOSForm(formState);
+		if (!profile) {
+			throw new Error("undefined profile");
+		}
+
+		await submitOSForm(formState, profile);
 	}
 </script>
 

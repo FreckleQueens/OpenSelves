@@ -1,9 +1,9 @@
 <script lang="ts">
 	import "altcha";
 
-	import { apiState } from "$lib/api.svelte";
 	import type { CaptchaAction, CaptchaController } from "$lib/components/captcha";
 	import { localeState } from "$lib/i18n/i18n";
+	import { Profile } from "$lib/idb/profiles";
 	import type { AltchaWidgetElement } from "altcha";
 	import { State } from "altcha/types";
 	import Argon2idWorker from "altcha/workers/argon2id?worker";
@@ -21,6 +21,8 @@
 		actionValue?: string;
 		captchaController?: CaptchaController | undefined;
 	} = $props();
+
+	let profile: Profile = Profile.getCurrentProfile();
 
 	let altchaWidget: AltchaWidgetElement | undefined = $state();
 	let onSolved: ((value: string | undefined) => void) | undefined = $state();
@@ -45,10 +47,14 @@
 	});
 
 	$effect(() => {
+		if (!profile.isSyncEnabled()) {
+			return;
+		}
+
 		const actionPathSuffix = action
 			? `/${action}` + (actionValue ? `/${actionValue}` : "")
 			: "";
-		const challengeUrl = `${apiState.url}/captcha/challenge` + actionPathSuffix;
+		const challengeUrl = `${profile.api.url}/captcha/challenge` + actionPathSuffix;
 		globalThis.$altcha.defaults.set({
 			challenge: challengeUrl,
 		});

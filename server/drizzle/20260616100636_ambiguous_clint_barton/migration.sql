@@ -1,1 +1,0 @@
-ALTER TABLE "sessions" ADD COLUMN "persist" boolean DEFAULT false NOT NULL;

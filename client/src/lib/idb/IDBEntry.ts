@@ -1,26 +1,62 @@
 import { PAYLOAD_STORE_NAME, type PayloadStore } from "$lib/idb/IDBPayload";
 import { IDB, IDBTransactionWrapper } from "$lib/idb/idb";
+import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte";
 import {
-	type Entry,
-	type EntryWithPayload,
-	fromJsonFriendly,
-	isEntryWithPayload,
-	isJsonFriendlyEntry,
-	j2000Now,
-	padUint64,
-	toJsonFriendly,
+	AuthorisedEntry,
+	AuthorisedEntryWithPayload,
+	Entry,
+	type NamespaceId,
+	Path,
+	type PayloadDigest,
+	SubspaceId,
+	Timestamp,
 } from "openselves-common/willow";
 
 export type EntryStore = "entries";
 export const ENTRY_STORE_NAME: EntryStore = "entries";
 
+type IDBFriendlyEntry = Omit<AuthorisedEntry, "timestamp" | "payloadLength"> & {
+	timestamp: string;
+	payloadLength: string;
+};
+
 export class IDBEntry {
+	public static toIDBFriendlyEntry(entry: AuthorisedEntry): IDBFriendlyEntry {
+		return {
+			...entry,
+			timestamp: Timestamp.padForLexicographicalOrder(entry.timestamp),
+			payloadLength: Timestamp.padForLexicographicalOrder(entry.payloadLength),
+		};
+	}
+
+	public static fromIDBFriendlyEntry(data: IDBFriendlyEntry): AuthorisedEntry {
+		return {
+			...data,
+			timestamp: BigInt(data.timestamp),
+			payloadLength: BigInt(data.payloadLength),
+		};
+	}
+
+	public static isIDBFriendlyEntry(data: unknown): data is IDBFriendlyEntry {
+		return !!(
+			data &&
+			typeof data === "object" &&
+			Entry.is({
+				...data,
+				timestamp: 0n,
+				payloadLength: 0n,
+			}) &&
+			typeof data["timestamp"] === "string" &&
+			typeof data["payloadLength"] === "string"
+		);
+	}
+
 	public constructor(protected readonly idb: IDB) {}
 
 	public async getByNamespaceId(
-		namespaceId: string,
+		namespaceId: NamespaceId,
 		tx?: IDBTransactionWrapper<EntryStore>,
-	): Promise<EntryWithPayload[]> {
+	): Promise<AuthorisedEntryWithPayload[]> {
 		return await this.idb.transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
@@ -31,24 +67,17 @@ export class IDBEntry {
 					undefined,
 					tx,
 				);
-				return (
-					await this.loadPayloads(
-						records
-							.filter((record) => isJsonFriendlyEntry(record))
-							.map((entry) => fromJsonFriendly(entry)),
-						tx,
-					)
-				).filter(isEntryWithPayload);
+				return this.onlyValidEntriesWithLoadedPayloads(records, tx);
 			},
 			tx,
 		);
 	}
 
 	public async getByNamespaceIdSubspaceId(
-		namespaceId: string,
-		subspaceId: string,
+		namespaceId: NamespaceId,
+		subspaceId: SubspaceId,
 		tx?: IDBTransactionWrapper<EntryStore>,
-	): Promise<EntryWithPayload[]> {
+	): Promise<AuthorisedEntryWithPayload[]> {
 		return await this.idb.transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
@@ -59,56 +88,47 @@ export class IDBEntry {
 					undefined,
 					tx,
 				);
-				return (
-					await this.loadPayloads(
-						records
-							.filter((record) => isJsonFriendlyEntry(record))
-							.map((entry) => fromJsonFriendly(entry)),
-						tx,
-					)
-				).filter(isEntryWithPayload);
+				return this.onlyValidEntriesWithLoadedPayloads(records, tx);
 			},
 			tx,
 		);
 	}
 
 	public async getByPathPrefix(
-		namespaceId: string,
-		subspaceId: string,
-		pathPrefix: string,
+		namespaceId: NamespaceId,
+		subspaceId: SubspaceId,
+		pathPrefix: Path,
 		tx?: IDBTransactionWrapper<EntryStore>,
-	): Promise<EntryWithPayload[]> {
-		if (pathPrefix.endsWith("/")) {
-			throw new Error("pathPrefix must not end with /");
+	): Promise<AuthorisedEntryWithPayload[]> {
+		if (pathPrefix.length === 0) {
+			throw new Error("Cannot get by empty path prefix");
 		}
 		return this.idb.transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
+				const nextPrefix = Path.getNextPrefix(pathPrefix);
 				const records = await this.idb.getByIndex(
 					ENTRY_STORE_NAME,
 					"primaryKey",
-					IDBKeyRange.bound(
-						[namespaceId, subspaceId, pathPrefix],
-						[namespaceId, subspaceId, pathPrefix + "_"],
-					),
+					nextPrefix
+						? IDBKeyRange.bound(
+								[namespaceId, subspaceId, pathPrefix],
+								[namespaceId, subspaceId, nextPrefix],
+								false,
+								true,
+							)
+						: IDBKeyRange.only([namespaceId, subspaceId, pathPrefix]),
 					undefined,
 					tx,
 				);
-				return (
-					await this.loadPayloads(
-						records
-							.filter((record) => isJsonFriendlyEntry(record))
-							.map((entry) => fromJsonFriendly(entry)),
-						tx,
-					)
-				).filter(isEntryWithPayload);
+				return this.onlyValidEntriesWithLoadedPayloads(records, tx);
 			},
 			tx,
 		);
 	}
 
 	public async getByPayloadDigest(
-		payloadDigest: string,
+		payloadDigest: PayloadDigest,
 		tx?: IDBTransactionWrapper<EntryStore>,
 	): Promise<Entry[]> {
 		const records = await this.idb.getByIndex(
@@ -118,42 +138,46 @@ export class IDBEntry {
 			undefined,
 			tx,
 		);
-		return records
-			.filter((record) => isJsonFriendlyEntry(record))
-			.map((entry) => fromJsonFriendly(entry));
+		return this.onlyValidRecords(records);
 	}
 
 	public async getAfterSavedAt(
-		namespaceId: string,
-		subspaceId: string,
+		namespaceId: NamespaceId,
+		subspaceId: SubspaceId,
 		savedAtTimestamp: bigint,
 		tx?: IDBTransactionWrapper<EntryStore>,
-	): Promise<EntryWithPayload[]> {
+	): Promise<AuthorisedEntryWithPayload[]> {
 		return this.idb.transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
 				const records = await this.idb.getByIndex(
 					ENTRY_STORE_NAME,
 					"namespaceIdSubspaceIdSavedAt",
-					IDBKeyRange.lowerBound([namespaceId, subspaceId, padUint64(savedAtTimestamp)]),
+					IDBKeyRange.bound(
+						[
+							namespaceId,
+							subspaceId,
+							Timestamp.padForLexicographicalOrder(savedAtTimestamp),
+						],
+						[
+							namespaceId,
+							subspaceId,
+							Timestamp.padForLexicographicalOrder(Timestamp.MAX_VALUE),
+						],
+						false,
+						false,
+					),
 					undefined,
 					tx,
 				);
-				return (
-					await this.loadPayloads(
-						records
-							.filter((record) => isJsonFriendlyEntry(record))
-							.map((entry) => fromJsonFriendly(entry)),
-						tx,
-					)
-				).filter(isEntryWithPayload);
+				return this.onlyValidEntriesWithLoadedPayloads(records, tx);
 			},
 			tx,
 		);
 	}
 
 	public async putAndDelete(
-		entryToPut: Entry | EntryWithPayload,
+		entryToPut: AuthorisedEntry | AuthorisedEntryWithPayload,
 		markForSync: boolean,
 		entriesToDelete: Entry[],
 		tx?: IDBTransactionWrapper<EntryStore | PayloadStore>,
@@ -161,8 +185,8 @@ export class IDBEntry {
 		await this.idb.transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
-				let entryToPutWithoutPayload = entryToPut;
-				if (isEntryWithPayload(entryToPutWithoutPayload)) {
+				let entryToPutWithoutPayload: AuthorisedEntry = entryToPut;
+				if (AuthorisedEntryWithPayload.is(entryToPutWithoutPayload)) {
 					const { payload, ...rest } = entryToPutWithoutPayload;
 					await this.idb.payloads.put(entryToPut.payloadDigest, payload, tx);
 					entryToPutWithoutPayload = rest;
@@ -175,10 +199,10 @@ export class IDBEntry {
 					]);
 				}
 				const dataToPut: Record<string, unknown> = {
-					...toJsonFriendly(entryToPutWithoutPayload),
+					...IDBEntry.toIDBFriendlyEntry(entryToPutWithoutPayload),
 				};
 				if (markForSync) {
-					dataToPut.savedAt = padUint64(j2000Now());
+					dataToPut.savedAt = Timestamp.padForLexicographicalOrder(Timestamp.now());
 				}
 				await tx.put(ENTRY_STORE_NAME, dataToPut);
 
@@ -192,14 +216,18 @@ export class IDBEntry {
 			},
 			tx,
 		);
+
+		if (markForSync) {
+			SyncWorker.setHasEntriesToPush();
+		}
 	}
 
 	private async loadPayload(
-		entry: Entry,
+		entry: AuthorisedEntry,
 		tx: IDBTransactionWrapper<EntryStore | PayloadStore>,
-	): Promise<Entry | EntryWithPayload> {
+	): Promise<AuthorisedEntry | AuthorisedEntryWithPayload> {
 		const payload = await this.idb.payloads.getByDigest(entry.payloadDigest, tx);
-		return typeof payload === "string"
+		return payload !== undefined
 			? {
 					...entry,
 					payload: payload,
@@ -208,9 +236,24 @@ export class IDBEntry {
 	}
 
 	private async loadPayloads(
-		entries: Entry[],
+		entries: AuthorisedEntry[],
 		tx: IDBTransactionWrapper<EntryStore | PayloadStore>,
-	): Promise<(Entry | EntryWithPayload)[]> {
+	): Promise<(AuthorisedEntry | AuthorisedEntryWithPayload)[]> {
 		return Promise.all(entries.map((entry) => this.loadPayload(entry, tx)));
+	}
+
+	private onlyValidRecords(records: object[]): AuthorisedEntry[] {
+		return records
+			.filter((record) => IDBEntry.isIDBFriendlyEntry(record))
+			.map((record) => IDBEntry.fromIDBFriendlyEntry(record));
+	}
+
+	private async onlyValidEntriesWithLoadedPayloads(
+		records: object[],
+		tx: IDBTransactionWrapper<EntryStore | PayloadStore>,
+	): Promise<AuthorisedEntryWithPayload[]> {
+		return (await this.loadPayloads(this.onlyValidRecords(records), tx)).filter((entry) =>
+			AuthorisedEntryWithPayload.is(entry),
+		);
 	}
 }

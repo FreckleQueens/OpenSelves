@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, type NestMiddleware } from "@nestjs/common";
-import type { Challenge, Solution } from "altcha-lib";
 import type { NextFunction } from "express";
 import type { Request, Response } from "express";
+import { isValidSchemaStatic } from "openselves-common/schema";
+
+import { captchaSchema } from "./captcha-type-helpers.js";
 
 @Injectable()
 export class ParseCaptchaMiddleware implements NestMiddleware {
@@ -11,47 +13,17 @@ export class ParseCaptchaMiddleware implements NestMiddleware {
 			return next();
 		}
 
-		if (!this.isValidPayload(payload)) {
+		if (!isValidSchemaStatic(captchaSchema, payload)) {
 			throw new BadRequestException("Invalid captcha payload");
 		}
 
 		request.captchaPayload = payload;
 
-		const email = payload.challenge.parameters.data?.["sendEmailActionEmail"];
+		const email: unknown = payload.challenge.parameters.data?.["sendEmailActionEmail"];
 		if (typeof email === "string") {
 			request.sendEmailActionEmail = email;
 		}
 
 		next();
-	}
-
-	private isValidPayload(
-		payload: unknown,
-	): payload is { challenge: Challenge; solution: Solution } {
-		if (!payload || typeof payload !== "object") {
-			return false;
-		}
-
-		if (
-			!("challenge" in payload) ||
-			!payload.challenge ||
-			typeof payload.challenge !== "object"
-		) {
-			return false;
-		}
-		const challenge = payload.challenge;
-		if (!("parameters" in challenge)) {
-			return false;
-		}
-
-		if (!("solution" in payload) || !payload.solution || typeof payload.solution !== "object") {
-			return false;
-		}
-		const solution = payload.solution;
-		if (["counter", "derivedKey"].find((prop) => !(prop in solution))) {
-			return false;
-		}
-
-		return true;
 	}
 }

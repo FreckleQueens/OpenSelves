@@ -6,6 +6,9 @@
 		"outDir": "./dist",
 		"tsBuildInfoFile": "./dist/.tsbuildinfo",
 		"types": ["node"],
+		"lib": ["ESNext"],
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true
 	},

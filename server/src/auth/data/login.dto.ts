@@ -1,11 +1,15 @@
-import { IsBoolean, IsEmail, IsOptional, MinLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
+import { Ed25519Signature } from "openselves-common/willow";
+
+import { IsByteString } from "../../sync/data/is-byte-string.decorator.js";
 
 export class LoginDto {
-	@IsEmail()
-	public readonly email!: string;
+	@IsString()
+	@MinLength(1)
+	public readonly challenge!: string;
 
-	@MinLength(8)
-	public readonly password!: string;
+	@IsByteString(Ed25519Signature.LENGTH)
+	public readonly signature!: Ed25519Signature;
 
 	@IsBoolean()
 	@IsOptional()

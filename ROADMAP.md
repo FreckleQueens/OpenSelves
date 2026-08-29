@@ -247,89 +247,68 @@ a short-lived one
 
 ## 🚧 0.7.0 - Willow data model, encryption and moving to a zero-trust model
 - [x] replace playwright with puppeteer
-- [ ] run client tests on firefox too
-- [ ] replace zod with joi
 - [ ] Willow data model
   As per https://willowprotocol.org/specs/data-model/index.html#data_model
   - [x] Make the server store members and fronts in a single table of entries - this also replaces the logs table. Each entry represents a single field (i.e. members.name would have a path akin to /members/[memberId]/name)
     - [x] migrate the database to the new format
-        ```ts
-        // MAX_UPLOAD_SIZE=5242880 (5MiB), the maximum individual payload_length at the controller level
-        // MAX_STORAGE_PER_USER=5368709120 (5GiB), the maximum sum of payload_length per user at the service level
-        // hash_payload is 
-        interface Entry {
-            // Not a db field
-            readonly namespace_id: "org.openselves";
-            // foreignKey users.id
-            readonly subspace_id: string;
-            readonly path: string;
-            // was logs.executedAt
-            timestamp: bigint;
-            // length of entries.payload in bytes
-            payload_length: bigint;
-            // The result of applying hash_payload to the Payload.
-            payload_digest: PayloadDigest;
-    
-            // a null value indicates either external storage or that it was not transmitted yet
-            payload: string | null;
-		
-            // Server-only field
-            // null, 0 to 8192 bytes, payload contains the raw value
-            // "s3", 8193 to Infinity bytes, means payload upload was complete and stored in object storage
-            payload_storage: null | "s3";
-    
-            // Server-only field
-            // was logs.pushedAt
-            // is set to now() when entry is created
-            // is updated to now() whenever any other non-readonly field changes
-            updated_at: number;
-        }
-        ```
     - [x] implement ingesting algorithm (Willow "Store")
     - [x] refuse entries with timestamps too far in the future, except empty payload plus timestamp equal to the maximum uint64
-  - [ ] Migrate the client to the new format
+  - [x] Migrate the client to the new format
     - [x] Migrate IndexedDB
     - [x] use `performance.timeOrigin + performance.now()` to get timestamp
-    - [ ] add `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers to increase timestamp precision
+  - [x] test willow lib with vectors from official repo
+- [x] Move common/db to server
 - [ ] encryption (client side)
-  - [ ] make sure the password is never sent to the server (srp? opaque?)
-  - [ ] use PBKDF2 to derive the KEK from the password, store it securely (idb?)
-  - [ ] generate a CEK, encrypt it with the KEK and store the result as an entry
-  - [ ] check the
-  - [ ] generate a CEK, encrypt it with the KEK and store as entry /encryption/CEK/recovery
-  - [ ] put the public key in a "/public.key"
-  - [ ] encrypt path components
-  - [ ] encrypt payloads
-- [ ] Move common/db to server
-- [ ] Have the client handle not uploading every entry all at once when it would make the json payload bigger than twice 
-the maximum allowed per-entry payload
-- [ ] obfuscate password recovery request response by always responding with success
-- [ ] client: add a loading screen on loading to wait for initial sync to ingest all entries
-- [ ] client: add staging mode to `/members` ?
+  - [ ] generate a CEK (random, crypto secure 256 bits), encrypt it with the subspace secret key, store the result as an unencrypted entry `/key_0`
+  - [ ] encrypt path components following https://willowprotocol.org/specs/e2e/index.html#e2e_paths
+  - [ ] encrypt payloads with the previous step's key
+- [ ] client: allow setting up sync on another device with a qr code
 - [ ] client: fix toolbar glitching outside of viewport on pull refresh
+- [ ] add `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers to increase timestamp precision
+        -> investigate whether this is possible while retaining the ability to fetch the api on a different domain than the client
+- [ ] server: test uploading a large payload over the individual entry limit, connection must be terminated before the entry is fully parsed (both with a valid and an invalid entry)
+- [ ] server: test uploading a very large amount of valid data, connection must be terminated once the amount of data reaches a configurable limit defaulting to 3 times the individual entry limit
+- [ ] server: add and test per-subspace storage limit (default to 1GiB?)
+- [ ] client: handle not uploading every entry all at once when it would make the total payload bigger than the server's advertised limit
+- [ ] client: model edit page: combine back and discard button 
 
 ## 0.8.0 - Simply Plural import
-- [ ] drop logs, members and fronts tables
+- [ ] run client tests on firefox too
+- [ ] replace zod with joi
 - [ ] simply plural data importer (save all simply plural ids!)
-- [ ] simply plural data vault
+- [ ] simply plural data vault (keep simply plural backup as is to automatically re-import when more features are added)
+- [ ] client: add staging mode to `/members`?
 
-## 0.9.0 - Exclusive-offline mode
-- [ ] add data export to zip file (json files + image files)
-- [ ] add data import from zip file
-- [ ] add data export to a consolidated json
-- [ ] add an option to create a local profile without registering an account
-- [ ] add an option to switch to a local profile without authentication
-- [ ] warn the user that using the app in this mode has potential data loss risks and that they should backup their data regularly
+## 0.9.0 - Data export and privacy
+- [ ] client: save app settings and profile data in willow store?
+- [ ] export formats: export from a profile, import to a new profile or to an existing profile
+  - [ ] drop format (willow export) (compressed?)
+    - [ ] export
+    - [ ] import
+  - [ ] single json (full) (compressed?)
+    - [ ] export
+    - [ ] import
+  - [ ] zip file (one folder per model with a json file and image files)
+    - [ ] export
+    - [ ] import
+- [ ] allow editing profile without "logging out"
+- [ ] warn the user that using the app with sync off has potential data loss risks and that they should backup their data regularly
 - [ ] add data backup reminder
-- [ ] add a way to copy data to the active local profile from any other local profile
-- [ ] Android: store data in a more persistent place than IndexedDB? Auto-backup?
+- [ ] add a way to copy data from any user profile to the active user profile
+- [ ] Android/iOS: store data in a more persistent place than IndexedDB? Auto-backup?
+- [ ] allow users to rotate their root CEK
+- [ ] allow users to rotate their subspace keys (generate new keys, copy and sign all data, permanently delete old data, sync, forget old keys)
+- [ ] allow obscuring entry timestamps?
+- [ ] add padding to entry payloads?
 
 ## 0.10.0 - Optimizations and UI tweaks
+- [ ] all in-code TODOs
 - [ ] client
   - [ ] drop prior unsynced create and update operations when deleting a record
   - [ ] leverage @capacitor/background-runner
   - [ ] leverage Background Sync API when available
   - [ ] detect unused translations and fail build
+  - [ ] client: add a loading screen to wait for initial sync to ingest all entries on login
 - [ ] server
   - [ ] preload all records used by sub-functions of computeOperations (solveHistory, filterCascadeDeletedRecordsOperations...) in computeOperations
   - [ ] purge logs that don't have an effect anymore

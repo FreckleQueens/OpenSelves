@@ -1,7 +1,7 @@
-import { call, scheduleOnlineCheck } from "$lib/api.svelte";
-import { appState } from "$lib/appState.svelte";
+import { Api } from "$lib/api.svelte";
 import type { CaptchaAction } from "$lib/components/captcha";
 import type { OSIconProps } from "$lib/components/os-icon";
+import { Profile } from "$lib/idb/profiles";
 import { type Component, onMount } from "svelte";
 
 export type FormFieldsValidationState = {
@@ -65,7 +65,11 @@ export function bindNativeInputValidation(
 	});
 }
 
-export async function submitOSForm(form: OSFormData) {
+export async function submitOSForm(form: OSFormData, profile: Profile) {
+	if (!profile.isSyncEnabled()) {
+		throw new Error("Sync not enabled for this profile");
+	}
+
 	form.isWorking = true;
 	try {
 		if (form.beforeSubmit && (await form.beforeSubmit()) !== true) {
@@ -74,18 +78,16 @@ export async function submitOSForm(form: OSFormData) {
 
 		form.workingStatus = form.submitWorkingStatus;
 
-		let result: { response: Response; responseBody: Record<string, unknown> } | undefined;
+		let result: { response: Response; responseBody?: Record<string, unknown> } | undefined;
 		try {
-			result = await call(form.endpoint, {
+			result = await Api.call(form.endpoint, {
 				method: form.method || "POST",
 				data: form.data,
 				returnUnhandledResponses: true,
 				isUnauthenticated: form.isUnauthenticated,
 			});
 
-			if (!result) {
-				appState.isApiReachable = false;
-				scheduleOnlineCheck();
+			if (!result || !result.responseBody) {
 				return;
 			}
 		} catch (error) {

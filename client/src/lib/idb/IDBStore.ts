@@ -1,44 +1,54 @@
 import { IDB, IDBTransactionWrapper } from "$lib/idb";
+import { IDBArea } from "$lib/idb/IDBArea";
 import { ENTRY_STORE_NAME, type EntryStore } from "$lib/idb/IDBEntry";
 import { PAYLOAD_STORE_NAME, type PayloadStore } from "$lib/idb/IDBPayload";
-import { IDBUserArea } from "$lib/idb/IDBUserArea";
 import { type EntryDataModel, type EntryDataModelSchema } from "openselves-common/client";
-import { Area, type EntryWithPayload, EntryWrapper, MemoryStore } from "openselves-common/willow";
+import {
+	Area,
+	AuthorisedEntryWithPayload,
+	type BaseStoreContext,
+	MemoryStore,
+	NamespaceId,
+	Path,
+	type SubspaceId,
+	type Timestamp,
+} from "openselves-common/willow";
 
-export type IDBStoreContext = {
+export type IDBStoreContext = BaseStoreContext & {
 	tx?: IDBTransactionWrapper<EntryStore | PayloadStore>;
 	dontMarkSavedEntriesForSync?: boolean;
 };
 
 export type EntrySubscription = {
-	callback: (entry: EntryWithPayload) => Promise<void> | void;
-	area?: Area<EntryWithPayload, IDBStoreContext, IDBStore>;
+	callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void;
+	area?: Area;
 };
 
-export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
+export class IDBStore extends MemoryStore<AuthorisedEntryWithPayload, IDBStoreContext> {
 	private static readonly instances: Map<string, IDBStore> = new Map();
 
-	public static getInstance(namespaceId: string): IDBStore {
-		let store = this.instances.get(namespaceId);
+	public static getInstance(namespaceId: NamespaceId): IDBStore {
+		const namespaceIdKey = namespaceId.toHex();
+		let store = this.instances.get(namespaceIdKey);
 		if (!store) {
 			store = new IDBStore(namespaceId);
-			this.instances.set(namespaceId, store);
+			this.instances.set(namespaceIdKey, store);
 		}
 		return store;
 	}
 
-	public static free(namespaceId: string) {
-		this.instances.delete(namespaceId);
+	public static free(namespaceId: NamespaceId) {
+		this.instances.delete(namespaceId.toHex());
 	}
 
 	private readonly subscriptions = new Set<EntrySubscription>();
 	private readonly pendingSubscriptionUpdates: {
 		subscription: EntrySubscription;
-		entryToAdd: EntryWithPayload;
+		entryToAdd: AuthorisedEntryWithPayload;
 	}[] = [];
 	private isInitialized: boolean = false;
 
-	private constructor(namespaceId: string) {
+	private constructor(namespaceId: NamespaceId) {
 		super(namespaceId);
 	}
 
@@ -56,12 +66,24 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	public async ingest(
-		entries: EntryWithPayload[],
+		entries: AuthorisedEntryWithPayload[],
 		ctx: IDBStoreContext = {},
-	): Promise<EntryWithPayload[]> {
+	): Promise<AuthorisedEntryWithPayload[]> {
+		if (ctx.tx && !ctx.areEntriesAlreadyVerified) {
+			throw new Error(
+				"Entries must be verified beforehand when calling ingest inside a pre-existing transaction",
+			);
+		}
+
 		if (!this.isInitialized) {
 			await this.init(ctx);
 		}
+
+		if (!ctx.tx && !ctx.areEntriesAlreadyVerified) {
+			await this.verifyEntries(entries, ctx);
+			ctx.areEntriesAlreadyVerified = true;
+		}
+
 		const survivingEntries = await IDB.getInstance().transaction(
 			[ENTRY_STORE_NAME, PAYLOAD_STORE_NAME],
 			async (tx) => {
@@ -71,7 +93,7 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		);
 
 		let subscriptionUpdate:
-			| { subscription: EntrySubscription; entryToAdd: EntryWithPayload }
+			| { subscription: EntrySubscription; entryToAdd: AuthorisedEntryWithPayload }
 			| undefined;
 		do {
 			subscriptionUpdate = this.pendingSubscriptionUpdates.shift();
@@ -85,8 +107,8 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 	}
 
 	protected async addRemoveEntries(
-		entryToAdd: EntryWithPayload,
-		entriesToRemove: EntryWithPayload[],
+		entryToAdd: AuthorisedEntryWithPayload,
+		entriesToRemove: AuthorisedEntryWithPayload[],
 		ctx: IDBStoreContext = {},
 	): Promise<void> {
 		if (ctx.tx) {
@@ -101,7 +123,7 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		await super.addRemoveEntries(entryToAdd, entriesToRemove);
 
 		for (const subscription of this.subscriptions.values()) {
-			if (!subscription.area || subscription.area.includesEntry(entryToAdd)) {
+			if (!subscription.area || Area.includesEntry(subscription.area, entryToAdd)) {
 				this.pendingSubscriptionUpdates.push({
 					subscription,
 					entryToAdd,
@@ -110,9 +132,13 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		}
 	}
 
+	protected override async isEntryValid(entry: AuthorisedEntryWithPayload): Promise<boolean> {
+		return AuthorisedEntryWithPayload.isValid(entry);
+	}
+
 	public subscribe(
-		callback: (entry: EntryWithPayload) => Promise<void> | void,
-		area?: Area<EntryWithPayload, IDBStoreContext, IDBStore>,
+		callback: (entry: AuthorisedEntryWithPayload) => Promise<void> | void,
+		area?: Area,
 	) {
 		const subscription: EntrySubscription = {
 			callback,
@@ -124,27 +150,30 @@ export class IDBStore extends MemoryStore<EntryWithPayload, IDBStoreContext> {
 		};
 	}
 
-	public userArea(
-		userId: string,
-		path: string = "/",
-		timesStart: bigint = 0n,
-		timesEnd: bigint | "open" = "open",
-	): IDBUserArea {
-		return new IDBUserArea(this, userId, path, timesStart, timesEnd);
+	public area(
+		subspaceId: SubspaceId,
+		path: Path = Path.EMPTY,
+		timesStart: Timestamp = 0n,
+		timesEnd: Timestamp | undefined = undefined,
+	): IDBArea {
+		return new IDBArea(this, subspaceId, path, timesStart, timesEnd);
 	}
 
-	public loadDataModel<Schema extends EntryDataModelSchema>(
+	public loadDataModel<
+		Model extends EntryDataModel<Schema>,
+		Schema extends EntryDataModelSchema = Model extends EntryDataModel<infer T> ? T : never,
+	>(
 		model: {
-			new (subspaceId: string, from: EntryWrapper[]): EntryDataModel<Schema>;
+			new (subspaceId: SubspaceId, from: AuthorisedEntryWithPayload[]): Model;
 			getModelKey(): string;
 		},
-		userId: string,
+		subspaceId: SubspaceId,
 		modelId: string,
 		ctx: IDBStoreContext = {},
 	) {
-		return this.userArea(userId, `/${model.getModelKey()}/${modelId}`).loadDataModel(
-			model,
-			ctx,
-		);
+		return this.area(subspaceId, Path.fromStrings(model.getModelKey(), modelId)).loadDataModel<
+			Model,
+			Schema
+		>(model, ctx);
 	}
 }

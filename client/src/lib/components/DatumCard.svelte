@@ -44,7 +44,7 @@
 		{/if}
 
 		{#if actions}
-			<List nested>
+			<List nested class="m-4">
 				{@render actions()}
 			</List>
 		{/if}

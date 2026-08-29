@@ -1,11 +1,11 @@
 import "$lib/global-error-handling.svelte";
-import "$lib/appState.svelte.js";
 
 import { PUBLIC_TEST_ENVIRONMENT } from "$env/static/public";
-import { PersistentStorage } from "$lib/PersistentStorage";
+import { Settings } from "$lib/Settings";
 import { IDB } from "$lib/idb";
-import { SyncWorker } from "$lib/idb/SyncWorker.js";
-import { OPENSELVES_NAMESPACE_ID } from "openselves-common/willow";
+import { Profile } from "$lib/idb/profiles";
+import { SyncWorker } from "$lib/idb/sync/SyncWorker.svelte.js";
+import { OPENSELVES_NAMESPACE_ID } from "openselves-common";
 import { tick } from "svelte";
 
 export const prerender = true;
@@ -14,9 +14,10 @@ export const ssr = false;
 if (PUBLIC_TEST_ENVIRONMENT === "1") {
 	window.openselves = {
 		IDB,
-		PersistentStorage: PersistentStorage,
+		Settings,
 		SyncWorker,
 		tick,
 		OPENSELVES_NAMESPACE_ID,
+		Profile,
 	};
 }

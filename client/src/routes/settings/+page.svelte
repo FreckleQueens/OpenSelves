@@ -4,10 +4,10 @@
 	import AppPage from "$lib/components/AppPage.svelte";
 	import Contributors from "$lib/components/Contributors.svelte";
 	import LanguageSwitcher from "$lib/components/forms/LanguageSwitcher.svelte";
-	import { requireAuth } from "$lib/routing-utils";
+	import { requireCurrentProfile } from "$lib/routing-utils";
 	import { Block, BlockTitle } from "konsta/svelte";
 
-	requireAuth();
+	requireCurrentProfile();
 </script>
 
 <AppPage title="" activeMenuItem={MenuItem.SETTINGS}>

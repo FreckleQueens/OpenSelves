@@ -8,17 +8,21 @@ export const dbProvider = {
 	provide: DB,
 	inject: [ConfigService],
 	useFactory: (configService: ConfigService<ConfigData>) => {
-		const connectionString = configService.getOrThrow<string>(DbService.dbUrlConfigKey, {
+		const useTestDb = configService.getOrThrow("USE_TEST_DB", {
 			infer: true,
 		});
+		const connectionString = configService.getOrThrow<string>(
+			useTestDb ? "TEST_DB_URL" : "DATABASE_URL",
+			{
+				infer: true,
+			},
+		);
 		return getDrizzle(connectionString);
 	},
 };
 
 @Injectable()
 export class DbService implements OnApplicationShutdown {
-	public static dbUrlConfigKey: keyof ConfigData = "DATABASE_URL";
-
 	constructor(private readonly db: DB) {}
 
 	async onApplicationShutdown() {

@@ -5,13 +5,16 @@ export interface ConfigData {
 
 	PUBLIC_URL: string;
 	CLIENT_PUBLIC_URL: string;
+	LISTEN_HOST: string;
 	LISTEN_PORT: number;
 	DATABASE_URL: string;
 	TEST_DB_URL: string;
+	USE_TEST_DB: boolean;
 
 	ALLOWED_ORIGINS: string[];
 
 	JWT_SECRET: string;
+	AUTH_CHALLENGE_DURATION: string;
 	ACCESS_TOKEN_DURATION: number;
 	REFRESH_TOKEN_DURATION: number;
 	REFRESH_TOKEN_SHORT_DURATION: number;
@@ -27,6 +30,7 @@ export interface ConfigData {
 
 	MAX_UPLOAD_SIZE: number;
 	TMP_UPLOAD_DIR?: string;
+	MAX_IN_DB_PAYLOAD_LENGTH: number;
 	S3_REGION?: string;
 	S3_ENDPOINT?: string;
 	S3_BUCKET?: string;
@@ -34,6 +38,7 @@ export interface ConfigData {
 	S3_SECRET_KEY?: string;
 
 	INSECURE_EASY_CAPTCHA_FOR_TESTS: boolean;
+	INSECURE_VERBOSE_THROTTLER_ERROR_MESSAGE: boolean;
 
 	_APP_VERSION: string;
 }
@@ -65,11 +70,13 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 			scheme: ["http", "https"],
 		})
 		.required(),
+	LISTEN_HOST: Joi.string().hostname(),
 	LISTEN_PORT: Joi.number(),
 	DATABASE_URL: Joi.string().uri().required(),
 	TEST_DB_URL: Joi.string().uri().not(Joi.ref("DATABASE_URL")).messages({
 		"any.invalid": "TEST_DB_URL cannot be the same as DATABASE_URL",
 	}),
+	USE_TEST_DB: Joi.boolean().default(false),
 
 	ALLOWED_ORIGINS: extendedJoi
 		.strCommaList()
@@ -84,6 +91,7 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 		"any.invalid": "Please set JWT_SECRET environment variable to secure random string",
 		"any.required": "Please set JWT_SECRET environment variable to secure random string",
 	}),
+	AUTH_CHALLENGE_DURATION: Joi.number().positive().min(1).max(60).default(60),
 	ACCESS_TOKEN_DURATION: Joi.number()
 		.positive()
 		.less(Joi.ref("REFRESH_TOKEN_DURATION"))
@@ -123,12 +131,15 @@ export const validationSchema: ObjectSchema<ConfigData> = Joi.object({
 
 	MAX_UPLOAD_SIZE: Joi.number().min(0).default(0),
 	TMP_UPLOAD_DIR: Joi.string(),
+	MAX_IN_DB_PAYLOAD_LENGTH: Joi.number().min(0).default(8192),
 	S3_REGION: Joi.string(),
 	S3_ENDPOINT: Joi.string().uri(),
 	S3_BUCKET: Joi.string(),
 	S3_ACCESS_KEY: Joi.string(),
 	S3_SECRET_KEY: Joi.string(),
 
-	INSECURE_EASY_CAPTCHA_FOR_TESTS: Joi.boolean(),
+	INSECURE_EASY_CAPTCHA_FOR_TESTS: Joi.boolean().default(false),
+	INSECURE_VERBOSE_THROTTLER_ERROR_MESSAGE: Joi.boolean().default(false),
+
 	_APP_VERSION: Joi.forbidden(),
 });
